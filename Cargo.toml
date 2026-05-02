@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/api",
+  "crates/player",
+  "crates/tui",
+  "crates/data",
+  "crates/error",
+]
+
+[workspace.dependencies]
+
+tokio = { version = "1.35", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.13", features = ["json", "cookies"] }
+ratatui = "0.30"
+dirs = "6.0.0"
+thiserror = "2.0.18"
+sha1 = "0.11.0"
+
+player = { path = "crates/player" }
+tui = { path = "crates/tui" }
+api = { path = "crates/api" }
+data = { path = "crates/data" }
+error = { path = "crates/error" }

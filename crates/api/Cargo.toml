@@ -1,0 +1,12 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+reqwest = { workspace = true }
+
+data = { workspace = true }
+error = { workspace = true }
+sha1 = { workspace = true }
+serde_json = { workspace = true }
