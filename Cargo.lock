@@ -540,6 +540,7 @@ dependencies = [
 name = "error"
 version = "0.1.0"
 dependencies = [
+ "dirs",
  "reqwest",
  "serde_json",
  "thiserror 2.0.18",

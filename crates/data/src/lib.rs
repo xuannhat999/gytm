@@ -1,22 +1,40 @@
 use ::serde::Deserialize;
 use error::{Result, YError};
 use serde_json::Value;
-use std::fs;
+use std::{fs, io::Write, path::Path};
 
 #[derive(Debug, Deserialize)]
 pub struct AppConfig {
     pub cookie: String,
     pub user_agent: String,
 }
-
 impl AppConfig {
     pub fn load() -> Result<Self> {
-        let conf_file = dirs::config_dir()
+        let conf_dir = dirs::config_dir()
             .ok_or(YError::ConfigFileErr)?
-            .join("ytm/config.json");
+            .join("ytm");
+        let conf_file = conf_dir.join("config.json");
+
+        if !conf_file.exists() {
+            Self::create_config_file(&conf_dir, &conf_file)?;
+            return Err(YError::InvalidCookie);
+        }
+
         let content = fs::read_to_string(conf_file)?;
         let config: AppConfig = serde_json::from_str(&content)?;
         Ok(config)
+    }
+
+    pub fn create_config_file(dir: &Path, file: &Path) -> Result<()> {
+        fs::create_dir_all(dir)?;
+        let default_config = serde_json::json!({
+            "cookie": "PASTE_YOUR_COOKIE_HERE",
+            "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        });
+        let mut f = fs::File::create(file)?;
+        f.write_all(serde_json::to_string_pretty(&default_config)?.as_bytes())?;
+        
+        Ok(())
     }
 }
 #[derive(Debug)]

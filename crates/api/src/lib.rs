@@ -26,13 +26,13 @@ impl YClient {
         let response_text = http.get(YTM_DOMAIN).send().await?.text().await?;
 
         let sapisid = extract_between(&config.cookie, "SAPISID=", ";")
-            .ok_or_else(|| YError::AuthError("No SAPISID In Cookie".to_string()))?;
+            .ok_or_else(|| YError::InvalidCookie)?;
 
         let api_key = extract_between(&response_text, "INNERTUBE_API_KEY\":\"", "\"")
-            .ok_or_else(|| YError::AuthError("No InnerTube In API Key".to_string()))?;
+            .ok_or_else(|| YError::InvalidCookie)?;
 
         let client_version = extract_between(&response_text, "INNERTUBE_CLIENT_VERSION\":\"", "\"")
-            .ok_or_else(|| YError::AuthError("No Client Version".to_string()))?;
+            .ok_or_else(|| YError::InvalidCookie)?;
 
         Ok(Self {
             http,

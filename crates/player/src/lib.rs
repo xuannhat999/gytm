@@ -17,6 +17,7 @@ pub struct MusicPlayer {
 }
 
 impl MusicPlayer {
+    // PLAY 1 SONG FROM VIDEO_ID
     pub fn play_song(&mut self, video_id: &str) {
         self.kill_current_process();
         let child = Command::new("mpv")
@@ -34,11 +35,14 @@ impl MusicPlayer {
         }
     }
 
+    // KILL CURRENT MPV PROCESS
     pub fn kill_current_process(&mut self) {
         if let Some(mut child) = self.current_process.take() {
             let _ = child.kill();
         }
     }
+
+    // PLAY A PLALIST (ALBUBM/PLAYLIST)
     pub fn start_playlist(&mut self, songs: &[Song], start_index: usize) {
         self.kill_current_process();
         let mut command = Command::new("mpv");
@@ -59,10 +63,8 @@ impl MusicPlayer {
         self.state = PlayerState::Playing;
     }
 
-    // Gửi lệnh qua Socket thay vì kill process
+    // SEND COMMAND TO IPC
     fn send_ipc_command(&self, command: &str) {
-        // Sử dụng lệnh socat hoặc ghi trực tiếp vào UnixStream trong Rust
-        // Ví dụ nhanh bằng Command:
         let json_cmd = format!("{{ \"command\": [{}] }}\n", command);
         let _ = Command::new("sh")
             .arg("-c")
@@ -71,6 +73,8 @@ impl MusicPlayer {
             .stderr(Stdio::null())
             .spawn();
     }
+
+    // PLAY A SONG IN CURRENT ALBUM/PLAYLIST
     pub fn jump_to_index(&mut self, index: usize) {
         if self.state != PlayerState::Playing {
             self.state = PlayerState::Playing;
@@ -81,13 +85,18 @@ impl MusicPlayer {
         let cmd = format!("\"set_property\", \"playlist-pos\", {}", index);
         self.send_ipc_command(&cmd);
     }
+
+    // PLAY PREVIOUS SONG IN ALBUM/PLAYLIST
     pub fn next(&self) {
         self.send_ipc_command("\"playlist-next\"");
     }
 
+    // PLAY NEXT SONG IN ALBUM/PLAYLIST
     pub fn prev(&self) {
         self.send_ipc_command("\"playlist-prev\"");
     }
+
+    // RESUME PLAYING CURRENT SONG
     pub fn resume(&mut self) {
         if self.state == PlayerState::Paused {
             // Gửi lệnh ép thuộc tính pause về false
@@ -96,7 +105,7 @@ impl MusicPlayer {
         }
     }
 
-    // Hoặc sửa lại toggle_pause để cập nhật luôn state trong App
+    // PAUSE PLAYING SONG
     pub fn toggle_pause(&mut self) {
         match self.state {
             PlayerState::Playing => {

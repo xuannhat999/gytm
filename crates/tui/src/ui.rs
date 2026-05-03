@@ -8,11 +8,14 @@ use ratatui::{
 };
 
 pub fn render(app: &mut App, frame: &mut Frame) {
+    // OUTER BORDER
     let main_block = Block::default()
         .borders(Borders::all())
         .border_type(ratatui::widgets::BorderType::Rounded);
     let inner_area = main_block.inner(frame.area());
     frame.render_widget(main_block, frame.area());
+
+    // MAIN VERTICAL LAYOUT
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -21,6 +24,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             Constraint::Percentage(10),
         ])
         .split(inner_area);
+
+    // HORIZONTAL LAYOUT (ALBUMS | PLAYLISTS)
     let playlist_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
@@ -30,10 +35,16 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     render_songs(frame, app, main_layout[1]);
     render_player(frame, app, main_layout[2]);
 }
+
+// RENDER ALBUM & PLAYLISTS
 fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusArea) {
     let result = match area_type {
-        FocusArea::Albums => Some((&app.albums, &mut app.album_list_state, " Albums ")),
-        FocusArea::Playlists => Some((&app.playlists, &mut app.playlist_list_state, " Playlists ")),
+        FocusArea::Albums => Some((&app.albums, &mut app.album_list_state, "[1]-Albums")),
+        FocusArea::Playlists => Some((
+            &app.playlists,
+            &mut app.playlist_list_state,
+            "[2]-Playlists",
+        )),
         _ => None,
     };
     if let Some((data, state, title)) = result {
@@ -67,6 +78,8 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
         frame.render_stateful_widget(list_widget, area, state);
     }
 }
+
+// RENDER SONGS FROM ALBUM/PLAYLIST
 fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
     if app.songs.is_empty() {
         let empty_block = Block::default()
@@ -109,7 +122,7 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!(" Tracks ({}) ", app.songs.len()))
+                .title(format!("[3]-Tracks ({})", app.songs.len()))
                 .border_style(border_style),
         )
         .highlight_style(highlight_style)
@@ -117,6 +130,8 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
 
     frame.render_stateful_widget(list_widget, area, &mut app.songs_list_state);
 }
+
+// RENDER PLAYER
 fn render_player(frame: &mut Frame, app: &mut App, area: Rect) {
     // 1. Xác định nội dung hiển thị dựa trên current_song_idx
     let content = if let Some(idx) = app.player.current_song_idx {

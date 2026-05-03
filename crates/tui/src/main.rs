@@ -6,7 +6,7 @@ use crossterm::{
 };
 use data::AppConfig;
 use ratatui::{Terminal, backend::CrosstermBackend};
-use std::{io, sync::Arc, time::Duration};
+use std::{io, sync::Arc};
 mod app;
 mod handler;
 mod ui;
@@ -14,18 +14,29 @@ mod ui;
 use crate::app::App;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    enable_raw_mode()?; // Cho phép đọc phím ngay lập tức
+    let mut app = App::new();
+    let config = match AppConfig::load() {
+        Ok(c) => c,
+        Err(e) => {
+            println!("{}", e);
+            std::process::exit(1);
+        }
+    };
+    let client = match YClient::new(config).await {
+        Ok(c) => Arc::new(c),
+        Err(e) => {
+            println!("{}", e);
+            std::process::exit(1);
+        }
+    };
+    let raw_data = client.get_lib_data().await?;
+
+    enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?; // Mở màn hình ứng dụng riêng
+    execute!(stdout, EnterAlternateScreen)?;
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-
-    let mut app = App::new();
-    let config = AppConfig::load().unwrap();
-    let client = Arc::new(YClient::new(config).await?);
-    let raw_data = client.get_lib_data().await?;
-
     let (albums, playlists) = data::extract_albums(&raw_data);
     app.albums = albums;
     app.playlists = playlists;
@@ -34,10 +45,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     loop {
         terminal.draw(|f| ui::render(&mut app, f))?;
-        if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                handler::handle_key_events(key, &mut app, Arc::clone(&client)).await;
-            }
+        if let Event::Key(key) = event::read()? {
+            handler::handle_key_events(key, &mut app, Arc::clone(&client)).await;
         }
         if app.is_exit {
             app.player.kill_current_process();

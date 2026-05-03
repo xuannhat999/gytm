@@ -10,15 +10,18 @@ pub enum FocusArea {
 }
 pub struct App {
     pub player: MusicPlayer,
-    pub is_exit: bool,
+
     pub albums: Vec<PlayList>,
     pub playlists: Vec<PlayList>,
     pub songs: Vec<Song>,
     pub focus_area: FocusArea,
+
     pub album_list_state: ListState,
     pub playlist_list_state: ListState,
     pub songs_list_state: ListState,
+
     pub is_loading: bool,
+    pub is_exit: bool,
 }
 impl App {
     pub fn new() -> Self {
@@ -36,6 +39,7 @@ impl App {
         }
     }
 
+    // FOCUS NEXT AREA
     pub fn toggle_focus(&mut self) {
         self.focus_area = match self.focus_area {
             FocusArea::Albums => FocusArea::Playlists,
@@ -43,6 +47,8 @@ impl App {
             FocusArea::SongList => FocusArea::SongList,
         };
     }
+
+    // TOGGLE NEXT ITEM IN LISTSTATE
     pub fn next(&mut self) {
         // 1. Xác định ListState và độ dài của Vec tương ứng
         let (state, len) = match self.focus_area {
@@ -70,6 +76,7 @@ impl App {
         state.select(Some(i));
     }
 
+    // TOGGLE PREVIOUS ITEM IN LISTSTATE
     pub fn previous(&mut self) {
         let (state, len) = match self.focus_area {
             FocusArea::Albums => (&mut self.album_list_state, self.albums.len()),

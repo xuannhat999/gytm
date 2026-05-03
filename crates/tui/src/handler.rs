@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::app::{self, App, FocusArea};
+use crate::app::{App, FocusArea};
 use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
 use player::PlayerState;
