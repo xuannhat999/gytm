@@ -42,6 +42,9 @@ impl YClient {
             app_config: config,
         })
     }
+
+    // This function is adapted from: https://github.com/ccgauche/ytermusic.git
+    // Original source: https://github.com/ccgauche/ytermusic/blob/master/crates/ytpapi2/src/lib.rs
     fn compute_sapi_hash(&self) -> String {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -59,6 +62,8 @@ impl YClient {
         format!("{}_{}", timestamp, hex_hash)
     }
 
+    // This function is adapted from: https://github.com/ccgauche/ytermusic.git
+    // Original source: https://github.com/ccgauche/ytermusic/blob/master/crates/ytpapi2/src/lib.rs
     pub fn get_api_headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
@@ -76,7 +81,6 @@ impl YClient {
             YTM_DOMAIN, self.innertube_api_key
         );
 
-        // Body chuẩn của InnerTube API để lấy dữ liệu trang chủ
         let body = json!({
             "context": {
                 "client": {
@@ -94,7 +98,7 @@ impl YClient {
             .json(&body)
             .send()
             .await?
-            .json::<Value>() // Parse toàn bộ response thành Value để dễ truy vấn
+            .json::<Value>()
             .await?;
         Ok(response)
     }
