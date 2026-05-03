@@ -50,7 +50,6 @@ impl App {
 
     // TOGGLE NEXT ITEM IN LISTSTATE
     pub fn next(&mut self) {
-        // 1. Xác định ListState và độ dài của Vec tương ứng
         let (state, len) = match self.focus_area {
             FocusArea::Albums => (&mut self.album_list_state, self.albums.len()),
             FocusArea::Playlists => (&mut self.playlist_list_state, self.playlists.len()),
@@ -61,16 +60,15 @@ impl App {
             return;
         }
 
-        // 2. Tính toán index tiếp theo (có quay vòng về 0)
         let i = match state.selected() {
             Some(i) => {
                 if i >= len - 1 {
-                    0 // Quay lại đầu danh sách
+                    0
                 } else {
                     i + 1
                 }
             }
-            None => 0, // Nếu chưa chọn gì thì chọn cái đầu tiên
+            None => 0,
         };
 
         state.select(Some(i));

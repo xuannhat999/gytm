@@ -4,6 +4,7 @@ use ratatui::{
     self, Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
 };
 
@@ -56,11 +57,10 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
         let border_style = if is_focused {
             Style::default()
                 .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD) // Màu Cyan cho Catppuccin
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)
         };
-
         // 4. Khởi tạo Widget List
         let list_widget = List::new(items)
             .block(
@@ -71,7 +71,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
             )
             .highlight_style(
                 Style::default()
-                    .bg(Color::Rgb(69, 71, 90)) // Màu Surface1 của Catppuccin
+                    .bg(Color::Rgb(69, 71, 90))
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
             );
@@ -133,28 +133,43 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
 
 // RENDER PLAYER
 fn render_player(frame: &mut Frame, app: &mut App, area: Rect) {
-    // 1. Xác định nội dung hiển thị dựa trên current_song_idx
-    let content = if let Some(idx) = app.player.current_song_idx {
-        if let Some(song) = app.songs.get(idx) {
-            // Biểu tượng trạng thái
-            let status_icon = if app.player.state == PlayerState::Playing {
-                "▶"
-            } else {
-                "⏸"
-            };
-            format!(" {}  {} ", status_icon, song.title)
-        } else {
-            "   Unknown Track ".to_string()
-        }
+    let content = if app.is_loading {
+        "Fetching...".to_string()
     } else {
-        "   No song playing ".to_string()
+        if let Some(idx) = app.player.current_song_idx {
+            if let Some(song) = app.songs.get(idx) {
+                // Biểu tượng trạng thái
+                let status_icon = if app.player.state == PlayerState::Playing {
+                    "▶"
+                } else {
+                    "⏸"
+                };
+                format!(" {}  {} ", status_icon, song.title)
+            } else {
+                "  Unknown Track ".to_string()
+            }
+        } else {
+            "  No song playing ".to_string()
+        }
     };
-    // 3. Tạo Widget Paragraph
+
+    let key_map = Line::from(vec![
+        Span::from(" <q> Quit"),
+        Span::raw(" | "),
+        Span::from("<Enter> Play"),
+        Span::raw(" | "),
+        Span::from("<Space> Pause/Resume"),
+        Span::raw(" | "),
+        Span::from("<n> Next_song"),
+        Span::raw(" | "),
+        Span::from("<p> Prev_song "),
+    ]);
     let player_widget = Paragraph::new(content)
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .title(" Player ")
+                .title_bottom(key_map)
                 .title_alignment(Alignment::Center)
                 .border_type(ratatui::widgets::BorderType::Rounded)
                 .border_style(Style::default().fg(Color::White)),

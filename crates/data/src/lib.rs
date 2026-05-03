@@ -8,6 +8,7 @@ pub struct AppConfig {
     pub cookie: String,
     pub user_agent: String,
 }
+
 impl AppConfig {
     pub fn load() -> Result<Self> {
         let conf_dir = dirs::config_dir()
@@ -37,6 +38,7 @@ impl AppConfig {
         Ok(())
     }
 }
+
 #[derive(Debug)]
 pub struct PlayList {
     pub title: String,
@@ -71,6 +73,7 @@ pub fn extract_albums(data: &Value) -> (Vec<PlayList>, Vec<PlayList>) {
         }
     (albums, playlists)
 }
+
 #[derive(Debug)]
 pub struct Song {
     pub title: String,
@@ -78,6 +81,45 @@ pub struct Song {
     pub duration: String,
 }
 
+// EXTRACT SONGS FROM RESONSED DATA FOR PLAYLIST (JSON TYPE)
+pub fn extract_songs_from_playlist(data: &Value) -> Vec<Song> {
+    let mut songs = Vec::new();
+
+    // 1. Khác biệt ở Path: Playlist dùng musicPlaylistShelfRenderer
+    let path = "/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicPlaylistShelfRenderer/contents";
+    
+    let items = data.pointer(path).and_then(|v| v.as_array());
+
+    if let Some(track_list) = items {
+        for item in track_list {
+            if let Some(renderer) = item.get("musicResponsiveListItemRenderer") {
+                
+                // Tiêu đề: Giống album
+                let title = renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
+                    .and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
+
+                // 2. Khác biệt ở Video ID: 
+                // Playlist thường có videoId nằm trong playlistItemData hoặc navigationEndpoint của cột đầu tiên
+                let video_id = renderer.pointer("/playlistItemData/videoId")
+                    .or_else(|| renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId"))
+                    .and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+                // 3. Khác biệt ở Duration:
+                // Trong playlist, thời lượng thường nằm ở cột cuối cùng (thường là cột index 2 hoặc fixedColumns)
+                let duration = renderer.pointer("/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text")
+                    .or_else(|| renderer.pointer("/flexColumns/2/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text"))
+                    .and_then(|v| v.as_str()).unwrap_or("0:00").to_string();
+
+                if !video_id.is_empty() {
+                    songs.push(Song { title, video_id, duration });
+                }
+            }
+        }
+    }
+    songs
+}
+
+// EXTRACT SONGS FROM RESPONSED DATA FOR ALBUM  (JSON TYPE)
 pub fn extract_songs_from_album(data: &Value) -> Vec<Song> {
     let mut songs = Vec::new();
 

@@ -39,6 +39,7 @@ impl MusicPlayer {
     pub fn kill_current_process(&mut self) {
         if let Some(mut child) = self.current_process.take() {
             let _ = child.kill();
+            let _ = child.wait();
         }
     }
 
