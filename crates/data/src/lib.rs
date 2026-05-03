@@ -26,15 +26,15 @@ pub struct PlayList {
     pub browse_id: String,
     pub playlist_id: String,
 }
-pub fn extract_albums(data: &Value) -> Vec<PlayList> {
+pub fn extract_albums(data: &Value) -> (Vec<PlayList>, Vec<PlayList>) {
+    let mut albums: Vec<PlayList> = Vec::new();
     let mut playlists: Vec<PlayList> = Vec::new();
-    let allowed_types = ["MUSIC_PAGE_TYPE_ALBUM", "MUSIC_PAGE_TYPE_PLAYLIST"];
     if let Some(items)= data.pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/gridRenderer/items").and_then(|v| v.as_array()) {
             for item in items {
                 if let Some(rerender) = item.get("musicTwoRowItemRenderer") {
                     let page_type = rerender.pointer("/title/runs/0/navigationEndpoint/browseEndpoint/browseEndpointContextSupportedConfigs/browseEndpointContextMusicConfig/pageType");
-                    if let Some(page_type) = page_type.and_then(|p| p.as_str()) && allowed_types.contains(&page_type) {
-                        let playlist = PlayList {
+                    if let Some(page_type) = page_type.and_then(|p| p.as_str()) { 
+                        let album = PlayList {
                             title: rerender.pointer("/title/runs/0/text").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
                             artist: rerender.pointer("/subtitle/runs/2/text").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
                             browse_id: rerender.pointer("/navigationEndpoint/browseEndpoint/browseId").and_then(|v| v.as_str()).unwrap_or("").to_string(),
@@ -42,10 +42,50 @@ pub fn extract_albums(data: &Value) -> Vec<PlayList> {
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("").to_string(),
                         };
-                        playlists.push(playlist);
+                        match page_type {
+                            "MUSIC_PAGE_TYPE_ALBUM" => {albums.push(album);},
+                            "MUSIC_PAGE_TYPE_PLAYLIST" => {playlists.push(album);},
+                            _=>{}
+                        }
                     }
                 }
             }
         }
-    playlists
+    (albums, playlists)
+}
+#[derive(Debug)]
+pub struct Song {
+    pub title: String,
+    pub video_id: String,
+    pub duration: String,
+}
+
+pub fn extract_songs_from_album(data: &Value) -> Vec<Song> {
+    let mut songs = Vec::new();
+
+    let items = data.pointer("/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicShelfRenderer/contents")
+        .and_then(|v| v.as_array());
+
+    if let Some(track_list) = items {
+        for item in track_list {
+            if let Some(renderer) = item.get("musicResponsiveListItemRenderer") {
+                let song = Song {
+                    // Tiêu đề bài hát
+                    title: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
+                        .and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
+                    
+                    // Video ID để phát nhạc
+                    video_id: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId")
+                        .or_else(|| renderer.pointer("/playlistItemData/videoId"))
+                        .and_then(|v| v.as_str()).unwrap_or("").to_string(),
+
+                    // Thời lượng (ví dụ: 4:28)
+                    duration: renderer.pointer("/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text")
+                        .and_then(|v| v.as_str()).unwrap_or("0:00").to_string(),
+               };
+                songs.push(song);
+            }
+        }
+    }
+    songs
 }
