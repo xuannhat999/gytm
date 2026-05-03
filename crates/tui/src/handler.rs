@@ -4,25 +4,32 @@ use crate::app::{App, FocusArea};
 use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::Song;
-use player::PlayerState;
 use serde_json::Value;
 
 pub async fn handle_key_events(key_event: KeyEvent, app: &mut App, client: Arc<YClient>) {
     match key_event.code {
         KeyCode::Char('q') => app.is_exit = true, // Q => QUIT APP
         KeyCode::Tab => app.toggle_focus(),       // TAB => SWITCH FOCUS TO OTHER FOCUS AREA
-        KeyCode::Char('1') => app.focus_area = FocusArea::Albums, // 1 => FOCUS ALBUMS AREA
-        KeyCode::Char('2') => app.focus_area = FocusArea::Playlists, // 2 => FOCUS PLAyLISTS AREA
+        KeyCode::Char('1') => {
+            // 1 => FOCUS ALBUMS AREA
+            app.focus_area = FocusArea::Albums;
+            if app.album_list_state.selected().is_none() {
+                app.album_list_state.select(Some(0));
+            }
+        }
+        KeyCode::Char('2') => {
+            // 2 => FOCUS PLAYLISTS AREA
+            app.focus_area = FocusArea::Playlists;
+            if app.playlist_list_state.selected().is_none() {
+                app.playlist_list_state.select(Some(0));
+            }
+        } // 2 => FOCUS PLAYLISTS AREA
         KeyCode::Char('3') => app.focus_area = FocusArea::SongList, // 3 => FOCUS SONG LIST AREA
 
         KeyCode::Char(' ') => {
             // SPACE => PAUSE/ RESUME CURRENT SONG
-            if !app.player.current_process.is_none() && !app.player.current_song_idx.is_none() {
-                if app.player.state == PlayerState::Playing {
-                    app.player.toggle_pause();
-                } else {
-                    app.player.resume();
-                }
+            if !app.player.current_process.is_none() {
+                app.player.toggle_pause();
             }
         }
         KeyCode::Char('n') => match app.player.current_song_idx {
@@ -51,7 +58,7 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App, client: Arc<Y
                 let target_info = match app.focus_area {
                     FocusArea::Albums => {
                         app.is_loading = true;
-                        app.songs_list_state.select(None);
+                        app.playlist_list_state.select(None);
                         app.album_list_state.selected().map(|i| {
                             (
                                 app.albums[i].browse_id.clone(),

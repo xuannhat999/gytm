@@ -43,8 +43,8 @@ impl App {
     pub fn toggle_focus(&mut self) {
         self.focus_area = match self.focus_area {
             FocusArea::Albums => FocusArea::Playlists,
-            FocusArea::Playlists => FocusArea::Albums,
-            FocusArea::SongList => FocusArea::SongList,
+            FocusArea::Playlists => FocusArea::SongList,
+            FocusArea::SongList => FocusArea::Albums,
         };
     }
 

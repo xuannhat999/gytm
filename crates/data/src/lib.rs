@@ -13,7 +13,7 @@ impl AppConfig {
     pub fn load() -> Result<Self> {
         let conf_dir = dirs::config_dir()
             .ok_or(YError::ConfigFileErr)?
-            .join("ytm");
+            .join("gytm");
         let conf_file = conf_dir.join("config.json");
 
         if !conf_file.exists() {

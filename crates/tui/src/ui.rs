@@ -101,7 +101,7 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
         .map(|song| ListItem::new(format!("{} ", song.title)))
         .collect();
 
-    let is_focused = app.focus_area == FocusArea::SongList;
+    let is_focused = FocusArea::SongList == app.focus_area;
 
     let border_style = if is_focused {
         Style::default()
