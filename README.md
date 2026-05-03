@@ -39,9 +39,7 @@ Fill your cookie in the config file
 - Go to tab Network
 - Choose filter `Fetch/XHR` under Filter bar
 - Refresh page (F5)
-- Look for `browse...`
-- Choose it, choose Header tab
-- Roll down to Request Headers section, there will bee a Cookie field, copy it
+- Find `browse...` and copy your Cookie at Request Headers in Headers tab
 - Open the configuration file and paste to the `cookie` field  
 *File path (Linux):*
 ```
