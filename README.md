@@ -1,4 +1,9 @@
 # ytm: TUI based Youtube Music player
+# Demo 
+<img width="1920" height="1080" alt="2026-05-03-191945_hyprshot" src="https://github.com/user-attachments/assets/11c058db-83f5-40ca-95ea-cb2ac19d1f0d" />
+<br><br>
+<img width="1920" height="1080" alt="2026-05-03-192008_hyprshot" src="https://github.com/user-attachments/assets/cb056fea-c925-4a18-9c0e-eb5f6a8a622c" />
+
 #  Packages required
 - **yt-dlp**: For fetching stream URLs.
 - **mpv**   : The core media engine.
