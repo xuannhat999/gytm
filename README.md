@@ -1,4 +1,4 @@
-# ytm: TUI based Youtube Music player
+# gytm: TUI based Youtube Music player
 Stream Youtube Music from your terminal !
 # Demo 
 <img width="1920" height="1080" alt="2026-05-03-191945_hyprshot" src="https://github.com/user-attachments/assets/11c058db-83f5-40ca-95ea-cb2ac19d1f0d" />
@@ -19,16 +19,16 @@ Stream Youtube Music from your terminal !
 # Installation
 1. Clone this repository:
 ```
-git clone git@github.com:xuannhat999/ytm.git
+git clone git@github.com:xuannhat999/gytm.git
 ```
 2. Install the binary
 ```
-cd  ytm
+cd  gytm
 cargo install --path ./tui
 ```
-3. Launch `ytm` once to generate the default configuration.
+3. Launch `gytm` once to generate the default configuration.
 ```
-ytm
+gytm
 ```
 The app will exit automatically after creating the config file.
 
@@ -48,7 +48,7 @@ Fill your cookie in the config file
 # Usage
 - After fill in config file, launch `ytm` and enjoy music
 ```
-ytm
+gytm
 ```
 ## 🛠 Troubleshooting
 ### Expired Cookies
