@@ -1,8 +1,13 @@
 # ytm: TUI based Youtube Music player
+Stream Youtube Music from your terminal !
 # Demo 
 <img width="1920" height="1080" alt="2026-05-03-191945_hyprshot" src="https://github.com/user-attachments/assets/11c058db-83f5-40ca-95ea-cb2ac19d1f0d" />
 <br><br>
 <img width="1920" height="1080" alt="2026-05-03-192008_hyprshot" src="https://github.com/user-attachments/assets/cb056fea-c925-4a18-9c0e-eb5f6a8a622c" />
+
+# Features
+- Stream songs on Youtube Music as saved album/playlist
+- Personalized Content: Seamlessly fetch your private playlists/album using local cookie authentication.
 
 #  Packages required
 - **yt-dlp**: For fetching stream URLs.
