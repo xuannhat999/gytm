@@ -1,0 +1,11 @@
+[package]
+name = "testing"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+api = { workspace = true }
+data = { workspace = true }
+player = { workspace = true }
+tokio = { workspace = true }
+tui = { workspace = true }

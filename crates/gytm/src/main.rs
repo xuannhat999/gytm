@@ -5,16 +5,14 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use data::AppConfig;
+use player::{MpvEvent, Player};
 use ratatui::{Terminal, backend::CrosstermBackend};
-use std::{io, sync::Arc};
-mod app;
-mod handler;
-mod ui;
+use std::{io, sync::Arc, thread, time::Duration};
 
-use crate::app::App;
+use tui::{app::App, handler, ui};
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut app = App::new();
     let config = match AppConfig::load() {
         Ok(c) => c,
         Err(e) => {
@@ -29,7 +27,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
+
+    let mut app = App::default();
+    let mut player = Player::default();
     let raw_data = client.get_lib_data().await?;
+
+    let (tx, rx) = std::sync::mpsc::channel::<MpvEvent>();
+    player.start_mpv();
+    thread::sleep(Duration::from_millis(100));
+    player.listen_playlist_changes(tx);
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -37,19 +43,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-    let (albums, playlists) = data::extract_albums(&raw_data);
+    let (albums, playlists) = data::extract_lists(&raw_data);
     app.albums = albums;
     app.playlists = playlists;
     if !app.albums.is_empty() {
         app.album_list_state.select(Some(0));
     }
     loop {
-        terminal.draw(|f| ui::render(&mut app, f))?;
-        if let Event::Key(key) = event::read()? {
-            handler::handle_key_events(key, &mut app, Arc::clone(&client)).await;
+        while let Ok(event) = rx.try_recv() {
+            handler::handle_mpv_event(&mut app, &mut player, event);
+        }
+        terminal.draw(|f| ui::render(&mut app, f, &player))?;
+        if event::poll(Duration::from_millis(10))? {
+            if let Event::Key(key) = event::read()? {
+                handler::handle_key_events(key, &mut app, Arc::clone(&client), &mut player).await;
+            }
         }
         if app.is_exit {
-            app.player.kill_current_process();
+            player.kill_current_process();
             break;
         }
     }

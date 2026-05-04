@@ -1,5 +1,5 @@
 use crate::app::{App, FocusArea};
-use player::PlayerState;
+use player::{Player, PlayerState};
 use ratatui::{
     self, Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph},
 };
 
-pub fn render(app: &mut App, frame: &mut Frame) {
+pub fn render(app: &mut App, frame: &mut Frame, player: &Player) {
     // OUTER BORDER
     let main_block = Block::default()
         .borders(Borders::all())
@@ -34,7 +34,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     render_list(frame, app, playlist_layout[0], FocusArea::Albums);
     render_list(frame, app, playlist_layout[1], FocusArea::Playlists);
     render_songs(frame, app, main_layout[1]);
-    render_player(frame, app, main_layout[2]);
+    render_player(frame, app, main_layout[2], player);
 }
 
 // RENDER ALBUM & PLAYLISTS
@@ -132,14 +132,13 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 
 // RENDER PLAYER
-fn render_player(frame: &mut Frame, app: &mut App, area: Rect) {
+fn render_player(frame: &mut Frame, app: &mut App, area: Rect, player: &Player) {
     let content = if app.is_loading {
         "Fetching...".to_string()
     } else {
-        if let Some(idx) = app.player.current_song_idx {
+        if let Some(idx) = app.song_idx {
             if let Some(song) = app.songs.get(idx) {
-                // Biểu tượng trạng thái
-                let status_icon = if app.player.state == PlayerState::Playing {
+                let status_icon = if player.state == PlayerState::Playing {
                     "▶ Playing: "
                 } else {
                     "⏸ Paused: "

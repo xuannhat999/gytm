@@ -46,7 +46,7 @@ pub struct PlayList {
     pub browse_id: String,
     pub playlist_id: String,
 }
-pub fn extract_albums(data: &Value) -> (Vec<PlayList>, Vec<PlayList>) {
+pub fn extract_lists(data: &Value) -> (Vec<PlayList>, Vec<PlayList>) {
     let mut albums: Vec<PlayList> = Vec::new();
     let mut playlists: Vec<PlayList> = Vec::new();
     if let Some(items)= data.pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/gridRenderer/items").and_then(|v| v.as_array()) {
