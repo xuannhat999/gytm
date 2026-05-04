@@ -140,9 +140,9 @@ fn render_player(frame: &mut Frame, app: &mut App, area: Rect) {
             if let Some(song) = app.songs.get(idx) {
                 // Biểu tượng trạng thái
                 let status_icon = if app.player.state == PlayerState::Playing {
-                    "▶"
+                    "▶ Playing: "
                 } else {
-                    "⏸"
+                    "⏸ Paused: "
                 };
                 format!(" {}  {} ", status_icon, song.title)
             } else {

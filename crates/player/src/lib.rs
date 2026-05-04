@@ -51,6 +51,8 @@ impl MusicPlayer {
             .arg("--no-video")
             .arg("--cache=yes")
             .arg("--input-ipc-server=/tmp/mpv-socket")
+            // .arg("--msg-level=all=info,ytdl=debug")
+            // .arg("--log-file=mpv_debug.log")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .arg(format!("--playlist-start={}", start_index));
@@ -121,4 +123,3 @@ impl MusicPlayer {
         }
     }
 }
-
