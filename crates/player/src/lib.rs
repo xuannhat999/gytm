@@ -119,10 +119,9 @@ impl Player {
                         {
                             if let Some(data) = msg.data {
                                 if let Some(items) = data.as_array() {
-                                    if let Some(current_item) = items.iter().find(|i| {
-                                        i["current"].as_bool() == Some(true)
-                                            && i["playing"].as_bool() == Some(true)
-                                    }) {
+                                    if let Some(current_item) =
+                                        items.iter().find(|i| i["playing"].as_bool() == Some(true))
+                                    {
                                         if let Some(url) = current_item["filename"].as_str() {
                                             let video_id = extract_id(url);
                                             let _ = tx.send(MpvEvent::StartPlaying(video_id));
@@ -178,8 +177,16 @@ impl Player {
                 let cmd_rest = serde_json::json!({
                     "command": ["loadfile", url, "append-play"]
                 });
-                thread::sleep(Duration::from_millis(20));
+                thread::sleep(Duration::from_millis(30));
                 let _ = writeln!(stream, "{}", cmd_rest);
+            }
+            thread::sleep(Duration::from_millis(30));
+            if self.play_mode == PlayMode::ShuffleMode {
+                let _ = writeln!(
+                    stream,
+                    "{}",
+                    serde_json::json!({"command": ["playlist-shuffle"]})
+                );
             }
         }
     }

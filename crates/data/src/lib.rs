@@ -78,7 +78,6 @@ pub fn extract_lists(data: &Value) -> (Vec<PlayList>, Vec<PlayList>) {
 pub struct Song {
     pub title: String,
     pub video_id: String,
-    pub duration: String,
 }
 // EXTRACT SONGS FROM RESONSED DATA FOR PLAYLIST (JSON TYPE)
 pub fn extract_songs_from_playlist(data: &Value) -> Vec<Song> {
@@ -93,24 +92,14 @@ pub fn extract_songs_from_playlist(data: &Value) -> Vec<Song> {
         for item in track_list {
             if let Some(renderer) = item.get("musicResponsiveListItemRenderer") {
                 
-                // Tiêu đề: Giống album
                 let title = renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
                     .and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
 
-                // 2. Khác biệt ở Video ID: 
-                // Playlist thường có videoId nằm trong playlistItemData hoặc navigationEndpoint của cột đầu tiên
                 let video_id = renderer.pointer("/playlistItemData/videoId")
                     .or_else(|| renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId"))
                     .and_then(|v| v.as_str()).unwrap_or("").to_string();
-
-                // 3. Khác biệt ở Duration:
-                // Trong playlist, thời lượng thường nằm ở cột cuối cùng (thường là cột index 2 hoặc fixedColumns)
-                let duration = renderer.pointer("/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text")
-                    .or_else(|| renderer.pointer("/flexColumns/2/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text"))
-                    .and_then(|v| v.as_str()).unwrap_or("0:00").to_string();
-
                 if !video_id.is_empty() {
-                    songs.push(Song { title, video_id, duration });
+                    songs.push(Song { title, video_id });
                 }
             }
         }
@@ -129,18 +118,12 @@ pub fn extract_songs_from_album(data: &Value) -> Vec<Song> {
         for item in track_list {
             if let Some(renderer) = item.get("musicResponsiveListItemRenderer") {
                 let song = Song {
-                    // Tiêu đề bài hát
                     title: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
                         .and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
                     
-                    // Video ID để phát nhạc
                     video_id: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId")
                         .or_else(|| renderer.pointer("/playlistItemData/videoId"))
                         .and_then(|v| v.as_str()).unwrap_or("").to_string(),
-
-                    // Thời lượng (ví dụ: 4:28)
-                    duration: renderer.pointer("/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text")
-                        .and_then(|v| v.as_str()).unwrap_or("0:00").to_string(),
                };
                 songs.push(song);
             }

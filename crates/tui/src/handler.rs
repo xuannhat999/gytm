@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::app::{App, FocusArea};
 use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
-use data::Song;
+use data::{PlayList, Song};
 use player::{MpvEvent, Player, PlayerState};
 use serde_json::Value;
 
@@ -64,6 +64,8 @@ pub async fn handle_key_events(
             Some(idx) => {
                 if idx < app.songs.len() - 1 {
                     player.next();
+                } else {
+                    player.play_at_index(0);
                 }
             }
             None => todo!(),
@@ -73,6 +75,8 @@ pub async fn handle_key_events(
             Some(idx) => {
                 if idx > 0 {
                     player.prev();
+                } else {
+                    player.play_at_index(app.songs.len() - 1);
                 }
             }
             None => todo!(),
