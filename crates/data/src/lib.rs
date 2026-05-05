@@ -74,13 +74,12 @@ pub fn extract_lists(data: &Value) -> (Vec<PlayList>, Vec<PlayList>) {
     (albums, playlists)
 }
 
-#[derive(Debug)]
+#[derive(Default,Debug)]
 pub struct Song {
     pub title: String,
     pub video_id: String,
     pub duration: String,
 }
-
 // EXTRACT SONGS FROM RESONSED DATA FOR PLAYLIST (JSON TYPE)
 pub fn extract_songs_from_playlist(data: &Value) -> Vec<Song> {
     let mut songs = Vec::new();

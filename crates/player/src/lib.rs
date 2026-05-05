@@ -1,3 +1,4 @@
+use data::Song;
 use serde::Deserialize;
 use serde_json::Value;
 use std::{
@@ -5,6 +6,7 @@ use std::{
     os::unix::net::UnixStream,
     process::{Command, Stdio},
     thread,
+    time::Duration,
 };
 
 pub enum MpvEvent {
@@ -61,30 +63,6 @@ impl Player {
             let _ = child.wait();
         }
     }
-
-    // SEND COMMAND TO IPC
-    fn send_ipc_command(&self, command: &str) {
-        let json_cmd = format!("{{ \"command\": [{}] }}\n", command);
-        let _ = Command::new("sh")
-            .arg("-c")
-            .arg(format!(
-                "echo '{}' | socat - {}",
-                json_cmd, self.socket_path
-            ))
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn();
-    }
-
-    // PLAY A SONG IN CURRENT ALBUM/PLAYLIST
-    pub fn jump_to_index(&mut self, index: usize) {
-        if self.state != PlayerState::Playing {
-            self.state = PlayerState::Playing;
-        }
-        let cmd = format!("\"set_property\", \"playlist-pos\", {}", index);
-        self.send_ipc_command(&cmd);
-    }
-
     // PLAY PREVIOUS SONG IN ALBUM/PLAYLIST
     pub fn next(&self) {
         self.send_mpv_command(r#"{"command": ["playlist-next"]}"#);
@@ -131,11 +109,8 @@ impl Player {
         let socket_path = self.socket_path.clone();
         thread::spawn(move || {
             let mut stream = UnixStream::connect(&socket_path).unwrap();
-
-            // Chỉ cần quan sát playlist
             let observe_cmd = r#"{"command": ["observe_property", 1, "playlist"]}"#;
             let _ = writeln!(stream, "{}", observe_cmd);
-
             let reader = BufReader::new(stream);
             for line in reader.lines() {
                 if let Ok(line_str) = line {
@@ -143,19 +118,17 @@ impl Player {
                         if msg.event == "property-change" && msg.name.as_deref() == Some("playlist")
                         {
                             if let Some(data) = msg.data {
-                                // if let Ok(pretty) = serde_json::to_string_pretty(&data) {
-                                //     println!("{}", pretty);
-                                // }
                                 if let Some(items) = data.as_array() {
                                     if let Some(current_item) = items.iter().find(|i| {
                                         i["current"].as_bool() == Some(true)
                                             && i["playing"].as_bool() == Some(true)
                                     }) {
-                                        // println!("Send StartPlayingEvent");
                                         if let Some(url) = current_item["filename"].as_str() {
                                             let video_id = extract_id(url);
                                             let _ = tx.send(MpvEvent::StartPlaying(video_id));
                                         }
+                                    } else {
+                                        let _ = tx.send(MpvEvent::ListChange(data.clone()));
                                     }
                                 }
                             }
@@ -181,6 +154,46 @@ impl Player {
         } else {
             eprintln!("Can not connect to socket");
         }
+    }
+    pub fn toggle_playmode(&mut self) {
+        match self.play_mode {
+            PlayMode::DefaultMode => {
+                self.play_mode = PlayMode::ShuffleMode;
+                self.send_mpv_command(r#"{"command": ["playlist-shuffle"]}"#);
+            }
+            PlayMode::ShuffleMode => {
+                self.play_mode = PlayMode::DefaultMode;
+                self.send_mpv_command(r#"{"command": ["playlist-unshuffle"]}"#);
+            }
+        }
+    }
+
+    pub fn load_playlist(&self, songs: &[Song]) {
+        if songs.is_empty() {
+            return;
+        }
+        if let Ok(mut stream) = UnixStream::connect(&self.socket_path) {
+            for song in songs {
+                let url = format!("https://www.youtube.com/watch?v={}", song.video_id);
+                let cmd_rest = serde_json::json!({
+                    "command": ["loadfile", url, "append-play"]
+                });
+                thread::sleep(Duration::from_millis(20));
+                let _ = writeln!(stream, "{}", cmd_rest);
+            }
+        }
+    }
+
+    pub fn play_at_index(&self, index: usize) {
+        let command = format!(
+            r#"{{"command": ["set_property", "playlist-pos", {}]}}"#,
+            index
+        );
+        self.send_mpv_command(&command);
+    }
+
+    pub fn clear_playlist(&self) {
+        self.send_mpv_command(r#"{"command": ["playlist-clear"]}"#);
     }
 }
 fn extract_id(url: &str) -> String {

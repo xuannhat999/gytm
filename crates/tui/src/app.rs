@@ -1,5 +1,3 @@
-use std::default;
-
 use data::{PlayList, Song};
 use ratatui::widgets::ListState;
 
@@ -19,7 +17,6 @@ pub struct App {
     pub playlist_list_state: ListState,
     pub songs_list_state: ListState,
 
-    pub is_loading: bool,
     pub is_exit: bool,
 
     pub song_idx: Option<usize>,
@@ -34,7 +31,6 @@ impl Default for App {
             playlist_list_state: ListState::default(),
             songs_list_state: ListState::default(),
             focus_area: FocusArea::Albums,
-            is_loading: false,
             is_exit: false,
             song_idx: None,
         }
