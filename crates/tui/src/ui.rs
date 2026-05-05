@@ -100,7 +100,7 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
         .enumerate()
         .map(|(i, song)| {
             let is_playing = Some(i) == app.song_idx;
-            let content = format!("{} - {}", song.title, song.duration);
+            let content = song.title.to_string();
             if is_playing {
                 ListItem::new(content).style(Style::default().fg(Color::Yellow))
             } else {
