@@ -22,7 +22,7 @@ git clone git@github.com:xuannhat999/gytm.git
 2. Install the binary
 ```
 cd  gytm
-cargo install --path ./gytm
+cargo install --path crates/gytm
 ```
 3. Launch `gytm` once to generate the default configuration.
 ```
