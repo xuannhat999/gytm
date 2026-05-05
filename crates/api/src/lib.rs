@@ -102,6 +102,7 @@ impl YClient {
             .await?;
         Ok(response)
     }
+
     pub async fn get_playlist_songs(&self, id: &str) -> Result<Value> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",

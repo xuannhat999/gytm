@@ -46,7 +46,7 @@ pub struct PlayList {
     pub browse_id: String,
     pub playlist_id: String,
 }
-pub fn extract_albums(data: &Value) -> (Vec<PlayList>, Vec<PlayList>) {
+pub fn extract_lists(data: &Value) -> (Vec<PlayList>, Vec<PlayList>) {
     let mut albums: Vec<PlayList> = Vec::new();
     let mut playlists: Vec<PlayList> = Vec::new();
     if let Some(items)= data.pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/gridRenderer/items").and_then(|v| v.as_array()) {
@@ -74,13 +74,12 @@ pub fn extract_albums(data: &Value) -> (Vec<PlayList>, Vec<PlayList>) {
     (albums, playlists)
 }
 
-#[derive(Debug)]
+#[derive(Default,Debug)]
 pub struct Song {
     pub title: String,
     pub video_id: String,
     pub duration: String,
 }
-
 // EXTRACT SONGS FROM RESONSED DATA FOR PLAYLIST (JSON TYPE)
 pub fn extract_songs_from_playlist(data: &Value) -> Vec<Song> {
     let mut songs = Vec::new();

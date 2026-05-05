@@ -1,14 +1,14 @@
 use crate::app::{App, FocusArea};
-use player::PlayerState;
+use player::{PlayMode, Player, PlayerState};
 use ratatui::{
     self, Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
 };
 
-pub fn render(app: &mut App, frame: &mut Frame) {
+pub fn render(app: &mut App, frame: &mut Frame, player: &Player) {
     // OUTER BORDER
     let main_block = Block::default()
         .borders(Borders::all())
@@ -34,7 +34,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     render_list(frame, app, playlist_layout[0], FocusArea::Albums);
     render_list(frame, app, playlist_layout[1], FocusArea::Playlists);
     render_songs(frame, app, main_layout[1]);
-    render_player(frame, app, main_layout[2]);
+    render_player(frame, app, main_layout[2], player);
 }
 
 // RENDER ALBUM & PLAYLISTS
@@ -94,11 +94,19 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
         frame.render_widget(message, area);
         return;
     }
-
     let items: Vec<ListItem> = app
         .songs
         .iter()
-        .map(|song| ListItem::new(format!("{} ", song.title)))
+        .enumerate()
+        .map(|(i, song)| {
+            let is_playing = Some(i) == app.song_idx;
+            let content = format!("{} - {}", song.title, song.duration);
+            if is_playing {
+                ListItem::new(content).style(Style::default().fg(Color::Yellow))
+            } else {
+                ListItem::new(content)
+            }
+        })
         .collect();
 
     let is_focused = FocusArea::SongList == app.focus_area;
@@ -112,7 +120,7 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
     };
     let highlight_style = if is_focused {
         Style::default()
-            .bg(Color::Rgb(69, 71, 90)) // Màu sáng (Surface1)
+            .bg(Color::Rgb(69, 71, 90))
             .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD)
     } else {
@@ -131,26 +139,25 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
     frame.render_stateful_widget(list_widget, area, &mut app.songs_list_state);
 }
 
-// RENDER PLAYER
-fn render_player(frame: &mut Frame, app: &mut App, area: Rect) {
-    let content = if app.is_loading {
-        "Fetching...".to_string()
-    } else {
-        if let Some(idx) = app.player.current_song_idx {
-            if let Some(song) = app.songs.get(idx) {
-                // Biểu tượng trạng thái
-                let status_icon = if app.player.state == PlayerState::Playing {
-                    "▶ Playing: "
-                } else {
-                    "⏸ Paused: "
-                };
-                format!(" {}  {} ", status_icon, song.title)
+fn render_player(frame: &mut Frame, app: &mut App, area: Rect, player: &Player) {
+    let song_info = if let Some(idx) = app.song_idx {
+        if let Some(song) = app.songs.get(idx) {
+            let status_icon = if player.state == PlayerState::Playing {
+                "▶ Playing: "
             } else {
-                "  Unknown Track ".to_string()
-            }
+                "⏸ Paused: "
+            };
+            format!(" {}  {} ", status_icon, song.title)
         } else {
-            "  No song playing ".to_string()
+            "  Unknown Track ".to_string()
         }
+    } else {
+        "  No song playing ".to_string()
+    };
+
+    let mode_text = match player.play_mode {
+        PlayMode::DefaultMode => "Play mode:    Default",
+        PlayMode::ShuffleMode => "Play mode:    Shuffle",
     };
 
     let key_map = Line::from(vec![
@@ -158,22 +165,22 @@ fn render_player(frame: &mut Frame, app: &mut App, area: Rect) {
         Span::raw(" | "),
         Span::from("<Enter> Play"),
         Span::raw(" | "),
-        Span::from("<Space> Pause/Resume"),
+        Span::from("<Space> Pause"),
         Span::raw(" | "),
-        Span::from("<n> Next_song"),
+        Span::from("<m> Playmode"),
         Span::raw(" | "),
-        Span::from("<p> Prev_song "),
+        Span::from("<n/p> Next/Prev"),
     ]);
-    let player_widget = Paragraph::new(content)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" Player ")
-                .title_bottom(key_map)
-                .title_alignment(Alignment::Center)
-                .border_type(ratatui::widgets::BorderType::Rounded)
-                .border_style(Style::default().fg(Color::White)),
-        )
+
+    let main_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Player ")
+        .title_bottom(key_map)
+        .title_alignment(Alignment::Center)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::White));
+
+    let left_area = Paragraph::new(song_info)
         .style(
             Style::default()
                 .fg(Color::White)
@@ -181,6 +188,26 @@ fn render_player(frame: &mut Frame, app: &mut App, area: Rect) {
         )
         .alignment(Alignment::Left);
 
-    // 4. Render lên màn hình
-    frame.render_widget(player_widget, area);
+    // 7. Render Cột 2 (Play Mode)
+    let right_area = Paragraph::new(mode_text)
+        .style(
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )
+        .alignment(Alignment::Right);
+
+    frame.render_widget(main_block, area);
+
+    let inner_area = area.inner(ratatui::layout::Margin {
+        vertical: 1,
+        horizontal: 1,
+    });
+    let inner_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+        .split(inner_area);
+
+    frame.render_widget(left_area, inner_chunks[0]);
+    frame.render_widget(right_area, inner_chunks[1]);
 }

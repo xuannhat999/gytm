@@ -1,5 +1,4 @@
 use data::{PlayList, Song};
-use player::{self, MusicPlayer};
 use ratatui::widgets::ListState;
 
 #[derive(PartialEq)]
@@ -9,8 +8,6 @@ pub enum FocusArea {
     SongList,
 }
 pub struct App {
-    pub player: MusicPlayer,
-
     pub albums: Vec<PlayList>,
     pub playlists: Vec<PlayList>,
     pub songs: Vec<Song>,
@@ -20,14 +17,13 @@ pub struct App {
     pub playlist_list_state: ListState,
     pub songs_list_state: ListState,
 
-    pub is_loading: bool,
     pub is_exit: bool,
+
+    pub song_idx: Option<usize>,
 }
-impl App {
-    pub fn new() -> Self {
+impl Default for App {
+    fn default() -> Self {
         Self {
-            player: MusicPlayer::default(),
-            is_exit: false,
             albums: Vec::new(),
             playlists: Vec::new(),
             songs: Vec::new(),
@@ -35,10 +31,12 @@ impl App {
             playlist_list_state: ListState::default(),
             songs_list_state: ListState::default(),
             focus_area: FocusArea::Albums,
-            is_loading: false,
+            is_exit: false,
+            song_idx: None,
         }
     }
-
+}
+impl App {
     // FOCUS NEXT AREA
     pub fn toggle_focus(&mut self) {
         self.focus_area = match self.focus_area {
@@ -96,7 +94,12 @@ impl App {
             }
             None => 0,
         };
-
         state.select(Some(i));
+    }
+    pub fn get_idx_from_id(&self, video_id: String) -> usize {
+        self.songs
+            .iter()
+            .position(|song| song.video_id == video_id)
+            .unwrap_or(0)
     }
 }
