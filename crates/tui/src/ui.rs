@@ -245,7 +245,7 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, styl
         Span::styled("Pause/Resume", style.text_style),
         Span::styled(" | ", style.text_style),
         Span::styled("<m> ", style.key_style),
-        Span::styled("Pause/Resume", style.text_style),
+        Span::styled("PlayMode", style.text_style),
         Span::styled(" | ", style.text_style),
         Span::styled("<p/n> ", style.key_style),
         Span::styled("Prev/Next", style.text_style),
