@@ -1,9 +1,9 @@
 # gytm: TUI based Youtube Music player
 Stream Youtube Music from your terminal !
 # Demo 
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/27178df9-703b-40ed-be15-8beebfb41b49" />
-<br><br>
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/b341dbab-4a7e-49f2-8472-69b077194d07" />
 
+<br><br>
 # Features
 - Stream songs on Youtube Music as saved album/playlist
 - Personalized Content: Seamlessly fetch your private playlists/album using local cookie authentication.
