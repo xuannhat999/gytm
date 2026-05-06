@@ -19,7 +19,11 @@ pub struct App {
 
     pub is_exit: bool,
 
-    pub song_idx: Option<usize>,
+    pub playing_song: Option<Song>,
+    pub mpv_list: Vec<String>,
+
+    pub playing_playlist: Option<String>,
+    pub viewing_playlist: Option<String>,
 }
 impl Default for App {
     fn default() -> Self {
@@ -32,7 +36,10 @@ impl Default for App {
             songs_list_state: ListState::default(),
             focus_area: FocusArea::Albums,
             is_exit: false,
-            song_idx: None,
+            playing_song: None,
+            mpv_list: Vec::new(),
+            playing_playlist: None,
+            viewing_playlist: None,
         }
     }
 }
@@ -96,10 +103,12 @@ impl App {
         };
         state.select(Some(i));
     }
-    pub fn get_idx_from_id(&self, video_id: String) -> usize {
-        self.songs
-            .iter()
-            .position(|song| song.video_id == video_id)
-            .unwrap_or(0)
+    pub fn get_mpv_idx(&self, id: &String) -> Option<usize> {
+        for (pos, mpv_id) in self.mpv_list.iter().enumerate() {
+            if id == mpv_id {
+                return Some(pos);
+            }
+        }
+        None
     }
 }

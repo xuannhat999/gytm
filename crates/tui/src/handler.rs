@@ -3,22 +3,20 @@ use std::sync::Arc;
 use crate::app::{App, FocusArea};
 use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
-use data::{PlayList, Song};
-use player::{MpvEvent, Player, PlayerState};
+use data::Song;
+use player::{MpvEvent, PlayMode, Player, PlayerState, log_to_file};
 use serde_json::Value;
 
 pub fn handle_mpv_event(app: &mut App, player: &mut Player, event: MpvEvent) {
     match event {
-        MpvEvent::ListChange(data) => {
-            if let Some(items) = data.as_array() {
-                // if items.len() < 2 && !app.songs.is_empty() {
-                if items.len() < 2 {}
+        MpvEvent::ListChange(list) => {
+            app.mpv_list = list;
+            if !app.mpv_list.is_empty() {
+                player.state = PlayerState::Loading;
             }
         }
-        MpvEvent::StartPlaying(video_id) => {
-            // println!("Recieved StartPlaying Event: {}", video_id);
-            let idx = app.get_idx_from_id(video_id);
-            app.song_idx = Some(idx);
+        MpvEvent::StartPlaying(song) => {
+            app.playing_song = Some(song);
             player.state = PlayerState::Playing;
         }
         _ => {}
@@ -31,99 +29,103 @@ pub async fn handle_key_events(
     player: &mut Player,
 ) {
     match key_event.code {
-        KeyCode::Char('q') => app.is_exit = true, // Q => QUIT APP
-        KeyCode::Tab => app.toggle_focus(),       // TAB => SWITCH FOCUS TO OTHER FOCUS AREA
+        KeyCode::Char('q') => app.is_exit = true,
+        KeyCode::Tab => app.toggle_focus(),
         KeyCode::Char('1') => {
-            // 1 => FOCUS ALBUMS AREA
             app.focus_area = FocusArea::Albums;
-            if app.album_list_state.selected().is_none() {
-                app.album_list_state.select(Some(0));
-            }
+            app.album_list_state
+                .select(app.album_list_state.selected().or(Some(0)));
         }
         KeyCode::Char('2') => {
-            // 2 => FOCUS PLAYLISTS AREA
             app.focus_area = FocusArea::Playlists;
-            if app.playlist_list_state.selected().is_none() {
-                app.playlist_list_state.select(Some(0));
-            }
-        } // 2 => FOCUS PLAYLISTS AREA
-        KeyCode::Char('3') => app.focus_area = FocusArea::SongList, // 3 => FOCUS SONG LIST AREA
+            app.playlist_list_state
+                .select(app.playlist_list_state.selected().or(Some(0)));
+        }
+        KeyCode::Char('3') => app.focus_area = FocusArea::SongList,
         KeyCode::Char(' ') => {
-            // SPACE => TOGGLE PAUSE
-            if !app.song_idx.is_none() {
-                player.toggle_pause();
-            } else {
-                println!("No song idx");
+            if app.playing_song.is_some() {
+                player.toggle_pause().await;
             }
         }
         KeyCode::Char('m') => {
-            player.toggle_playmode();
+            player.toggle_playmode().await;
         }
-        KeyCode::Char('n') => match app.song_idx {
-            // N => PLAY NEXT SONG IN LIST
-            Some(idx) => {
-                if idx < app.songs.len() - 1 {
-                    player.next();
-                } else {
-                    player.play_at_index(0);
-                }
-            }
-            None => todo!(),
-        },
-        KeyCode::Char('p') => match app.song_idx {
-            // P => PLAY PREVIOUS SONG IN LIST
-            Some(idx) => {
-                if idx > 0 {
-                    player.prev();
-                } else {
-                    player.play_at_index(app.songs.len() - 1);
-                }
-            }
-            None => todo!(),
-        },
 
-        KeyCode::Enter => match app.focus_area {
-            // ENTER AT ALBUMS / PLAYLISTS FOCUS AREA
+        // --- NEXT / PREV ---
+        KeyCode::Char('n') => {
+            player.next().await;
+        }
+        KeyCode::Char('p') => {
+            player.prev().await;
+        }
+
+        // --- ENTER / L
+        KeyCode::Enter | KeyCode::Char('l') => match app.focus_area {
             FocusArea::Albums | FocusArea::Playlists => {
-                let target_info = match app.focus_area {
-                    FocusArea::Albums => {
-                        app.playlist_list_state.select(None);
-                        app.album_list_state.selected().map(|i| {
-                            (
-                                app.albums[i].browse_id.clone(),
-                                data::extract_songs_from_album as fn(&Value) -> Vec<Song>,
-                            )
-                        })
-                    }
-                    FocusArea::Playlists => {
-                        app.album_list_state.select(None);
-                        app.playlist_list_state.selected().map(|i| {
-                            (
-                                app.playlists[i].browse_id.clone(),
-                                data::extract_songs_from_playlist as fn(&Value) -> Vec<Song>,
-                            )
-                        })
-                    }
-                    _ => None,
+                let is_album = app.focus_area == FocusArea::Albums;
+
+                let selection = if is_album {
+                    app.album_list_state.selected().map(|i| {
+                        (
+                            &app.albums[i].browse_id,
+                            data::extract_songs_from_album as fn(&Value) -> Vec<Song>,
+                        )
+                    })
+                } else {
+                    app.playlist_list_state.selected().map(|i| {
+                        (
+                            &app.playlists[i].browse_id,
+                            data::extract_songs_from_playlist as fn(&Value) -> Vec<Song>,
+                        )
+                    })
                 };
-                if let Some((browse_id, extractor)) = target_info {
-                    if let Ok(data_songs) = client.get_playlist_songs(&browse_id).await {
+
+                if let Some((browse_id, extractor)) = selection {
+                    if let Ok(data_songs) = client.get_playlist_songs(browse_id).await {
                         let songs = extractor(&data_songs);
-                        app.songs = songs;
-                        if !app.songs.is_empty() {
-                            player.load_song(&app.songs.get(0).unwrap().video_id, false);
-                            player.load_playlist(&app.songs[1..]);
+                        if !songs.is_empty() {
+                            app.songs = songs;
                             app.songs_list_state.select(Some(0));
                             app.focus_area = FocusArea::SongList;
-                        } else {
-                            app.songs_list_state.select(None);
+                            app.viewing_playlist = Some(browse_id.to_string());
+                            if key_event.code == KeyCode::Enter {
+                                app.playing_playlist = Some(browse_id.to_string());
+                                player.load_playlist(&app.songs).await;
+                                if player.play_mode == PlayMode::ShuffleMode {
+                                    tokio::time::sleep(tokio::time::Duration::from_millis(50))
+                                        .await;
+                                    player.shuffle().await;
+                                }
+                                if is_album {
+                                    app.playlist_list_state.select(None);
+                                } else {
+                                    app.album_list_state.select(None);
+                                }
+                            }
                         }
                     }
                 }
-            } // ENTER AT SONG LIST FOCUS AREA
+                player::log_to_file(&format!("Viewing playlist: {:?}", &app.viewing_playlist));
+                player::log_to_file(&format!("Playing playlist: {:?}", &app.playing_playlist));
+            }
             FocusArea::SongList => {
                 if let Some(i) = app.songs_list_state.selected() {
-                    player.play_at_index(i);
+                    log_to_file("Played song");
+                    let target_id = &app.songs[i].video_id;
+                    if app.playing_playlist == app.viewing_playlist {
+                        if let Some(pos) = app.get_mpv_idx(target_id) {
+                            player.play_at_idx(&pos).await;
+                        }
+                    } else {
+                        player.load_playlist(&app.songs).await;
+                        tokio::time::sleep(tokio::time::Duration::from_millis(120)).await;
+                        player.play_at_idx(&i).await;
+                        app.playing_playlist = app.viewing_playlist.clone();
+                        if player.play_mode == PlayMode::ShuffleMode {
+                            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                            player.shuffle().await;
+                        }
+                    }
                 }
             }
         },

@@ -1,18 +1,20 @@
+use chrono::Local;
 use data::Song;
 use serde::Deserialize;
 use serde_json::Value;
+use std::fs::File;
 use std::{
-    io::{BufRead, BufReader, Write},
-    os::unix::net::UnixStream,
+    fs::OpenOptions,
+    io::Write,
     process::{Command, Stdio},
-    thread,
-    time::Duration,
 };
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::UnixStream;
 
 pub enum MpvEvent {
-    ListChange(Value),
+    ListChange(Vec<String>),
     EndSong,
-    StartPlaying(String),
+    StartPlaying(Song),
 }
 #[derive(Deserialize, Debug)]
 struct MpvResponse {
@@ -28,6 +30,7 @@ pub enum PlayerState {
     Idle,
     Playing,
     Paused,
+    Loading,
 }
 
 #[derive(Default, PartialEq)]
@@ -64,17 +67,21 @@ impl Player {
         }
     }
     // PLAY PREVIOUS SONG IN ALBUM/PLAYLIST
-    pub fn next(&self) {
-        self.send_mpv_command(r#"{"command": ["playlist-next"]}"#);
+    pub async fn next(&mut self) {
+        self.state = PlayerState::Loading;
+        self.send_mpv_command(r#"{"command": ["playlist-next"]}"#)
+            .await;
     }
 
     // PLAY NEXT SONG IN ALBUM/PLAYLIST
-    pub fn prev(&self) {
-        self.send_mpv_command(r#"{"command": ["playlist-prev"]}"#);
+    pub async fn prev(&mut self) {
+        self.state = PlayerState::Loading;
+        self.send_mpv_command(r#"{"command": ["playlist-prev"]}"#)
+            .await;
     }
 
     // PAUSE PLAYING SONG
-    pub fn toggle_pause(&mut self) {
+    pub async fn toggle_pause(&mut self) {
         match self.state {
             PlayerState::Playing => {
                 self.state = PlayerState::Paused;
@@ -84,7 +91,8 @@ impl Player {
             }
             _ => {}
         };
-        self.send_mpv_command(r#"{"command": ["cycle", "pause"]}"#);
+        self.send_mpv_command(r#"{"command": ["cycle", "pause"]}"#)
+            .await;
     }
     pub fn start_mpv(&mut self) {
         let child = Command::new("mpv")
@@ -98,38 +106,53 @@ impl Player {
         self.current_process = Some(child);
     }
 
-    fn send_mpv_command(&self, command: &str) {
-        if let Ok(mut stream) = UnixStream::connect(&self.socket_path) {
-            let _ = stream.write_all(command.as_bytes());
-            let _ = stream.write_all(b"\n");
+    async fn send_mpv_command(&self, command: &str) {
+        if let Ok(mut stream) = UnixStream::connect(&self.socket_path).await {
+            let _ = stream.write_all(command.as_bytes()).await;
+            let _ = stream.write_all(b"\n").await;
         }
     }
-
-    pub fn listen_playlist_changes(&self, tx: std::sync::mpsc::Sender<MpvEvent>) {
+    pub async fn listen_playlist_changes(&self, tx: std::sync::mpsc::Sender<MpvEvent>) {
         let socket_path = self.socket_path.clone();
-        thread::spawn(move || {
-            let mut stream = UnixStream::connect(&socket_path).unwrap();
+        tokio::spawn(async move {
+            let mut s = match UnixStream::connect(&socket_path).await {
+                Ok(s) => s,
+                Err(e) => return log_to_file(&format!("Error connect socket: {}", e)),
+            };
+
             let observe_cmd = r#"{"command": ["observe_property", 1, "playlist"]}"#;
-            let _ = writeln!(stream, "{}", observe_cmd);
-            let reader = BufReader::new(stream);
-            for line in reader.lines() {
-                if let Ok(line_str) = line {
-                    if let Ok(msg) = serde_json::from_str::<MpvResponse>(&line_str) {
-                        if msg.event == "property-change" && msg.name.as_deref() == Some("playlist")
+            if let Err(e) = s.write_all(format!("{}\n", observe_cmd).as_bytes()).await {
+                return log_to_file(&format!("Error sending observe cmd: {}", e));
+            }
+
+            let reader = BufReader::new(s);
+            let mut lines = reader.lines(); // Đây là Async lines
+
+            while let Ok(Some(line)) = lines.next_line().await {
+                let Ok(msg) = serde_json::from_str::<MpvResponse>(&line) else {
+                    continue;
+                };
+
+                if msg.event == "property-change" && msg.name.as_deref() == Some("playlist") {
+                    if let Some(items) = msg.data.and_then(|d| d.as_array().cloned()) {
+                        let mpv_ids: Vec<String> = items
+                            .iter()
+                            .filter_map(|i| i["filename"].as_str().map(extract_id))
+                            .collect();
+                        let _ = tx.send(MpvEvent::ListChange(mpv_ids));
+                        if let Some(item) = items
+                            .iter()
+                            .find(|i| i[r#"playing"#].as_bool() == Some(true))
                         {
-                            if let Some(data) = msg.data {
-                                if let Some(items) = data.as_array() {
-                                    if let Some(current_item) =
-                                        items.iter().find(|i| i["playing"].as_bool() == Some(true))
-                                    {
-                                        if let Some(url) = current_item["filename"].as_str() {
-                                            let video_id = extract_id(url);
-                                            let _ = tx.send(MpvEvent::StartPlaying(video_id));
-                                        }
-                                    } else {
-                                        let _ = tx.send(MpvEvent::ListChange(data.clone()));
-                                    }
-                                }
+                            if let (Some(url), Some(title)) =
+                                (item["filename"].as_str(), item["title"].as_str())
+                            {
+                                let song = Song {
+                                    title: title.to_string(),
+                                    video_id: extract_id(url),
+                                    ..Default::default()
+                                };
+                                let _ = tx.send(MpvEvent::StartPlaying(song));
                             }
                         }
                     }
@@ -137,72 +160,92 @@ impl Player {
             }
         });
     }
-    pub fn load_song(&self, video_id: &str, append: bool) {
-        let url = format!("https://www.youtube.com/watch?v={}", video_id);
-
-        let mode = if append { "append-play" } else { "replace" };
-
-        let command = serde_json::json!({
-            "command": ["loadfile", url, mode]
-        });
-
-        if let Ok(mut stream) = UnixStream::connect(&self.socket_path) {
-            if let Ok(cmd_string) = serde_json::to_string(&command) {
-                let _ = writeln!(stream, "{}", cmd_string);
-            }
-        } else {
-            eprintln!("Can not connect to socket");
-        }
-    }
-    pub fn toggle_playmode(&mut self) {
+    // pub async fn load_song(&self, video_id: &str, append: bool) {
+    //     let url = format!("https://www.youtube.com/watch?v={}", video_id);
+    //
+    //     let mode = if append { "append-play" } else { "replace" };
+    //
+    //     let command = serde_json::json!({
+    //         "command": ["loadfile", url, mode]
+    //     });
+    //
+    //     if let Ok(mut stream) = UnixStream::connect(&self.socket_path).await {
+    //         if let Ok(cmd_string) = serde_json::to_string(&command) {
+    //             let _ = writeln!(stream, "{}", cmd_string);
+    //         }
+    //     } else {
+    //         eprintln!("Can not connect to socket");
+    //     }
+    // }
+    pub async fn toggle_playmode(&mut self) {
+        self.state = PlayerState::Loading;
         match self.play_mode {
             PlayMode::DefaultMode => {
                 self.play_mode = PlayMode::ShuffleMode;
-                self.send_mpv_command(r#"{"command": ["playlist-shuffle"]}"#);
+                self.send_mpv_command(r#"{"command": ["playlist-shuffle"]}"#)
+                    .await;
+                log_to_file("Shuffle");
             }
             PlayMode::ShuffleMode => {
                 self.play_mode = PlayMode::DefaultMode;
-                self.send_mpv_command(r#"{"command": ["playlist-unshuffle"]}"#);
+                self.send_mpv_command(r#"{"command": ["playlist-unshuffle"]}"#)
+                    .await;
+                log_to_file("Default");
             }
         }
     }
-
-    pub fn load_playlist(&self, songs: &[Song]) {
+    pub async fn shuffle(&self) {
+        self.send_mpv_command(r#"{"command": ["playlist-shuffle"]}"#)
+            .await;
+    }
+    pub async fn load_playlist(&mut self, songs: &[Song]) {
         if songs.is_empty() {
             return;
         }
-        if let Ok(mut stream) = UnixStream::connect(&self.socket_path) {
+        self.state = PlayerState::Loading;
+        let playlist_path = "/tmp/gytm_playlist.m3u";
+        if let Ok(mut file) = File::create(playlist_path) {
             for song in songs {
-                let url = format!("https://www.youtube.com/watch?v={}", song.video_id);
-                let cmd_rest = serde_json::json!({
-                    "command": ["loadfile", url, "append-play"]
-                });
-                thread::sleep(Duration::from_millis(30));
-                let _ = writeln!(stream, "{}", cmd_rest);
+                let _ = writeln!(file, "https://www.youtube.com/watch?v={}", song.video_id);
             }
-            thread::sleep(Duration::from_millis(30));
-            if self.play_mode == PlayMode::ShuffleMode {
-                let _ = writeln!(
-                    stream,
-                    "{}",
-                    serde_json::json!({"command": ["playlist-shuffle"]})
-                );
-            }
+            let _ = file.sync_all();
+        }
+        if let Ok(mut stream) = tokio::net::UnixStream::connect(&self.socket_path).await {
+            let load_cmd = format!(
+                r#"{{"command": ["loadlist", "{}", "replace"]}}{}"#,
+                playlist_path, "\n"
+            );
+            let _ = stream.write_all(load_cmd.as_bytes()).await;
+            let _ = stream.flush().await;
         }
     }
-
-    pub fn play_at_index(&self, index: usize) {
+    pub async fn play_at_idx(&mut self, index: &usize) {
+        self.state = PlayerState::Loading;
         let command = format!(
             r#"{{"command": ["set_property", "playlist-pos", {}]}}"#,
             index
         );
-        self.send_mpv_command(&command);
+        log_to_file(&command);
+        self.send_mpv_command(&command).await;
     }
 
-    pub fn clear_playlist(&self) {
-        self.send_mpv_command(r#"{"command": ["playlist-clear"]}"#);
+    pub async fn clear_playlist(&mut self) {
+        self.state = PlayerState::Loading;
+        self.send_mpv_command(r#"{"command": ["playlist-clear"]}"#)
+            .await;
     }
 }
 fn extract_id(url: &str) -> String {
     url.split("v=").last().unwrap_or(url).to_string()
+}
+
+pub fn log_to_file(message: &str) {
+    let datetime = Local::now().format("%Y-%m-%d %H:%M:%S");
+    let log_message = format!(
+        "\n┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n{} - {}\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n",
+        datetime, message
+    );
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open("log.txt") {
+        let _ = file.write_all(log_message.as_bytes());
+    }
 }
