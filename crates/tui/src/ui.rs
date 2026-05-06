@@ -7,8 +7,52 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
 };
+struct CustomStyle {
+    key_style: Style,
+    text_style: Style,
+    border_active: Style,
+    border_inactive: Style,
+    highlight_item: Style,
+    playing_style: Style,
+}
+impl CustomStyle {
+    fn new(theme: Theme) -> Self {
+        CustomStyle {
+            key_style: Style::default()
+                .fg(theme.secondary_color)
+                .add_modifier(Modifier::BOLD),
+            text_style: Style::default().fg(Color::White),
+            border_active: Style::default()
+                .fg(theme.active_color)
+                .add_modifier(Modifier::BOLD),
+            border_inactive: Style::default().fg(theme.inactive_color),
+            highlight_item: Style::default()
+                .bg(Color::Rgb(69, 71, 90))
+                .fg(theme.primary_color)
+                .add_modifier(Modifier::BOLD),
+            playing_style: Style::default(),
+        }
+    }
+}
+struct Theme {
+    primary_color: Color,
+    secondary_color: Color,
+    active_color: Color,
+    inactive_color: Color,
+}
+impl Default for Theme {
+    fn default() -> Self {
+        Theme {
+            primary_color: Color::Magenta,
+            secondary_color: Color::Yellow,
+            active_color: Color::Cyan,
+            inactive_color: Color::DarkGray,
+        }
+    }
+}
 
 pub fn render(app: &mut App, frame: &mut Frame, player: &Player) {
+    let style = CustomStyle::new(Theme::default());
     // OUTER BORDER
     let main_block = Block::default()
         .borders(Borders::all())
@@ -31,14 +75,20 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player) {
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(main_layout[0]);
-    render_list(frame, app, playlist_layout[0], FocusArea::Albums);
-    render_list(frame, app, playlist_layout[1], FocusArea::Playlists);
-    render_songs(frame, app, main_layout[1]);
-    render_player(frame, app, main_layout[2], player);
+    render_list(frame, app, playlist_layout[0], FocusArea::Albums, &style);
+    render_list(frame, app, playlist_layout[1], FocusArea::Playlists, &style);
+    render_songs(frame, app, main_layout[1], &style);
+    render_player(frame, app, main_layout[2], player, &style);
 }
 
 // RENDER ALBUM & PLAYLISTS
-fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusArea) {
+fn render_list(
+    frame: &mut Frame,
+    app: &mut App,
+    area: Rect,
+    area_type: FocusArea,
+    style: &CustomStyle,
+) {
     let result = match area_type {
         FocusArea::Albums => Some((&app.albums, &mut app.album_list_state, "[1]-Albums")),
         FocusArea::Playlists => Some((
@@ -48,39 +98,65 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
         )),
         _ => None,
     };
-    if let Some((data, state, title)) = result {
+
+    if let Some((data, list, title)) = result {
         let items: Vec<ListItem> = data
             .iter()
-            .map(|list| ListItem::new(format!(" {} | {} ", list.title, list.artist)))
+            .map(|item| {
+                let is_playing = app
+                    .playing_playlist
+                    .as_ref()
+                    .map_or(false, |playing| playing.as_str() == item.browse_id);
+                let content = format!(" {} - {}", item.title, item.artist);
+                if is_playing {
+                    ListItem::new(content).style(
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    )
+                } else {
+                    ListItem::new(content)
+                }
+            })
             .collect();
+
         let is_focused = app.focus_area == area_type;
         let border_style = if is_focused {
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
+            style.border_active
         } else {
-            Style::default().fg(Color::DarkGray)
+            style.border_inactive
         };
-        // 4. Khởi tạo Widget List
+
+        let mut block = Block::default()
+            .borders(Borders::ALL)
+            .title(title)
+            .border_style(border_style);
+
+        if area_type == FocusArea::Albums {
+            let bottom_nav = Line::from(vec![
+                Span::styled("</k>", style.key_style),
+                Span::styled(" Up", style.text_style),
+                Span::styled(" | ", style.text_style),
+                Span::styled("</j>", style.key_style),
+                Span::styled(" Down", style.text_style),
+                Span::styled(" | ", style.text_style),
+                Span::styled("<Enter/l>", style.key_style),
+                Span::styled(" Play/Toggle", style.text_style),
+            ]);
+
+            block = block.title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Right));
+        }
+
         let list_widget = List::new(items)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(title)
-                    .border_style(border_style),
-            )
-            .highlight_style(
-                Style::default()
-                    .bg(Color::Rgb(69, 71, 90))
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            );
-        frame.render_stateful_widget(list_widget, area, state);
+            .block(block)
+            .highlight_style(style.highlight_item);
+
+        frame.render_stateful_widget(list_widget, area, list);
     }
 }
 
 // RENDER SONGS FROM ALBUM/PLAYLIST
-fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
+fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, style: &CustomStyle) {
     if app.songs.is_empty() {
         let empty_block = Block::default()
             .borders(Borders::ALL)
@@ -97,32 +173,34 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = app
         .songs
         .iter()
-        .enumerate()
-        .map(|(i, song)| {
-            let is_playing = Some(i) == app.song_idx;
-            let content = song.title.to_string();
+        .map(|song| {
+            let is_playing = app
+                .playing_song
+                .as_ref()
+                .map_or(false, |playing| playing.video_id == song.video_id);
+
+            let content = format!(" {}", song.title);
+
             if is_playing {
-                ListItem::new(content).style(Style::default().fg(Color::Yellow))
+                ListItem::new(content).style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )
             } else {
                 ListItem::new(content)
             }
         })
         .collect();
-
     let is_focused = FocusArea::SongList == app.focus_area;
 
     let border_style = if is_focused {
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD)
+        style.border_active
     } else {
-        Style::default().fg(Color::DarkGray)
+        style.border_inactive
     };
     let highlight_style = if is_focused {
-        Style::default()
-            .bg(Color::Rgb(69, 71, 90))
-            .fg(Color::Yellow)
-            .add_modifier(Modifier::BOLD)
+        style.highlight_item
     } else {
         Style::default()
     };
@@ -139,9 +217,11 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect) {
     frame.render_stateful_widget(list_widget, area, &mut app.songs_list_state);
 }
 
-fn render_player(frame: &mut Frame, app: &mut App, area: Rect, player: &Player) {
-    let song_info = if let Some(idx) = app.song_idx {
-        if let Some(song) = app.songs.get(idx) {
+fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, style: &CustomStyle) {
+    let song_info = if player.state == PlayerState::Loading {
+        "Loading...".to_string()
+    } else {
+        if let Some(song) = &app.playing_song {
             let status_icon = if player.state == PlayerState::Playing {
                 "▶ Playing: "
             } else {
@@ -149,27 +229,26 @@ fn render_player(frame: &mut Frame, app: &mut App, area: Rect, player: &Player) 
             };
             format!(" {}  {} ", status_icon, song.title)
         } else {
-            "  Unknown Track ".to_string()
+            "  No song playing ".to_string()
         }
-    } else {
-        "  No song playing ".to_string()
     };
-
     let mode_text = match player.play_mode {
         PlayMode::DefaultMode => "Play mode:    Default",
         PlayMode::ShuffleMode => "Play mode:    Shuffle",
     };
 
     let key_map = Line::from(vec![
-        Span::from(" <q> Quit"),
-        Span::raw(" | "),
-        Span::from("<Enter> Play"),
-        Span::raw(" | "),
-        Span::from("<Space> Pause"),
-        Span::raw(" | "),
-        Span::from("<m> Playmode"),
-        Span::raw(" | "),
-        Span::from("<n/p> Next/Prev"),
+        Span::styled(" <q> ", style.key_style),
+        Span::styled("Quit", style.text_style),
+        Span::styled(" | ", style.text_style),
+        Span::styled("<Space> ", style.key_style),
+        Span::styled("Pause/Resume", style.text_style),
+        Span::styled(" | ", style.text_style),
+        Span::styled("<m> ", style.key_style),
+        Span::styled("Pause/Resume", style.text_style),
+        Span::styled(" | ", style.text_style),
+        Span::styled("<p/n> ", style.key_style),
+        Span::styled("Prev/Next", style.text_style),
     ]);
 
     let main_block = Block::default()
@@ -187,8 +266,6 @@ fn render_player(frame: &mut Frame, app: &mut App, area: Rect, player: &Player) 
                 .add_modifier(Modifier::BOLD),
         )
         .alignment(Alignment::Left);
-
-    // 7. Render Cột 2 (Play Mode)
     let right_area = Paragraph::new(mode_text)
         .style(
             Style::default()

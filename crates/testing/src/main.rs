@@ -3,14 +3,14 @@ use player::MpvEvent;
 use player::Player;
 use std::{thread, time::Duration};
 use tui::handler;
-
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut player = Player::default();
     let mut app = tui::app::App::default();
     let (tx, rx) = std::sync::mpsc::channel::<MpvEvent>();
     player.start_mpv();
     thread::sleep(Duration::from_millis(50));
-    player.listen_playlist_changes(tx);
+    player.listen_playlist_changes(tx).await;
     println!("Listening event from mpv...");
 
     let mut songs: Vec<Song> = Vec::default();
@@ -28,7 +28,7 @@ fn main() {
     song3.title = "Jazzy Night".to_string();
     songs.push(song3);
 
-    player.load_playlist(&songs);
+    player.load_playlist(&songs).await;
 
     loop {
         while let Ok(event) = rx.try_recv() {

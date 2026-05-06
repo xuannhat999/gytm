@@ -38,8 +38,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx, rx) = std::sync::mpsc::channel::<MpvEvent>();
 
     player.start_mpv();
-    thread::sleep(Duration::from_millis(50));
-    player.listen_playlist_changes(tx);
+    thread::sleep(Duration::from_millis(100));
+    player.listen_playlist_changes(tx).await;
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
