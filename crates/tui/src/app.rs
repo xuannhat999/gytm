@@ -103,7 +103,7 @@ impl App {
         };
         state.select(Some(i));
     }
-    pub fn get_mpv_idx(&self, id: &String) -> Option<usize> {
+    pub fn get_mpv_idx(&self, id: &str) -> Option<usize> {
         for (pos, mpv_id) in self.mpv_list.iter().enumerate() {
             if id == mpv_id {
                 return Some(pos);
