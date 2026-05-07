@@ -4,9 +4,9 @@ use crate::app::{App, FocusArea};
 use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::Song;
+use error::log_to_file;
 use player::{MpvEvent, PlayMode, Player, PlayerState};
 use serde_json::Value;
-
 pub fn handle_mpv_event(app: &mut App, player: &mut Player, event: MpvEvent) {
     match event {
         MpvEvent::ListChange(list) => {
@@ -41,19 +41,25 @@ pub async fn handle_key_events(
                 .select(app.playlist_list_state.selected().or(Some(0)));
         }
         KeyCode::Char('3') => app.focus_area = FocusArea::SongList,
-        KeyCode::Char(' ') => {
-            if app.playing_song.is_some() {
-                player.toggle_pause().await;
+        KeyCode::Char(' ') if app.playing_song.is_some() => {
+            if let Err(e) = player.toggle_pause().await {
+                log_to_file(&format!("{}", e));
             }
         }
         KeyCode::Char('m') => {
-            player.toggle_playmode().await;
+            if let Err(e) = player.toggle_playmode().await {
+                log_to_file(&format!("{}", e));
+            }
         }
         KeyCode::Char('n') => {
-            player.next().await;
+            if let Err(e) = player.next().await {
+                log_to_file(&format!("{}", e));
+            }
         }
         KeyCode::Char('p') => {
-            player.prev().await;
+            if let Err(e) = player.prev().await {
+                log_to_file(&format!("{}", e));
+            }
         }
         // --- ENTER / L
         KeyCode::Enter | KeyCode::Char('l') => match app.focus_area {
@@ -84,11 +90,15 @@ pub async fn handle_key_events(
                             app.viewing_playlist = Some(browse_id.to_string());
                             if key_event.code == KeyCode::Enter {
                                 app.playing_playlist = Some(browse_id.to_string());
-                                player.load_playlist(&app.songs).await;
+                                if let Err(e) = player.load_playlist(&app.songs).await {
+                                    log_to_file(&format!("{}", e));
+                                }
                                 if player.play_mode == PlayMode::ShuffleMode {
                                     tokio::time::sleep(tokio::time::Duration::from_millis(50))
                                         .await;
-                                    player.shuffle().await;
+                                    if let Err(e) = player.shuffle().await {
+                                        log_to_file(&format!("{}", e));
+                                    }
                                 }
                                 if is_album {
                                     app.playlist_list_state.select(None);
@@ -97,10 +107,10 @@ pub async fn handle_key_events(
                                 }
                             }
                         }
+                    } else {
+                        log_to_file("Fetching songs Error");
                     }
                 }
-                // player::log_to_file(&format!("Viewing playlist: {:?}", &app.viewing_playlist));
-                // player::log_to_file(&format!("Playing playlist: {:?}", &app.playing_playlist));
             }
 
             FocusArea::SongList => {
@@ -109,16 +119,26 @@ pub async fn handle_key_events(
                     let target_id = &app.songs[i].video_id;
                     if app.playing_playlist == app.viewing_playlist {
                         if let Some(pos) = app.get_mpv_idx(target_id) {
-                            player.play_at_idx(&pos).await;
+                            if let Err(e) = player.play_at_idx(&pos).await {
+                                log_to_file(&format!("{}", e));
+                            }
+                        } else {
+                            log_to_file("Failed to get mpv index");
                         }
                     } else {
-                        player.load_playlist(&app.songs).await;
+                        if let Err(e) = player.load_playlist(&app.songs).await {
+                            log_to_file(&format!("{}", e));
+                        }
                         tokio::time::sleep(tokio::time::Duration::from_millis(120)).await;
-                        player.play_at_idx(&i).await;
+                        if let Err(e) = player.play_at_idx(&i).await {
+                            log_to_file(&format!("{}", e));
+                        }
                         app.playing_playlist = app.viewing_playlist.clone();
                         if player.play_mode == PlayMode::ShuffleMode {
                             tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                            player.shuffle().await;
+                            if let Err(e) = player.shuffle().await {
+                                log_to_file(&format!("{}", e));
+                            }
                         }
                     }
                 }
