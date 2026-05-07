@@ -4,7 +4,7 @@ use crate::app::{App, FocusArea};
 use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::Song;
-use player::{MpvEvent, PlayMode, Player, PlayerState, log_to_file};
+use player::{MpvEvent, PlayMode, Player, PlayerState};
 use serde_json::Value;
 
 pub fn handle_mpv_event(app: &mut App, player: &mut Player, event: MpvEvent) {
@@ -19,7 +19,6 @@ pub fn handle_mpv_event(app: &mut App, player: &mut Player, event: MpvEvent) {
             app.playing_song = Some(song);
             player.state = PlayerState::Playing;
         }
-        _ => {}
     }
 }
 pub async fn handle_key_events(
@@ -50,39 +49,34 @@ pub async fn handle_key_events(
         KeyCode::Char('m') => {
             player.toggle_playmode().await;
         }
-
-        // --- NEXT / PREV ---
         KeyCode::Char('n') => {
             player.next().await;
         }
         KeyCode::Char('p') => {
             player.prev().await;
         }
-
         // --- ENTER / L
         KeyCode::Enter | KeyCode::Char('l') => match app.focus_area {
             FocusArea::Albums | FocusArea::Playlists => {
                 let is_album = app.focus_area == FocusArea::Albums;
-
                 let selection = if is_album {
                     app.album_list_state.selected().map(|i| {
                         (
                             &app.albums[i].browse_id,
-                            data::extract_songs_from_album as fn(&Value) -> Vec<Song>,
+                            data::extract_songs_from_album as fn(Value) -> Vec<Song>,
                         )
                     })
                 } else {
                     app.playlist_list_state.selected().map(|i| {
                         (
                             &app.playlists[i].browse_id,
-                            data::extract_songs_from_playlist as fn(&Value) -> Vec<Song>,
+                            data::extract_songs_from_playlist as fn(Value) -> Vec<Song>,
                         )
                     })
                 };
-
                 if let Some((browse_id, extractor)) = selection {
                     if let Ok(data_songs) = client.get_playlist_songs(browse_id).await {
-                        let songs = extractor(&data_songs);
+                        let songs = extractor(data_songs);
                         if !songs.is_empty() {
                             app.songs = songs;
                             app.songs_list_state.select(Some(0));
@@ -105,12 +99,13 @@ pub async fn handle_key_events(
                         }
                     }
                 }
-                player::log_to_file(&format!("Viewing playlist: {:?}", &app.viewing_playlist));
-                player::log_to_file(&format!("Playing playlist: {:?}", &app.playing_playlist));
+                // player::log_to_file(&format!("Viewing playlist: {:?}", &app.viewing_playlist));
+                // player::log_to_file(&format!("Playing playlist: {:?}", &app.playing_playlist));
             }
+
             FocusArea::SongList => {
                 if let Some(i) = app.songs_list_state.selected() {
-                    log_to_file("Played song");
+                    // log_to_file("Played song");
                     let target_id = &app.songs[i].video_id;
                     if app.playing_playlist == app.viewing_playlist {
                         if let Some(pos) = app.get_mpv_idx(target_id) {
@@ -154,6 +149,7 @@ fn handle_playlists_events(key_event: KeyEvent, app: &mut App) {
         _ => {}
     }
 }
+
 // SONG LIST EVENT
 fn handle_songs_events(key_event: KeyEvent, app: &mut App) {
     match key_event.code {
