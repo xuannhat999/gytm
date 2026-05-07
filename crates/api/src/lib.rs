@@ -117,7 +117,6 @@ impl YClient {
             },
             "browseId": id.to_string(),
         });
-
         let response = self
             .http
             .post(&url)
@@ -127,7 +126,6 @@ impl YClient {
             .await?
             .json::<Value>()
             .await?;
-
         Ok(response)
     }
 }

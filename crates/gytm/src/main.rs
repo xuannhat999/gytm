@@ -28,23 +28,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
-
-    let mut app = App::default();
-    let mut player = Player::default();
     let raw_data = client.get_lib_data().await?;
     let (albums, playlists) = data::extract_lists(raw_data);
+    if albums.is_empty() && playlists.is_empty() {
+        println!("Error: No album/playlist found. Please check your config and cookies.");
+        std::process::exit(1);
+    }
+    let mut app = App::default();
+    let mut player = Player::default();
     app.albums = albums;
     app.playlists = playlists;
+
     let (tx, rx) = std::sync::mpsc::channel::<MpvEvent>();
-
-    player.start_mpv();
+    if let Err(e) = player.start_mpv() {
+        println!("Error starting MPV: {}", e);
+        std::process::exit(1);
+    }
     thread::sleep(Duration::from_millis(100));
-    player.listen_playlist_changes(tx).await;
-
+    if let Err(e) = player.listen_playlist_changes(tx).await {
+        println!("{}", e);
+        std::process::exit(1);
+    }
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
-
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -55,12 +62,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         while let Ok(event) = rx.try_recv() {
             handler::handle_mpv_event(&mut app, &mut player, event);
         }
-        terminal.draw(|f| ui::render(&mut app, f, &player))?;
-        if event::poll(Duration::from_millis(30))? {
+        if event::poll(Duration::from_millis(500))? {
             if let Event::Key(key) = event::read()? {
                 handler::handle_key_events(key, &mut app, Arc::clone(&client), &mut player).await;
             }
         }
+
+        terminal.draw(|f| ui::render(&mut app, f, &player))?;
         if app.is_exit {
             player.kill_current_process();
             break;

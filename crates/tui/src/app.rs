@@ -94,7 +94,7 @@ impl App {
         let i = match state.selected() {
             Some(i) => {
                 if i == 0 {
-                    len - 1 // Quay xuống cuối danh sách
+                    len - 1
                 } else {
                     i - 1
                 }

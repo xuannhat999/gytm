@@ -157,11 +157,11 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let is_focused = FocusArea::SongList == app.focus_area;
 
     let border_style = if is_focused {
-        Style::default().fg(theme.inactive)
-    } else {
         Style::default()
             .fg(theme.active)
             .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(theme.inactive)
     };
     let highlight_style = if is_focused {
         Style::default()
