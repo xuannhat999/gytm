@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = App::default();
     let mut player = Player::default();
     let raw_data = client.get_lib_data().await?;
-    let (albums, playlists) = data::extract_lists(&raw_data);
+    let (albums, playlists) = data::extract_lists(raw_data);
     app.albums = albums;
     app.playlists = playlists;
     let (tx, rx) = std::sync::mpsc::channel::<MpvEvent>();
@@ -69,6 +69,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
-
     Ok(())
 }

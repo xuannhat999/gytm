@@ -30,7 +30,9 @@ impl CustomStyle {
                 .bg(Color::Rgb(69, 71, 90))
                 .fg(theme.primary_color)
                 .add_modifier(Modifier::BOLD),
-            playing_style: Style::default(),
+            playing_style: Style::default()
+                .fg(theme.secondary_color)
+                .add_modifier(Modifier::BOLD),
         }
     }
 }
@@ -43,9 +45,9 @@ struct Theme {
 impl Default for Theme {
     fn default() -> Self {
         Theme {
-            primary_color: Color::Magenta,
-            secondary_color: Color::Yellow,
-            active_color: Color::Cyan,
+            primary_color: Color::LightGreen,
+            secondary_color: Color::LightYellow,
+            active_color: Color::LightCyan,
             inactive_color: Color::DarkGray,
         }
     }
@@ -53,12 +55,6 @@ impl Default for Theme {
 
 pub fn render(app: &mut App, frame: &mut Frame, player: &Player) {
     let style = CustomStyle::new(Theme::default());
-    // OUTER BORDER
-    let main_block = Block::default()
-        .borders(Borders::all())
-        .border_type(ratatui::widgets::BorderType::Rounded);
-    let inner_area = main_block.inner(frame.area());
-    frame.render_widget(main_block, frame.area());
 
     // MAIN VERTICAL LAYOUT
     let main_layout = Layout::default()
@@ -68,7 +64,7 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player) {
             Constraint::Percentage(50),
             Constraint::Percentage(10),
         ])
-        .split(inner_area);
+        .split(frame.area());
 
     // HORIZONTAL LAYOUT (ALBUMS | PLAYLISTS)
     let playlist_layout = Layout::default()
@@ -90,11 +86,11 @@ fn render_list(
     style: &CustomStyle,
 ) {
     let result = match area_type {
-        FocusArea::Albums => Some((&app.albums, &mut app.album_list_state, "[1]-Albums")),
+        FocusArea::Albums => Some((&app.albums, &mut app.album_list_state, "[1]- Albums")),
         FocusArea::Playlists => Some((
             &app.playlists,
             &mut app.playlist_list_state,
-            "[2]-Playlists",
+            "[2]-󰲸 Playlists",
         )),
         _ => None,
     };
@@ -109,11 +105,7 @@ fn render_list(
                     .map_or(false, |playing| playing.as_str() == item.browse_id);
                 let content = format!(" {} - {}", item.title, item.artist);
                 if is_playing {
-                    ListItem::new(content).style(
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    )
+                    ListItem::new(content).style(style.playing_style)
                 } else {
                     ListItem::new(content)
                 }
@@ -129,6 +121,7 @@ fn render_list(
 
         let mut block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .title(title)
             .border_style(border_style);
 
@@ -160,8 +153,9 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, style: &CustomStyl
     if app.songs.is_empty() {
         let empty_block = Block::default()
             .borders(Borders::ALL)
-            .title("Songs")
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_type(BorderType::Rounded)
+            .title(" Tracks")
+            .border_style(style.border_inactive);
 
         let message = Paragraph::new("Select an Album or Playlist to view songs")
             .block(empty_block)
@@ -173,20 +167,15 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, style: &CustomStyl
     let items: Vec<ListItem> = app
         .songs
         .iter()
-        .map(|song| {
-            let is_playing = app
+        .enumerate()
+        .map(|(i, song)| {
+            let content = format!("{:>3}. {}", i + 1, song.title);
+            if app
                 .playing_song
                 .as_ref()
-                .map_or(false, |playing| playing.video_id == song.video_id);
-
-            let content = format!(" {}", song.title);
-
-            if is_playing {
-                ListItem::new(content).style(
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )
+                .map_or(false, |playing| playing.video_id == song.video_id)
+            {
+                ListItem::new(content).style(style.playing_style)
             } else {
                 ListItem::new(content)
             }
@@ -208,11 +197,12 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, style: &CustomStyl
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!("[3]-Tracks ({})", app.songs.len()))
+                .border_type(BorderType::Rounded)
+                .title(format!("[3]- Tracks ({})", app.songs.len()))
                 .border_style(border_style),
         )
         .highlight_style(highlight_style)
-        .highlight_symbol("▶ ");
+        .highlight_symbol("▶");
 
     frame.render_stateful_widget(list_widget, area, &mut app.songs_list_state);
 }
@@ -236,9 +226,8 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, styl
         PlayMode::DefaultMode => "Play mode:    Default",
         PlayMode::ShuffleMode => "Play mode:    Shuffle",
     };
-
     let key_map = Line::from(vec![
-        Span::styled(" <q> ", style.key_style),
+        Span::styled("<q> ", style.key_style),
         Span::styled("Quit", style.text_style),
         Span::styled(" | ", style.text_style),
         Span::styled("<Space> ", style.key_style),
@@ -253,7 +242,7 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, styl
 
     let main_block = Block::default()
         .borders(Borders::ALL)
-        .title(" Player ")
+        .title(" Player")
         .title_bottom(key_map)
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)

@@ -2,18 +2,17 @@ use chrono::Local;
 use data::Song;
 use serde::Deserialize;
 use serde_json::Value;
-use std::fs::File;
 use std::{
     fs::OpenOptions,
     io::Write,
     process::{Command, Stdio},
 };
+use tempfile::NamedTempFile;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
 
 pub enum MpvEvent {
     ListChange(Vec<String>),
-    EndSong,
     StartPlaying(Song),
 }
 #[derive(Deserialize, Debug)]
@@ -46,6 +45,7 @@ pub struct Player {
     pub volume: u8,
     pub play_mode: PlayMode,
     pub socket_path: String,
+    pub playlist_file: Option<NamedTempFile>,
 }
 impl Default for Player {
     fn default() -> Self {
@@ -55,9 +55,11 @@ impl Default for Player {
             volume: 100,
             play_mode: PlayMode::DefaultMode,
             socket_path: "/tmp/mpv-socket".to_string(),
+            playlist_file: None,
         }
     }
 }
+
 impl Player {
     // KILL CURRENT MPV PROCESS
     pub fn kill_current_process(&mut self) {
@@ -65,7 +67,9 @@ impl Player {
             let _ = child.kill();
             let _ = child.wait();
         }
+        self.playlist_file = None
     }
+
     // PLAY PREVIOUS SONG IN ALBUM/PLAYLIST
     pub async fn next(&mut self) {
         self.state = PlayerState::Loading;
@@ -94,6 +98,7 @@ impl Player {
         self.send_mpv_command(r#"{"command": ["cycle", "pause"]}"#)
             .await;
     }
+
     pub fn start_mpv(&mut self) {
         let child = Command::new("mpv")
             .arg("--idle")
@@ -140,10 +145,10 @@ impl Player {
                             .filter_map(|i| i["filename"].as_str().map(extract_id))
                             .collect();
                         let _ = tx.send(MpvEvent::ListChange(mpv_ids));
-                        if let Some(item) = items
-                            .iter()
-                            .find(|i| i[r#"playing"#].as_bool() == Some(true))
-                        {
+                        if let Some(item) = items.iter().find(|i| {
+                            i["playing"].as_bool() == Some(true)
+                                || i["current"].as_bool() == Some(true)
+                        }) {
                             if let (Some(url), Some(title)) =
                                 (item["filename"].as_str(), item["title"].as_str())
                             {
@@ -160,6 +165,7 @@ impl Player {
             }
         });
     }
+
     // pub async fn load_song(&self, video_id: &str, append: bool) {
     //     let url = format!("https://www.youtube.com/watch?v={}", video_id);
     //
@@ -177,6 +183,7 @@ impl Player {
     //         eprintln!("Can not connect to socket");
     //     }
     // }
+
     pub async fn toggle_playmode(&mut self) {
         self.state = PlayerState::Loading;
         match self.play_mode {
@@ -194,31 +201,43 @@ impl Player {
             }
         }
     }
+
     pub async fn shuffle(&self) {
         self.send_mpv_command(r#"{"command": ["playlist-shuffle"]}"#)
             .await;
     }
+
     pub async fn load_playlist(&mut self, songs: &[Song]) {
         if songs.is_empty() {
             return;
         }
         self.state = PlayerState::Loading;
-        let playlist_path = "/tmp/gytm_playlist.m3u";
-        if let Ok(mut file) = File::create(playlist_path) {
+        if self.playlist_file.is_none() {
+            match NamedTempFile::new() {
+                Ok(f) => self.playlist_file = Some(f),
+                Err(e) => log_to_file(&format!("Failed to create temp file: {}", e)),
+            }
+        }
+        if let Some(ref mut tempfile) = self.playlist_file {
+            let file = tempfile.as_file_mut();
+            let _ = file.set_len(0);
+            let _ = std::io::Seek::seek(file, std::io::SeekFrom::Start(0));
             for song in songs {
                 let _ = writeln!(file, "https://www.youtube.com/watch?v={}", song.video_id);
             }
             let _ = file.sync_all();
-        }
-        if let Ok(mut stream) = tokio::net::UnixStream::connect(&self.socket_path).await {
-            let load_cmd = format!(
-                r#"{{"command": ["loadlist", "{}", "replace"]}}{}"#,
-                playlist_path, "\n"
-            );
-            let _ = stream.write_all(load_cmd.as_bytes()).await;
-            let _ = stream.flush().await;
+            let playlist_path = tempfile.path().to_string_lossy().to_string();
+            if let Ok(mut stream) = tokio::net::UnixStream::connect(&self.socket_path).await {
+                let load_cmd = format!(
+                    r#"{{"command": ["loadlist", "{}", "replace"]}}{}"#,
+                    playlist_path, "\n"
+                );
+                let _ = stream.write_all(load_cmd.as_bytes()).await;
+                let _ = stream.flush().await;
+            }
         }
     }
+
     pub async fn play_at_idx(&mut self, index: &usize) {
         self.state = PlayerState::Loading;
         let command = format!(
@@ -229,22 +248,20 @@ impl Player {
         self.send_mpv_command(&command).await;
     }
 
-    pub async fn clear_playlist(&mut self) {
-        self.state = PlayerState::Loading;
-        self.send_mpv_command(r#"{"command": ["playlist-clear"]}"#)
-            .await;
-    }
+    // pub async fn clear_playlist(&mut self) {
+    //     self.state = PlayerState::Loading;
+    //     self.send_mpv_command(r#"{"command": ["playlist-clear"]}"#)
+    //         .await;
+    // }
 }
+
 fn extract_id(url: &str) -> String {
     url.split("v=").last().unwrap_or(url).to_string()
 }
 
 pub fn log_to_file(message: &str) {
     let datetime = Local::now().format("%Y-%m-%d %H:%M:%S");
-    let log_message = format!(
-        "\n┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n{} - {}\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n",
-        datetime, message
-    );
+    let log_message = format!("{} : {}", datetime, message);
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open("log.txt") {
         let _ = file.write_all(log_message.as_bytes());
     }
