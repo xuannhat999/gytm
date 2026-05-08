@@ -75,6 +75,7 @@ impl YClient {
         headers
     }
 
+    // Fetch YoutubeMusic Data (Library Page)
     pub async fn get_lib_data(&self) -> Result<Value> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
@@ -90,7 +91,6 @@ impl YClient {
             },
             "browseId": "FEmusic_library_landing",
         });
-
         let response = self
             .http
             .post(&url)

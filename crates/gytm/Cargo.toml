@@ -6,7 +6,6 @@ authors = ["Xuân Nhật <xuannhat123456789@gmail.com>"]
 description = "YouTube Music TUI client"
 license = "Apache-2.0"
 
-
 [dependencies]
 tui = { workspace = true }
 data = { workspace = true }

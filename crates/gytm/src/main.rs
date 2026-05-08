@@ -8,7 +8,6 @@ use data::AppConfig;
 use player::{MpvEvent, Player};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::{io, sync::Arc, thread, time::Duration};
-
 use tui::{app::App, handler, ui};
 
 #[tokio::main]
@@ -40,11 +39,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.playlists = playlists;
 
     let (tx, rx) = std::sync::mpsc::channel::<MpvEvent>();
+
     if let Err(e) = player.start_mpv() {
         println!("Error starting MPV: {}", e);
         std::process::exit(1);
     }
-    thread::sleep(Duration::from_millis(100));
+
+    thread::sleep(Duration::from_millis(200));
+
     if let Err(e) = player.listen_playlist_changes(tx).await {
         println!("{}", e);
         std::process::exit(1);
