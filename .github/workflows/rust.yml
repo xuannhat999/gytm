@@ -1,0 +1,40 @@
+name: Build GYTM
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: gytm-linux
+            binary_name: gytm
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: gytm-windows
+            binary_name: gytm.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build Crate
+        run: cargo build --release --target ${{ matrix.target }} -p gytm
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: target/${{ matrix.target }}/release/${{ matrix.binary_name }}
