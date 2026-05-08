@@ -12,7 +12,6 @@ members = [
 ]
 
 [workspace.dependencies]
-
 tokio = { version = "1.35", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -32,3 +31,9 @@ api = { path = "crates/api" }
 data = { path = "crates/data" }
 error = { path = "crates/error" }
 gytm = { path = "crates/gytm" }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
