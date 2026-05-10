@@ -68,7 +68,11 @@ impl Player {
         }
         self.playlist_file = None
     }
-
+    pub async fn set_loop_playlist(&self) -> Result<()> {
+        self.send_mpv_command(r#"{"command": ["set_property", "loop-playlist", "inf"]}"#)
+            .await?;
+        Ok(())
+    }
     // PLAY PREVIOUS SONG IN ALBUM/PLAYLIST
     pub async fn next(&mut self) -> Result<()> {
         self.state = PlayerState::Loading;
@@ -166,7 +170,7 @@ impl Player {
                                         ..Default::default()
                                     };
                                     tx.send(MpvEvent::StartPlaying(song))
-                                        .map_err(|e| YError::ChannelSendError(e.to_string()));
+                                        .map_err(|e| YError::ChannelSendError(e.to_string()))?;
                                 }
                             }
                         }

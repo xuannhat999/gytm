@@ -51,6 +51,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}", e);
         std::process::exit(1);
     }
+
+    player.set_loop_playlist().await?;
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
@@ -59,7 +62,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if !app.albums.is_empty() {
         app.album_list_state.select(Some(0));
+    } else {
+        app.playlist_list_state.select(Some(0));
     }
+
     loop {
         while let Ok(event) = rx.try_recv() {
             handler::handle_mpv_event(&mut app, &mut player, event);
