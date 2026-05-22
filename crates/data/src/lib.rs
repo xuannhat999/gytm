@@ -1,39 +1,25 @@
 use ::serde::Deserialize;
 use error::{Result, YError};
-use serde_json::Value;
+use serde::Serialize;
 use std::{fs, io::Write, path::Path};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct AppConfig {
     pub user_agent: String,
 }
 
 impl AppConfig {
     pub fn load() -> Result<Self> {
-        let conf_dir = dirs::config_dir()
-            .ok_or(YError::ConfigFileErr)?
-            .join("gytm");
-        let conf_file = conf_dir.join("config.json");
+        let conf_file = dirs::config_dir()
+            .ok_or(YError::ConfigFileError)?
+            .join("gytm/config.json");
 
         if !conf_file.exists() {
-            Self::create_config_file(&conf_dir, &conf_file)?;
-            return Err(YError::InvalidCookie);
+            return create_config_file(&conf_file);
         }
-
         let content = fs::read_to_string(conf_file)?;
         let config: AppConfig = serde_json::from_str(&content)?;
         Ok(config)
-    }
-
-    pub fn create_config_file(dir: &Path, file: &Path) -> Result<()> {
-        fs::create_dir_all(dir)?;
-        let default_config = serde_json::json!({
-            "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        });
-        let mut f = fs::File::create(file)?;
-        f.write_all(serde_json::to_string_pretty(&default_config)?.as_bytes())?;
-        
-        Ok(())
     }
 }
 
@@ -44,88 +30,23 @@ pub struct PlayList {
     pub browse_id: String,
     pub playlist_id: String,
 }
-pub fn extract_lists(data: Value) -> (Vec<PlayList>, Vec<PlayList>) {
-    let mut albums: Vec<PlayList> = Vec::new();
-    let mut playlists: Vec<PlayList> = Vec::new();
-    if let Some(items)= data.pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/gridRenderer/items").and_then(|v| v.as_array()) {
-            for item in items {
-                if let Some(rerender) = item.get("musicTwoRowItemRenderer") {
-                    let page_type = rerender.pointer("/title/runs/0/navigationEndpoint/browseEndpoint/browseEndpointContextSupportedConfigs/browseEndpointContextMusicConfig/pageType");
-                    if let Some(page_type) = page_type.and_then(|p| p.as_str()) { 
-                        let album = PlayList {
-                            title: rerender.pointer("/title/runs/0/text").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
-                            artist: rerender.pointer("/subtitle/runs/2/text").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
-                            browse_id: rerender.pointer("/navigationEndpoint/browseEndpoint/browseId").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                            playlist_id: rerender.pointer("/thumbnailOverlay/musicItemThumbnailOverlayRenderer/content/musicPlayButtonRenderer/playNavigationEndpoint/watchPlaylistEndpoint/playlistId")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("").to_string(),
-                        };
-                        match page_type {
-                            "MUSIC_PAGE_TYPE_ALBUM" => {albums.push(album);},
-                            "MUSIC_PAGE_TYPE_PLAYLIST" => {playlists.push(album);},
-                            _=>{}
-                        }
-                    }
-                }
-            }
-        }
-    (albums, playlists)
-}
 
-#[derive(Default,Debug)]
+#[derive(Default, Debug)]
 pub struct Song {
     pub title: String,
     pub video_id: String,
 }
-// EXTRACT SONGS FROM RESONSED DATA FOR PLAYLIST (JSON TYPE)
-pub fn extract_songs_from_playlist(data: Value) -> Vec<Song> {
-    let mut songs = Vec::new();
 
-    // 1. Khác biệt ở Path: Playlist dùng musicPlaylistShelfRenderer
-    let path = "/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicPlaylistShelfRenderer/contents";
-    
-    let items = data.pointer(path).and_then(|v| v.as_array());
+pub fn create_config_file(file: &Path) -> Result<AppConfig> {
+    let dir = file.parent().ok_or(YError::ConfigFileError)?;
+    fs::create_dir_all(dir)?;
 
-    if let Some(track_list) = items {
-        for item in track_list {
-            if let Some(renderer) = item.get("musicResponsiveListItemRenderer") {
-                
-                let title = renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
-                    .and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
+    let default_config = AppConfig {
+        user_agent : "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36".to_string(),
+    };
+    let content = serde_json::to_string_pretty(&default_config)?;
+    let mut f = fs::File::create(file)?;
+    f.write_all(serde_json::to_string_pretty(&content)?.as_bytes())?;
 
-                let video_id = renderer.pointer("/playlistItemData/videoId")
-                    .or_else(|| renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId"))
-                    .and_then(|v| v.as_str()).unwrap_or("").to_string();
-                if !video_id.is_empty() {
-                    songs.push(Song { title, video_id });
-                }
-            }
-        }
-    }
-    songs
-}
-
-// EXTRACT SONGS FROM RESPONSED DATA FOR ALBUM  (JSON TYPE)
-pub fn extract_songs_from_album(data: Value) -> Vec<Song> {
-    let mut songs = Vec::new();
-
-    let items = data.pointer("/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicShelfRenderer/contents")
-        .and_then(|v| v.as_array());
-
-    if let Some(track_list) = items {
-        for item in track_list {
-            if let Some(renderer) = item.get("musicResponsiveListItemRenderer") {
-                let song = Song {
-                    title: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
-                        .and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
-                    
-                    video_id: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId")
-                        .or_else(|| renderer.pointer("/playlistItemData/videoId"))
-                        .and_then(|v| v.as_str()).unwrap_or("").to_string(),
-               };
-                songs.push(song);
-            }
-        }
-    }
-    songs
+    Ok(default_config)
 }

@@ -27,12 +27,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
-    let raw_data = client.get_lib_data().await?;
-    let (albums, playlists) = data::extract_lists(raw_data);
-    if albums.is_empty() && playlists.is_empty() {
-        println!("Error: No album/playlist found. Please check your config and cookies.");
-        std::process::exit(1);
-    }
+    let (albums, playlists) = client.get_lists().await?;
+
     let mut app = App::default();
     let mut player = Player::default();
     app.albums = albums;

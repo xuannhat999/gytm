@@ -8,8 +8,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum YError {
-    #[error("Config File Error")]
-    ConfigFileErr,
+    #[error("Config File Error: {}", get_config_path_display())]
+    ConfigFileError,
 
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
@@ -44,17 +44,11 @@ pub enum YError {
     #[error("Channel Recieve Error: {0}")]
     ChannelReceiveError(String),
 
-    #[error(
-        "Invalid Cookie: Fill your cookie in {} and restart",
-        get_config_path_display()
-    )]
+    #[error("Invalid Cookie")]
     InvalidCookie,
 
     #[error("URL parsing failed: {0}")]
     UrlParseError(#[from] url::ParseError),
-
-    #[error("Cookie Error: {0}")]
-    CookieError(String),
 }
 fn get_config_path_display() -> String {
     dirs::config_dir()
