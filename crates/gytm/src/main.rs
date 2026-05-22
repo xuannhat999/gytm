@@ -1,18 +1,19 @@
 use api::YClient;
+use config::AppConfig;
 use crossterm::{
     event::{self, Event},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use data::AppConfig;
-use player::{MpvEvent, Player};
+use data::MpvEvent;
+use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::{io, sync::Arc, thread, time::Duration};
 use tui::{app::App, handler, ui};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = match AppConfig::load() {
+    let mut config = match AppConfig::load() {
         Ok(c) => c,
         Err(e) => {
             println!("{}", e);
@@ -20,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     println!("󱎫 Connecting to YouTube Music...");
-    let client = match YClient::new(config).await {
+    let client = match YClient::new(&config).await {
         Ok(c) => Arc::new(c),
         Err(e) => {
             println!("{}", e);
@@ -30,25 +31,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (albums, playlists) = client.get_lists().await?;
 
     let mut app = App::default();
-    let mut player = Player::default();
+    let mut player = Player::new(&config.player_conf);
     app.albums = albums;
     app.playlists = playlists;
 
     let (tx, rx) = std::sync::mpsc::channel::<MpvEvent>();
 
-    if let Err(e) = player.start_mpv() {
+    if let Err(e) = player.start_mpv(config.player_conf.volume) {
         println!("Error starting MPV: {}", e);
         std::process::exit(1);
     }
 
     thread::sleep(Duration::from_millis(300));
 
-    if let Err(e) = player.listen_playlist_changes(tx).await {
+    if let Err(e) = player.observe_mpv_changes(tx).await {
         println!("{}", e);
         std::process::exit(1);
     }
-
-    player.set_loop_playlist().await?;
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -64,11 +63,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         while let Ok(event) = rx.try_recv() {
-            handler::handle_mpv_event(&mut app, &mut player, event);
+            handler::handle_mpv_event(&mut app, &mut player, &mut config, event);
         }
-        if event::poll(Duration::from_millis(500))? {
+        if event::poll(Duration::from_millis(750))? {
             if let Event::Key(key) = event::read()? {
-                handler::handle_key_events(key, &mut app, Arc::clone(&client), &mut player).await;
+                handler::handle_key_events(
+                    key,
+                    &mut app,
+                    Arc::clone(&client),
+                    &mut player,
+                    &mut config,
+                )
+                .await;
             }
         }
 

@@ -1,6 +1,7 @@
 use chrono::Local;
 use reqwest::header::InvalidHeaderValue;
 use std::{
+    fmt::Display,
     fs::{self, OpenOptions},
     io::Write,
 };
@@ -61,9 +62,12 @@ fn get_config_path_display() -> String {
         .unwrap_or_else(|| "~/.config/gytm/config.json".to_string())
 }
 pub type Result<T> = std::result::Result<T, YError>;
-pub fn log_to_file(message: &str) {
+pub fn log_to_file<T: Display>(message: T) {
     if let Some(log_path) = dirs::config_dir().map(|p| p.join("gytm")) {
-        let _ = fs::create_dir_all(&log_path);
+        if !log_path.exists() {
+            let _ = fs::create_dir_all(&log_path);
+        }
+
         let file_path = log_path.join("log.txt");
         let datetime = Local::now().format("%Y-%m-%d %H:%M:%S");
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(file_path) {

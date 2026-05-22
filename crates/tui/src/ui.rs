@@ -1,5 +1,7 @@
-use crate::app::{App, FocusArea};
-use player::{PlayMode, Player, PlayerState};
+use crate::app::App;
+use data::FocusArea;
+use data::{PlayMode, PlayerState};
+use player::Player;
 use ratatui::{
     self, Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -203,6 +205,10 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
         PlayMode::DefaultMode => "Play mode:    Default",
         PlayMode::ShuffleMode => "Play mode:    Shuffle",
     };
+    let right_content = vec![
+        Line::from(mode_text),
+        Line::from(format!("Volume:    {}%", player.volume)),
+    ];
     let key_style = Style::default()
         .fg(theme.secondary)
         .add_modifier(Modifier::BOLD);
@@ -216,7 +222,9 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
         Span::styled("| Pause/Resume: ", text_style),
         Span::styled("m", key_style),
         Span::styled("| Prev/Next: ", text_style),
-        Span::styled("p/n", key_style),
+        Span::styled("p/n ", key_style),
+        Span::styled("| Volume: ", text_style),
+        Span::styled("+/- ", key_style),
         Span::styled(" ]", text_style),
     ]);
 
@@ -231,7 +239,7 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
     let left_area = Paragraph::new(song_info)
         .style(Style::default().fg(theme.base).add_modifier(Modifier::BOLD))
         .alignment(Alignment::Left);
-    let right_area = Paragraph::new(mode_text)
+    let right_area = Paragraph::new(right_content)
         .style(Style::default().fg(theme.base).add_modifier(Modifier::BOLD))
         .alignment(Alignment::Right);
 

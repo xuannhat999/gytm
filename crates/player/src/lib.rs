@@ -1,8 +1,6 @@
-use data::Song;
-use error::log_to_file;
-use error::{Result, YError};
-use serde::Deserialize;
-use serde_json::Value;
+use config::PlayerConfig;
+use data::{MpvEvent, MpvResponse, PlayMode, PlayerState, Song};
+use error::{Result, YError, log_to_file};
 use std::{
     io::Write,
     process::{Command, Stdio},
@@ -10,33 +8,6 @@ use std::{
 use tempfile::NamedTempFile;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
-pub enum MpvEvent {
-    ListChange(Vec<String>),
-    StartPlaying(Song),
-}
-#[derive(Deserialize, Debug)]
-struct MpvResponse {
-    event: Option<String>,
-    name: Option<String>,
-    #[serde(default)]
-    data: Option<Value>,
-}
-
-#[derive(Default, PartialEq)]
-pub enum PlayerState {
-    #[default]
-    Idle,
-    Playing,
-    Paused,
-    Loading,
-}
-
-#[derive(Default, PartialEq)]
-pub enum PlayMode {
-    #[default]
-    DefaultMode,
-    ShuffleMode,
-}
 
 pub struct Player {
     pub current_process: Option<std::process::Child>,
@@ -46,20 +17,19 @@ pub struct Player {
     pub socket_path: String,
     pub playlist_file: Option<NamedTempFile>,
 }
-impl Default for Player {
-    fn default() -> Self {
+
+impl Player {
+    pub fn new(player_conf: &PlayerConfig) -> Self {
         Self {
             current_process: None,
             state: PlayerState::Idle,
-            volume: 100,
-            play_mode: PlayMode::DefaultMode,
+            volume: player_conf.volume,
+            play_mode: player_conf.play_mode.clone(),
             socket_path: "/tmp/mpv-socket".to_string(),
             playlist_file: None,
         }
     }
-}
 
-impl Player {
     // KILL CURRENT MPV PROCESS
     pub fn kill_current_process(&mut self) {
         if let Some(mut child) = self.current_process.take() {
@@ -68,11 +38,7 @@ impl Player {
         }
         self.playlist_file = None
     }
-    pub async fn set_loop_playlist(&self) -> Result<()> {
-        self.send_mpv_command(r#"{"command": ["set_property", "loop-playlist", "inf"]}"#)
-            .await?;
-        Ok(())
-    }
+
     // PLAY PREVIOUS SONG IN ALBUM/PLAYLIST
     pub async fn next(&mut self) -> Result<()> {
         self.state = PlayerState::Loading;
@@ -105,16 +71,33 @@ impl Player {
         Ok(())
     }
 
-    pub fn start_mpv(&mut self) -> Result<()> {
+    // START MPV SOCKET
+    pub fn start_mpv(&mut self, volume: u8) -> Result<()> {
         let child = Command::new("mpv")
             .arg("--idle")
             .arg(format!("--input-ipc-server={}", self.socket_path))
             .arg("--no-video")
+            .arg(format!("--volume={}", volume))
+            .arg("--loop-playlist=inf")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
             .map_err(|_| YError::MpvSpawnError)?;
         self.current_process = Some(child);
+        Ok(())
+    }
+
+    pub async fn increase_volume(&mut self) -> Result<()> {
+        self.volume = self.volume.saturating_add(5).min(100);
+        self.send_mpv_command(r#"{"command": ["add", "volume", 5]}"#)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn decrease_volume(&mut self) -> Result<()> {
+        self.volume = self.volume.saturating_sub(5);
+        self.send_mpv_command(r#"{"command": ["add", "volume", -5]}"#)
+            .await?;
         Ok(())
     }
 
@@ -126,10 +109,7 @@ impl Player {
         stream.write_all(b"\n").await?;
         Ok(())
     }
-    pub async fn listen_playlist_changes(
-        &self,
-        tx: std::sync::mpsc::Sender<MpvEvent>,
-    ) -> Result<()> {
+    pub async fn observe_mpv_changes(&self, tx: std::sync::mpsc::Sender<MpvEvent>) -> Result<()> {
         let socket_path = self.socket_path.clone();
         tokio::spawn(async move {
             let process_events = async {
@@ -137,8 +117,15 @@ impl Player {
                     .await
                     .map_err(|e| YError::MpvSocketError(e.to_string()))?;
 
-                let observe_cmd = r#"{"command": ["observe_property", 1, "playlist"]}"#;
-                s.write_all(format!("{}\n", observe_cmd).as_bytes())
+                // OBSERVE PLAYLIST CHANGE (PLAYING SONG / PLAYING PLAYLIST)
+                let observe_playlist_cmd = r#"{"command": ["observe_property", 1, "playlist"]}"#;
+                s.write_all(format!("{}\n", observe_playlist_cmd).as_bytes())
+                    .await
+                    .map_err(YError::IoError)?;
+
+                // OBSERVE VOLUME CHANGE
+                let observe_vol_cmd = r#"{"command": ["observe_property", 2, "volume"]}"#;
+                s.write_all(format!("{}\n", observe_vol_cmd).as_bytes())
                     .await
                     .map_err(YError::IoError)?;
 
@@ -147,39 +134,52 @@ impl Player {
 
                 while let Ok(Some(line)) = lines.next_line().await {
                     let msg: MpvResponse = serde_json::from_str(&line)?;
-                    if msg.event.as_deref() == Some("property-change")
-                        && msg.name.as_deref() == Some("playlist")
-                    {
-                        if let Some(items) = msg.data.and_then(|d| d.as_array().cloned()) {
-                            let mpv_ids: Vec<String> = items
-                                .iter()
-                                .filter_map(|i| i["filename"].as_str().map(get_vid_id_from_url))
-                                .collect();
-                            tx.send(MpvEvent::ListChange(mpv_ids))
-                                .map_err(|e| YError::ChannelSendError(e.to_string()))?;
-                            if let Some(item) = items.iter().find(|i| {
-                                i["playing"].as_bool() == Some(true)
-                                    || i["current"].as_bool() == Some(true)
-                            }) {
-                                if let (Some(url), Some(title)) =
-                                    (item["filename"].as_str(), item["title"].as_str())
-                                {
-                                    let song = Song {
-                                        title: title.to_string(),
-                                        video_id: get_vid_id_from_url(url),
-                                        ..Default::default()
-                                    };
-                                    tx.send(MpvEvent::StartPlaying(song))
+                    if msg.event.as_deref() == Some("property-change") {
+                        match msg.name.as_deref() {
+                            Some("playlist") => {
+                                if let Some(items) = msg.data.and_then(|d| d.as_array().cloned()) {
+                                    let mpv_ids: Vec<String> = items
+                                        .iter()
+                                        .filter_map(|i| {
+                                            i["filename"].as_str().map(get_vid_id_from_url)
+                                        })
+                                        .collect();
+                                    tx.send(MpvEvent::ListChange(mpv_ids))
+                                        .map_err(|e| YError::ChannelSendError(e.to_string()))?;
+                                    if let Some(item) = items.iter().find(|i| {
+                                        i["playing"].as_bool() == Some(true)
+                                            || i["current"].as_bool() == Some(true)
+                                    }) {
+                                        if let (Some(url), Some(title)) =
+                                            (item["filename"].as_str(), item["title"].as_str())
+                                        {
+                                            let song = Song {
+                                                title: title.to_string(),
+                                                video_id: get_vid_id_from_url(url),
+                                                ..Default::default()
+                                            };
+                                            tx.send(MpvEvent::StartPlaying(song)).map_err(|e| {
+                                                YError::ChannelSendError(e.to_string())
+                                            })?;
+                                        }
+                                    }
+                                }
+                            }
+                            Some("volume") => {
+                                if let Some(vol_float) = msg.data.and_then(|d| d.as_f64()) {
+                                    let vol_int = vol_float as u8;
+                                    tx.send(MpvEvent::VolumeChange(vol_int))
                                         .map_err(|e| YError::ChannelSendError(e.to_string()))?;
                                 }
                             }
+                            _ => {}
                         }
                     }
                 }
                 Ok::<(), YError>(())
             };
             if let Err(e) = process_events.await {
-                log_to_file(&format!("Playlist Listener Error: {}\n", e));
+                log_to_file(&e);
             }
         });
         Ok(())
