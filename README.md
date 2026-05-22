@@ -11,10 +11,10 @@ Stream Youtube Music from your terminal !
 #  Packages required
 - **yt-dlp**: For fetching stream URLs.
 - **mpv**   : The core media engine.
-- **Rust**  : To build the project from source.
 ## Supported OS
 - **Linux** (Tested on **Arch Linux** with **Hyprland**)
 # Installation
+**- Build from source** 
 1. Clone this repository:
 ```
 git clone git@github.com:xuannhat999/gytm.git
@@ -27,7 +27,7 @@ cargo install --path crates/gytm
  
 # Config file path (Linux):
 ```
-~/.config/ytm/config.json
+~/.config/gytm/config.json
 ```
 # Usage
 - Launch `gytm` and enjoy music
