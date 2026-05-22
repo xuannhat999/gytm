@@ -5,7 +5,7 @@ use reqwest::{
     cookie::Jar,
     header::{HeaderMap, HeaderValue},
 };
-use rookie::brave;
+use rookie::load;
 use serde_json::{Value, json};
 use sha1::Digest;
 use std::sync::Arc;
@@ -22,14 +22,7 @@ const YTM_DOMAIN: &str = "https://music.youtube.com";
 
 impl YClient {
     pub async fn new(config: AppConfig) -> Result<Self> {
-        let jar = Jar::default();
-        let url = YTM_DOMAIN.parse::<Url>().unwrap();
-
-        for cookie_slice in config.cookie.split(';') {
-            if !cookie_slice.trim().is_empty() {
-                jar.add_cookie_str(cookie_slice.trim(), &url);
-            }
-        }
+        let (jar, sapisid) = load_auto_cookies()?;
 
         let http = Client::builder()
             .cookie_provider(Arc::new(jar))
@@ -37,9 +30,6 @@ impl YClient {
             .build()?;
 
         let response_text = http.get(YTM_DOMAIN).send().await?.text().await?;
-
-        let sapisid = extract_between(&config.cookie, "SAPISID=", ";")
-            .ok_or_else(|| YError::InvalidCookie)?;
 
         let api_key = extract_between(&response_text, "INNERTUBE_API_KEY\":\"", "\"")
             .ok_or_else(|| YError::InvalidCookie)?;
@@ -49,13 +39,14 @@ impl YClient {
 
         Ok(Self {
             http,
-            sapisid: sapisid.to_string(),
+            sapisid,
             innertube_api_key: api_key.to_string(),
             client_version: client_version.to_string(),
             app_config: config,
         })
     }
-
+    // This function is adapted from: https://github.com/ccgauche/ytermusic.git
+    // Original source: https://github.com/ccgauche/ytermusic/blob/master/crates/ytpapi2/src/lib.rs
     fn compute_sapi_hash(&self) -> String {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -73,14 +64,13 @@ impl YClient {
         format!("{}_{}", timestamp, hex_hash)
     }
 
+    // This function is adapted from: https://github.com/ccgauche/ytermusic.git
+    // Original source: https://github.com/ccgauche/ytermusic/blob/master/crates/ytpapi2/src/lib.rs
     pub fn get_api_headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
-
         headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
-
         headers.insert("X-Goog-AuthUser", HeaderValue::from_static("0"));
-
         headers.insert(
             "Authorization",
             HeaderValue::from_str(&format!("SAPISIDHASH {}", self.compute_sapi_hash())).unwrap(),
@@ -99,8 +89,6 @@ impl YClient {
                 "client": {
                     "clientName": "WEB_REMIX",
                     "clientVersion": self.client_version,
-                    "hl": "vi",
-                    "gl": "VN"
                 }
             },
             "browseId": "FEmusic_library_landing",
@@ -146,22 +134,31 @@ impl YClient {
         Ok(response)
     }
 }
-pub fn load_auto_cookies() -> Result<(Jar)> {
+
+pub fn load_auto_cookies() -> Result<(Jar, String)> {
     let jar = Jar::default();
     let url = "https://music.youtube.com".parse::<Url>()?;
 
-    let domains = vec![
-        "youtube.com".to_string(),
-        "music.youtube.com".to_string(),
-        ".youtube.com".to_string(),
-    ];
-    let cookies = brave(Some(domains)).map_err(|e| YError::CookieError(e.to_string()))?;
+    let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
+
+    let cookies = load(Some(domains)).map_err(|e| YError::CookieError(e.to_string()))?;
+    let mut sapisid_extracted = String::new();
+
     for cookie in cookies {
+        if cookie.name == "SAPISID" {
+            sapisid_extracted = cookie.value.clone();
+        }
         let cookie_str = format!("{}={}", cookie.name, cookie.value);
         jar.add_cookie_str(&cookie_str, &url);
     }
-    Ok(jar)
+
+    if sapisid_extracted.is_empty() {
+        return Err(YError::InvalidCookie);
+    }
+
+    Ok((jar, sapisid_extracted))
 }
+
 fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
     source.find(start).and_then(|start_idx| {
         let start_pos = start_idx + start.len();
@@ -170,3 +167,4 @@ fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
             .map(|end_idx| source[start_pos..start_pos + end_idx].to_string())
     })
 }
+

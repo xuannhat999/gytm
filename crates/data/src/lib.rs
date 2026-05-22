@@ -5,7 +5,6 @@ use std::{fs, io::Write, path::Path};
 
 #[derive(Debug, Deserialize)]
 pub struct AppConfig {
-    pub cookie: String,
     pub user_agent: String,
 }
 
@@ -29,7 +28,6 @@ impl AppConfig {
     pub fn create_config_file(dir: &Path, file: &Path) -> Result<()> {
         fs::create_dir_all(dir)?;
         let default_config = serde_json::json!({
-            "cookie": "PASTE_YOUR_COOKIE_HERE",
             "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         });
         let mut f = fs::File::create(file)?;
