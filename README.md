@@ -24,10 +24,8 @@ git clone git@github.com:xuannhat999/gytm.git
 cd  gytm
 cargo install --path crates/gytm
 ```
-```
-```
  
-*Config file path (Linux):*
+# Config file path (Linux):
 ```
 ~/.config/ytm/config.json
 ```
@@ -36,13 +34,5 @@ cargo install --path crates/gytm
 ```
 gytm
 ```
-## Troubleshooting
-### Expired Cookies
-If you encounter errors after using the app for a while, or if your **playlists and albums disappear**, it is likely that your YouTube Music session cookie has expired.
-
-**To fix this:**
-1. Follow the **Configuration** steps again to obtain a fresh cookie from your browser.
-2. Update the `cookie` field in `~/.config/ytm/config.json`.
-3. Restart `ytm`.
 # ❤️ Credits & Inspiration
 This project is inspired by: [ytermusic](https://github.com/ccgauche/ytermusic.git)
