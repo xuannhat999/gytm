@@ -3,10 +3,9 @@ use std::sync::Arc;
 use crate::app::{App, FocusArea};
 use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
-use data::Song;
 use error::log_to_file;
 use player::{MpvEvent, PlayMode, Player, PlayerState};
-use serde_json::Value;
+
 pub fn handle_mpv_event(app: &mut App, player: &mut Player, event: MpvEvent) {
     match event {
         MpvEvent::ListChange(list) => {
@@ -66,30 +65,23 @@ pub async fn handle_key_events(
             FocusArea::Albums | FocusArea::Playlists => {
                 let is_album = app.focus_area == FocusArea::Albums;
                 let selection = if is_album {
-                    app.album_list_state.selected().map(|i| {
-                        (
-                            &app.albums[i].browse_id,
-                            data::extract_songs_from_album as fn(Value) -> Vec<Song>,
-                        )
-                    })
+                    app.album_list_state
+                        .selected()
+                        .map(|i| &app.albums[i].browse_id)
                 } else {
-                    app.playlist_list_state.selected().map(|i| {
-                        (
-                            &app.playlists[i].browse_id,
-                            data::extract_songs_from_playlist as fn(Value) -> Vec<Song>,
-                        )
-                    })
+                    app.playlist_list_state
+                        .selected()
+                        .map(|i| &app.playlists[i].browse_id)
                 };
-                if let Some((browse_id, extractor)) = selection {
-                    if let Ok(data_songs) = client.get_playlist_songs(browse_id).await {
-                        let songs = extractor(data_songs);
+                if let Some(browse_id) = selection {
+                    if let Ok(songs) = client.get_songs(browse_id).await {
                         if !songs.is_empty() {
                             app.songs = songs;
                             app.songs_list_state.select(Some(0));
                             app.focus_area = FocusArea::SongList;
-                            app.viewing_playlist = Some(browse_id.to_string());
+                            app.viewing_playlist = Some(browse_id.clone());
                             if key_event.code == KeyCode::Enter {
-                                app.playing_playlist = Some(browse_id.to_string());
+                                app.playing_playlist = app.viewing_playlist.clone();
                                 if let Err(e) = player.load_playlist(&app.songs).await {
                                     log_to_file(&format!("{}", e));
                                 }

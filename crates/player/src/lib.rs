@@ -68,12 +68,16 @@ impl Player {
         }
         self.playlist_file = None
     }
-
+    pub async fn set_loop_playlist(&self) -> Result<()> {
+        self.send_mpv_command(r#"{"command": ["set_property", "loop-playlist", "inf"]}"#)
+            .await?;
+        Ok(())
+    }
     // PLAY PREVIOUS SONG IN ALBUM/PLAYLIST
     pub async fn next(&mut self) -> Result<()> {
         self.state = PlayerState::Loading;
         self.send_mpv_command(r#"{"command": ["playlist-next"]}"#)
-            .await;
+            .await?;
         Ok(())
     }
 
@@ -81,7 +85,7 @@ impl Player {
     pub async fn prev(&mut self) -> Result<()> {
         self.state = PlayerState::Loading;
         self.send_mpv_command(r#"{"command": ["playlist-prev"]}"#)
-            .await;
+            .await?;
         Ok(())
     }
 
@@ -149,7 +153,7 @@ impl Player {
                         if let Some(items) = msg.data.and_then(|d| d.as_array().cloned()) {
                             let mpv_ids: Vec<String> = items
                                 .iter()
-                                .filter_map(|i| i["filename"].as_str().map(extract_id))
+                                .filter_map(|i| i["filename"].as_str().map(get_vid_id_from_url))
                                 .collect();
                             tx.send(MpvEvent::ListChange(mpv_ids))
                                 .map_err(|e| YError::ChannelSendError(e.to_string()))?;
@@ -162,11 +166,11 @@ impl Player {
                                 {
                                     let song = Song {
                                         title: title.to_string(),
-                                        video_id: extract_id(url),
+                                        video_id: get_vid_id_from_url(url),
                                         ..Default::default()
                                     };
                                     tx.send(MpvEvent::StartPlaying(song))
-                                        .map_err(|e| YError::ChannelSendError(e.to_string()));
+                                        .map_err(|e| YError::ChannelSendError(e.to_string()))?;
                                 }
                             }
                         }
@@ -181,24 +185,6 @@ impl Player {
         Ok(())
     }
 
-    // pub async fn load_song(&self, video_id: &str, append: bool) {
-    //     let url = format!("https://www.youtube.com/watch?v={}", video_id);
-    //
-    //     let mode = if append { "append-play" } else { "replace" };
-    //
-    //     let command = serde_json::json!({
-    //         "command": ["loadfile", url, mode]
-    //     });
-    //
-    //     if let Ok(mut stream) = UnixStream::connect(&self.socket_path).await {
-    //         if let Ok(cmd_string) = serde_json::to_string(&command) {
-    //             let _ = writeln!(stream, "{}", cmd_string);
-    //         }
-    //     } else {
-    //         eprintln!("Can not connect to socket");
-    //     }
-    // }
-
     pub async fn toggle_playmode(&mut self) -> Result<()> {
         self.state = PlayerState::Loading;
         match self.play_mode {
@@ -206,13 +192,11 @@ impl Player {
                 self.play_mode = PlayMode::ShuffleMode;
                 self.send_mpv_command(r#"{"command": ["playlist-shuffle"]}"#)
                     .await?;
-                // log_to_file("Shuffle");
             }
             PlayMode::ShuffleMode => {
                 self.play_mode = PlayMode::DefaultMode;
                 self.send_mpv_command(r#"{"command": ["playlist-unshuffle"]}"#)
                     .await?;
-                // log_to_file("Default");
             }
         }
         Ok(())
@@ -259,14 +243,8 @@ impl Player {
         self.send_mpv_command(&command).await?;
         Ok(())
     }
-
-    // pub async fn clear_playlist(&mut self) {
-    //     self.state = PlayerState::Loading;
-    //     self.send_mpv_command(r#"{"command": ["playlist-clear"]}"#)
-    //         .await;
-    // }
 }
 
-fn extract_id(url: &str) -> String {
+fn get_vid_id_from_url(url: &str) -> String {
     url.split("v=").last().unwrap_or(url).to_string()
 }

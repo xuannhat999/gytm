@@ -24,27 +24,15 @@ git clone git@github.com:xuannhat999/gytm.git
 cd  gytm
 cargo install --path crates/gytm
 ```
-3. Launch `gytm` once to generate the default configuration.
 ```
-gytm
 ```
-The app will exit automatically after creating the config file.
-
-# Configuration (Required)
-Fill your cookie in the config file
-- Access [YouTube Music](https://music.youtube.com) in your browser ( make sure you signed in)
-- Open Developer's Tools Tab (F12)
-- Go to tab Network
-- Choose filter `Fetch/XHR` under Filter bar
-- Refresh page (F5)
-- Find `browse...` and copy your Cookie at Request Headers in Headers tab
-- Open the configuration file and paste to the `cookie` field  
-*File path (Linux):*
+ 
+*Config file path (Linux):*
 ```
 ~/.config/ytm/config.json
 ```
 # Usage
-- After fill in config file, launch `ytm` and enjoy music
+- Launch `gytm` and enjoy music
 ```
 gytm
 ```
