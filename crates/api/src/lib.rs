@@ -1,11 +1,14 @@
 use data::AppConfig;
 use error::{Result, YError};
 use reqwest::{
-    Client,
-    header::{COOKIE, HeaderMap, HeaderValue, USER_AGENT},
+    Client, Url,
+    cookie::Jar,
+    header::{HeaderMap, HeaderValue},
 };
+use rookie::brave;
 use serde_json::{Value, json};
 use sha1::Digest;
+use std::sync::Arc;
 
 pub struct YClient {
     pub http: Client,
@@ -14,14 +17,24 @@ pub struct YClient {
     pub client_version: String,
     pub app_config: AppConfig,
 }
+
 const YTM_DOMAIN: &str = "https://music.youtube.com";
+
 impl YClient {
     pub async fn new(config: AppConfig) -> Result<Self> {
-        let mut headers = HeaderMap::new();
-        headers.insert(COOKIE, HeaderValue::from_str(&config.cookie)?);
-        headers.insert(USER_AGENT, HeaderValue::from_str(&config.user_agent)?);
+        let jar = Jar::default();
+        let url = YTM_DOMAIN.parse::<Url>().unwrap();
 
-        let http = Client::builder().default_headers(headers.clone()).build()?;
+        for cookie_slice in config.cookie.split(';') {
+            if !cookie_slice.trim().is_empty() {
+                jar.add_cookie_str(cookie_slice.trim(), &url);
+            }
+        }
+
+        let http = Client::builder()
+            .cookie_provider(Arc::new(jar))
+            .user_agent(&config.user_agent)
+            .build()?;
 
         let response_text = http.get(YTM_DOMAIN).send().await?.text().await?;
 
@@ -43,8 +56,6 @@ impl YClient {
         })
     }
 
-    // This function is adapted from: https://github.com/ccgauche/ytermusic.git
-    // Original source: https://github.com/ccgauche/ytermusic/blob/master/crates/ytpapi2/src/lib.rs
     fn compute_sapi_hash(&self) -> String {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -62,12 +73,14 @@ impl YClient {
         format!("{}_{}", timestamp, hex_hash)
     }
 
-    // This function is adapted from: https://github.com/ccgauche/ytermusic.git
-    // Original source: https://github.com/ccgauche/ytermusic/blob/master/crates/ytpapi2/src/lib.rs
     pub fn get_api_headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
-        headers.insert("X-Origin", HeaderValue::from_static(YTM_DOMAIN));
+
+        headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
+
+        headers.insert("X-Goog-AuthUser", HeaderValue::from_static("0"));
+
         headers.insert(
             "Authorization",
             HeaderValue::from_str(&format!("SAPISIDHASH {}", self.compute_sapi_hash())).unwrap(),
@@ -75,7 +88,6 @@ impl YClient {
         headers
     }
 
-    // Fetch YoutubeMusic Data (Library Page)
     pub async fn get_lib_data(&self) -> Result<Value> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
@@ -87,10 +99,13 @@ impl YClient {
                 "client": {
                     "clientName": "WEB_REMIX",
                     "clientVersion": self.client_version,
+                    "hl": "vi",
+                    "gl": "VN"
                 }
             },
             "browseId": "FEmusic_library_landing",
         });
+
         let response = self
             .http
             .post(&url)
@@ -113,6 +128,8 @@ impl YClient {
                 "client": {
                     "clientName": "WEB_REMIX",
                     "clientVersion": self.client_version,
+                    "hl": "vi",
+                    "gl": "VN"
                 }
             },
             "browseId": id.to_string(),
@@ -129,7 +146,22 @@ impl YClient {
         Ok(response)
     }
 }
+pub fn load_auto_cookies() -> Result<(Jar)> {
+    let jar = Jar::default();
+    let url = "https://music.youtube.com".parse::<Url>()?;
 
+    let domains = vec![
+        "youtube.com".to_string(),
+        "music.youtube.com".to_string(),
+        ".youtube.com".to_string(),
+    ];
+    let cookies = brave(Some(domains)).map_err(|e| YError::CookieError(e.to_string()))?;
+    for cookie in cookies {
+        let cookie_str = format!("{}={}", cookie.name, cookie.value);
+        jar.add_cookie_str(&cookie_str, &url);
+    }
+    Ok(jar)
+}
 fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
     source.find(start).and_then(|start_idx| {
         let start_pos = start_idx + start.len();

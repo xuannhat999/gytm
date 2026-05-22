@@ -10,3 +10,4 @@ reqwest = { workspace = true }
 tokio = { workspace = true }
 dirs = { workspace = true }
 chrono = { workspace = true }
+url = { workspace = true }

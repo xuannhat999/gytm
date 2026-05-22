@@ -1,9 +1,9 @@
+use chrono::Local;
+use reqwest::header::InvalidHeaderValue;
 use std::{
     fs::{self, OpenOptions},
     io::Write,
 };
-
-use chrono::Local;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -21,7 +21,7 @@ pub enum YError {
     ReqwestError(#[from] reqwest::Error),
 
     #[error("Request Header Inval: {0}")]
-    InvalidHeaderErr(#[from] reqwest::header::InvalidHeaderValue),
+    InvalidHeaderErr(#[from] InvalidHeaderValue),
 
     #[error("Auth Extraction Err: {0}")]
     AuthError(String),
@@ -49,11 +49,17 @@ pub enum YError {
         get_config_path_display()
     )]
     InvalidCookie,
+
+    #[error("URL parsing failed: {0}")]
+    UrlParseError(#[from] url::ParseError),
+
+    #[error("Cookie Error: {0}")]
+    CookieError(String),
 }
 fn get_config_path_display() -> String {
     dirs::config_dir()
         .map(|p| {
-            p.join("ytm")
+            p.join("gytm")
                 .join("config.json")
                 .to_string_lossy()
                 .into_owned()
