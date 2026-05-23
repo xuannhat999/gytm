@@ -8,7 +8,7 @@ Stream Youtube Music from your terminal !
 - Stream songs on Youtube Music as saved album/playlist
 - Personalized Content: Seamlessly fetch your private playlists/album using local cookie authentication.
 
-#  Packages required
+#  Required packages 
 - **yt-dlp**: For fetching stream URLs.
 - **mpv**   : The core media engine.
 ## Supported OS
