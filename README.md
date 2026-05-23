@@ -25,10 +25,6 @@ cd  gytm
 cargo install --path crates/gytm
 ```
  
-# Config file path (Linux):
-```
-~/.config/gytm/config.json
-```
 # Usage
 - Launch `gytm` and enjoy music
 ```
