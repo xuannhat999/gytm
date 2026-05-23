@@ -4,14 +4,14 @@ use serde::{Deserialize, Serialize};
 use std::{fs, io::Write, path::Path};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct PlayerStat {
+pub struct PlayerState {
     pub volume: u8,
     pub play_mode: PlayMode,
 }
 
-impl Default for PlayerStat {
+impl Default for PlayerState {
     fn default() -> Self {
-        PlayerStat {
+        PlayerState {
             volume: 100,
             play_mode: PlayMode::DefaultMode,
         }
@@ -21,7 +21,7 @@ impl Default for PlayerStat {
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct AppState {
     pub user_agent: String,
-    pub player_stat: PlayerStat,
+    pub player_state: PlayerState,
 }
 
 impl AppState {
@@ -46,7 +46,7 @@ impl AppState {
 
         let default_config = AppState {
             user_agent : "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36".to_string(),
-            player_stat: PlayerStat::default()
+            player_state: PlayerState::default()
         };
         let content = serde_json::to_string_pretty(&default_config)?;
         let mut f = fs::File::create(file)?;

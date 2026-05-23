@@ -1,6 +1,6 @@
 use crate::app::App;
 use data::FocusArea;
-use data::{PlayMode, PlayerState};
+use data::{PlayMode, PlayerStatus};
 use player::Player;
 use ratatui::{
     self, Frame,
@@ -187,11 +187,11 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
 }
 
 fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, theme: &Theme) {
-    let song_info = if player.state == PlayerState::Loading {
+    let song_info = if player.state == PlayerStatus::Loading {
         "Loading...".to_string()
     } else {
         if let Some(song) = &app.playing_song {
-            let status_icon = if player.state == PlayerState::Playing {
+            let status_icon = if player.state == PlayerStatus::Playing {
                 "▶ Playing: "
             } else {
                 "⏸ Paused: "

@@ -30,7 +30,7 @@ pub enum MpvEvent {
 }
 
 #[derive(Default, PartialEq)]
-pub enum PlayerState {
+pub enum PlayerStatus {
     #[default]
     Idle,
     Playing,

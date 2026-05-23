@@ -1,6 +1,6 @@
-use data::{MpvEvent, MpvResponse, PlayMode, PlayerState, Song};
+use data::{MpvEvent, MpvResponse, PlayMode, PlayerStatus, Song};
 use error::{Result, YError, log_to_file};
-use state::PlayerStat;
+use state::PlayerState;
 use std::{
     io::Write,
     process::{Command, Stdio},
@@ -11,7 +11,7 @@ use tokio::net::UnixStream;
 
 pub struct Player {
     pub current_process: Option<std::process::Child>,
-    pub state: PlayerState,
+    pub state: PlayerStatus,
     pub volume: u8,
     pub play_mode: PlayMode,
     pub socket_path: String,
@@ -19,12 +19,12 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(player_conf: &PlayerStat) -> Self {
+    pub fn new(player_state: &PlayerState) -> Self {
         Self {
             current_process: None,
-            state: PlayerState::Idle,
-            volume: player_conf.volume,
-            play_mode: player_conf.play_mode.clone(),
+            state: PlayerStatus::Idle,
+            volume: player_state.volume,
+            play_mode: player_state.play_mode.clone(),
             socket_path: "/tmp/mpv-socket".to_string(),
             playlist_file: None,
         }
@@ -41,7 +41,7 @@ impl Player {
 
     // PLAY PREVIOUS SONG IN ALBUM/PLAYLIST
     pub async fn next(&mut self) -> Result<()> {
-        self.state = PlayerState::Loading;
+        self.state = PlayerStatus::Loading;
         self.send_mpv_command(r#"{"command": ["playlist-next"]}"#)
             .await?;
         Ok(())
@@ -49,7 +49,7 @@ impl Player {
 
     // PLAY NEXT SONG IN ALBUM/PLAYLIST
     pub async fn prev(&mut self) -> Result<()> {
-        self.state = PlayerState::Loading;
+        self.state = PlayerStatus::Loading;
         self.send_mpv_command(r#"{"command": ["playlist-prev"]}"#)
             .await?;
         Ok(())
@@ -58,11 +58,11 @@ impl Player {
     // PAUSE PLAYING SONG
     pub async fn toggle_pause(&mut self) -> Result<()> {
         match self.state {
-            PlayerState::Playing => {
-                self.state = PlayerState::Paused;
+            PlayerStatus::Playing => {
+                self.state = PlayerStatus::Paused;
             }
-            PlayerState::Paused => {
-                self.state = PlayerState::Playing;
+            PlayerStatus::Paused => {
+                self.state = PlayerStatus::Playing;
             }
             _ => {}
         };
@@ -211,7 +211,7 @@ impl Player {
         if songs.is_empty() {
             return Err(YError::PlaylistEmpty);
         }
-        self.state = PlayerState::Loading;
+        self.state = PlayerStatus::Loading;
         if self.playlist_file.is_none() {
             self.playlist_file = Some(NamedTempFile::new()?);
         }
@@ -234,7 +234,7 @@ impl Player {
     }
 
     pub async fn play_at_idx(&mut self, index: &usize) -> Result<()> {
-        self.state = PlayerState::Loading;
+        self.state = PlayerStatus::Loading;
         let command = format!(
             r#"{{"command": ["set_property", "playlist-pos", {}]}}"#,
             index

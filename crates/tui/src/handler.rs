@@ -4,7 +4,7 @@ use crate::app::App;
 use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::FocusArea;
-use data::{MpvEvent, PlayMode, PlayerState};
+use data::{MpvEvent, PlayMode, PlayerStatus};
 use error::log_to_file;
 use player::Player;
 use state::AppState;
@@ -19,15 +19,15 @@ pub fn handle_mpv_event(
         MpvEvent::ListChange(list) => {
             app.mpv_list = list;
             if !app.mpv_list.is_empty() {
-                player.state = PlayerState::Loading;
+                player.state = PlayerStatus::Loading;
             }
         }
         MpvEvent::StartPlaying(song) => {
             app.playing_song = Some(song);
-            player.state = PlayerState::Playing;
+            player.state = PlayerStatus::Playing;
         }
         MpvEvent::VolumeChange(vol) => {
-            config.player_stat.volume = vol;
+            config.player_state.volume = vol;
             if let Err(e) = config.save() {
                 log_to_file(&e);
             }
@@ -64,7 +64,7 @@ pub async fn handle_key_events(
             if let Err(e) = player.toggle_playmode().await {
                 log_to_file(&e);
             } else {
-                config.player_stat.play_mode = player.play_mode.clone();
+                config.player_state.play_mode = player.play_mode.clone();
                 if let Err(e) = config.save() {
                     log_to_file(&e);
                 }

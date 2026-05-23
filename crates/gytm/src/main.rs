@@ -31,13 +31,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (albums, playlists) = client.get_lists().await?;
 
     let mut app = App::default();
-    let mut player = Player::new(&config.player_stat);
+    let mut player = Player::new(&config.player_state);
     app.albums = albums;
     app.playlists = playlists;
 
     let (tx, rx) = std::sync::mpsc::channel::<MpvEvent>();
 
-    if let Err(e) = player.start_mpv(config.player_stat.volume) {
+    if let Err(e) = player.start_mpv(config.player_state.volume) {
         println!("Error starting MPV: {}", e);
         std::process::exit(1);
     }
