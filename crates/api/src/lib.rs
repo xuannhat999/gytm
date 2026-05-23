@@ -1,4 +1,3 @@
-use config::AppConfig;
 use data::{PlayList, Song};
 use error::{Result, YError, log_to_file};
 use reqwest::{
@@ -9,6 +8,7 @@ use reqwest::{
 use rookie::load;
 use serde_json::{Value, json};
 use sha1::Digest;
+use state::AppState;
 use std::sync::Arc;
 pub mod parser;
 
@@ -22,7 +22,7 @@ pub struct YClient {
 const YTM_DOMAIN: &str = "https://music.youtube.com";
 
 impl YClient {
-    pub async fn new(config: &AppConfig) -> Result<Self> {
+    pub async fn new(config: &AppState) -> Result<Self> {
         let (jar, sapisid) = load_cookies()?;
 
         let http = Client::builder()

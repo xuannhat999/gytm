@@ -9,7 +9,7 @@ members = [
   "crates/player",
   "crates/testing",
   "crates/gytm",
-  "crates/config",
+  "crates/state",
 ]
 
 [workspace.dependencies]
@@ -35,4 +35,4 @@ api = { path = "crates/api" }
 data = { path = "crates/data" }
 error = { path = "crates/error" }
 gytm = { path = "crates/gytm" }
-config = { path = "crates/config" }
+state = { path = "crates/state" }

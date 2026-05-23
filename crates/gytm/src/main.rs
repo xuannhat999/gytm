@@ -1,5 +1,4 @@
 use api::YClient;
-use config::AppConfig;
 use crossterm::{
     event::{self, Event},
     execute,
@@ -8,12 +7,13 @@ use crossterm::{
 use data::MpvEvent;
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
+use state::AppState;
 use std::{io, sync::Arc, thread, time::Duration};
 use tui::{app::App, handler, ui};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut config = match AppConfig::load() {
+    let mut config = match AppState::load() {
         Ok(c) => c,
         Err(e) => {
             println!("{}", e);
@@ -31,13 +31,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (albums, playlists) = client.get_lists().await?;
 
     let mut app = App::default();
-    let mut player = Player::new(&config.player_conf);
+    let mut player = Player::new(&config.player_stat);
     app.albums = albums;
     app.playlists = playlists;
 
     let (tx, rx) = std::sync::mpsc::channel::<MpvEvent>();
 
-    if let Err(e) = player.start_mpv(config.player_conf.volume) {
+    if let Err(e) = player.start_mpv(config.player_stat.volume) {
         println!("Error starting MPV: {}", e);
         std::process::exit(1);
     }

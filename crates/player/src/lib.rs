@@ -1,6 +1,6 @@
-use config::PlayerConfig;
 use data::{MpvEvent, MpvResponse, PlayMode, PlayerState, Song};
 use error::{Result, YError, log_to_file};
+use state::PlayerStat;
 use std::{
     io::Write,
     process::{Command, Stdio},
@@ -19,7 +19,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(player_conf: &PlayerConfig) -> Self {
+    pub fn new(player_conf: &PlayerStat) -> Self {
         Self {
             current_process: None,
             state: PlayerState::Idle,
@@ -166,9 +166,9 @@ impl Player {
                                 }
                             }
                             Some("volume") => {
-                                if let Some(vol_float) = msg.data.and_then(|d| d.as_f64()) {
-                                    let vol_int = vol_float as u8;
-                                    tx.send(MpvEvent::VolumeChange(vol_int))
+                                if let Some(volume) = msg.data.and_then(|d| d.as_f64()) {
+                                    let vol = volume as u8;
+                                    tx.send(MpvEvent::VolumeChange(vol))
                                         .map_err(|e| YError::ChannelSendError(e.to_string()))?;
                                 }
                             }
@@ -186,7 +186,6 @@ impl Player {
     }
 
     pub async fn toggle_playmode(&mut self) -> Result<()> {
-        self.state = PlayerState::Loading;
         match self.play_mode {
             PlayMode::DefaultMode => {
                 self.play_mode = PlayMode::ShuffleMode;

@@ -2,17 +2,17 @@ use std::sync::Arc;
 
 use crate::app::App;
 use api::YClient;
-use config::AppConfig;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::FocusArea;
 use data::{MpvEvent, PlayMode, PlayerState};
 use error::log_to_file;
 use player::Player;
+use state::AppState;
 
 pub fn handle_mpv_event(
     app: &mut App,
     player: &mut Player,
-    config: &mut AppConfig,
+    config: &mut AppState,
     event: MpvEvent,
 ) {
     match event {
@@ -27,7 +27,7 @@ pub fn handle_mpv_event(
             player.state = PlayerState::Playing;
         }
         MpvEvent::VolumeChange(vol) => {
-            config.player_conf.volume = vol;
+            config.player_stat.volume = vol;
             if let Err(e) = config.save() {
                 log_to_file(&e);
             }
@@ -39,7 +39,7 @@ pub async fn handle_key_events(
     app: &mut App,
     client: Arc<YClient>,
     player: &mut Player,
-    config: &mut AppConfig,
+    config: &mut AppState,
 ) {
     match key_event.code {
         KeyCode::Char('q') => app.is_exit = true,
@@ -64,19 +64,23 @@ pub async fn handle_key_events(
             if let Err(e) = player.toggle_playmode().await {
                 log_to_file(&e);
             } else {
-                config.player_conf.play_mode = player.play_mode.clone();
+                config.player_stat.play_mode = player.play_mode.clone();
                 if let Err(e) = config.save() {
                     log_to_file(&e);
                 }
             }
         }
         KeyCode::Char('n') => {
-            if let Err(e) = player.next().await {
+            if !app.songs.is_empty()
+                && let Err(e) = player.next().await
+            {
                 log_to_file(&e);
             }
         }
         KeyCode::Char('p') => {
-            if let Err(e) = player.prev().await {
+            if !app.songs.is_empty()
+                && let Err(e) = player.prev().await
+            {
                 log_to_file(&e);
             }
         }
