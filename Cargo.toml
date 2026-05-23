@@ -34,10 +34,10 @@ api = { path = "crates/api" }
 data = { path = "crates/data" }
 error = { path = "crates/error" }
 gytm = { path = "crates/gytm" }
+state = { path = "crates/state" }
 
 [profile.release]
 opt-level = "z"
 lto = true
 codegen-units = 1
 strip = true
-state = { path = "crates/state" }
