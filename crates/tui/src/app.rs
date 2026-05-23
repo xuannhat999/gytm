@@ -1,12 +1,7 @@
+use data::FocusArea;
 use data::{PlayList, Song};
 use ratatui::widgets::ListState;
 
-#[derive(PartialEq)]
-pub enum FocusArea {
-    Albums,
-    Playlists,
-    SongList,
-}
 pub struct App {
     pub albums: Vec<PlayList>,
     pub playlists: Vec<PlayList>,

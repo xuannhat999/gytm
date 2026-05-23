@@ -9,6 +9,7 @@ members = [
   "crates/player",
   "crates/testing",
   "crates/gytm",
+  "crates/state",
 ]
 
 [workspace.dependencies]
@@ -39,3 +40,4 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 strip = true
+state = { path = "crates/state" }

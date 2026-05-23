@@ -12,6 +12,7 @@ data = { workspace = true }
 api = { workspace = true }
 error = { workspace = true }
 player = { workspace = true }
+state = { workspace = true }
 
 crossterm = { workspace = true }
 serde = { workspace = true }

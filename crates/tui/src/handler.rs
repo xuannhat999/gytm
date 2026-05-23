@@ -1,12 +1,20 @@
 use std::sync::Arc;
 
-use crate::app::{App, FocusArea};
+use crate::app::App;
 use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
+use data::FocusArea;
+use data::{MpvEvent, PlayMode, PlayerState};
 use error::log_to_file;
-use player::{MpvEvent, PlayMode, Player, PlayerState};
+use player::Player;
+use state::AppState;
 
-pub fn handle_mpv_event(app: &mut App, player: &mut Player, event: MpvEvent) {
+pub fn handle_mpv_event(
+    app: &mut App,
+    player: &mut Player,
+    config: &mut AppState,
+    event: MpvEvent,
+) {
     match event {
         MpvEvent::ListChange(list) => {
             app.mpv_list = list;
@@ -18,6 +26,12 @@ pub fn handle_mpv_event(app: &mut App, player: &mut Player, event: MpvEvent) {
             app.playing_song = Some(song);
             player.state = PlayerState::Playing;
         }
+        MpvEvent::VolumeChange(vol) => {
+            config.player_stat.volume = vol;
+            if let Err(e) = config.save() {
+                log_to_file(&e);
+            }
+        }
     }
 }
 pub async fn handle_key_events(
@@ -25,6 +39,7 @@ pub async fn handle_key_events(
     app: &mut App,
     client: Arc<YClient>,
     player: &mut Player,
+    config: &mut AppState,
 ) {
     match key_event.code {
         KeyCode::Char('q') => app.is_exit = true,
@@ -42,22 +57,41 @@ pub async fn handle_key_events(
         KeyCode::Char('3') => app.focus_area = FocusArea::SongList,
         KeyCode::Char(' ') if app.playing_song.is_some() => {
             if let Err(e) = player.toggle_pause().await {
-                log_to_file(&format!("{}", e));
+                log_to_file(&e);
             }
         }
         KeyCode::Char('m') => {
             if let Err(e) = player.toggle_playmode().await {
-                log_to_file(&format!("{}", e));
+                log_to_file(&e);
+            } else {
+                config.player_stat.play_mode = player.play_mode.clone();
+                if let Err(e) = config.save() {
+                    log_to_file(&e);
+                }
             }
         }
         KeyCode::Char('n') => {
-            if let Err(e) = player.next().await {
-                log_to_file(&format!("{}", e));
+            if !app.songs.is_empty()
+                && let Err(e) = player.next().await
+            {
+                log_to_file(&e);
             }
         }
         KeyCode::Char('p') => {
-            if let Err(e) = player.prev().await {
-                log_to_file(&format!("{}", e));
+            if !app.songs.is_empty()
+                && let Err(e) = player.prev().await
+            {
+                log_to_file(&e);
+            }
+        }
+        KeyCode::Char('-') => {
+            if let Err(e) = player.decrease_volume().await {
+                log_to_file(&e);
+            }
+        }
+        KeyCode::Char('+') => {
+            if let Err(e) = player.increase_volume().await {
+                log_to_file(&e);
             }
         }
         // --- ENTER / L
@@ -83,13 +117,13 @@ pub async fn handle_key_events(
                             if key_event.code == KeyCode::Enter {
                                 app.playing_playlist = app.viewing_playlist.clone();
                                 if let Err(e) = player.load_playlist(&app.songs).await {
-                                    log_to_file(&format!("{}", e));
+                                    log_to_file(&e);
                                 }
                                 if player.play_mode == PlayMode::ShuffleMode {
                                     tokio::time::sleep(tokio::time::Duration::from_millis(50))
                                         .await;
                                     if let Err(e) = player.shuffle().await {
-                                        log_to_file(&format!("{}", e));
+                                        log_to_file(&e);
                                     }
                                 }
                                 if is_album {
@@ -107,29 +141,28 @@ pub async fn handle_key_events(
 
             FocusArea::SongList => {
                 if let Some(i) = app.songs_list_state.selected() {
-                    // log_to_file("Played song");
                     let target_id = &app.songs[i].video_id;
                     if app.playing_playlist == app.viewing_playlist {
                         if let Some(pos) = app.get_mpv_idx(target_id) {
                             if let Err(e) = player.play_at_idx(&pos).await {
-                                log_to_file(&format!("{}", e));
+                                log_to_file(&e);
                             }
                         } else {
                             log_to_file("Failed to get mpv index");
                         }
                     } else {
                         if let Err(e) = player.load_playlist(&app.songs).await {
-                            log_to_file(&format!("{}", e));
+                            log_to_file(&e);
                         }
                         tokio::time::sleep(tokio::time::Duration::from_millis(120)).await;
                         if let Err(e) = player.play_at_idx(&i).await {
-                            log_to_file(&format!("{}", e));
+                            log_to_file(&e);
                         }
                         app.playing_playlist = app.viewing_playlist.clone();
                         if player.play_mode == PlayMode::ShuffleMode {
                             tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
                             if let Err(e) = player.shuffle().await {
-                                log_to_file(&format!("{}", e));
+                                log_to_file(&e);
                             }
                         }
                     }

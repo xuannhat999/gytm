@@ -1,5 +1,5 @@
-use data::{AppConfig, PlayList, Song};
-use error::{Result, YError};
+use data::{PlayList, Song};
+use error::{Result, YError, log_to_file};
 use reqwest::{
     Client, Url,
     cookie::Jar,
@@ -8,6 +8,7 @@ use reqwest::{
 use rookie::load;
 use serde_json::{Value, json};
 use sha1::Digest;
+use state::AppState;
 use std::sync::Arc;
 pub mod parser;
 
@@ -16,13 +17,12 @@ pub struct YClient {
     pub sapisid: String,
     pub innertube_api_key: String,
     pub client_version: String,
-    pub app_config: AppConfig,
 }
 
 const YTM_DOMAIN: &str = "https://music.youtube.com";
 
 impl YClient {
-    pub async fn new(config: AppConfig) -> Result<Self> {
+    pub async fn new(config: &AppState) -> Result<Self> {
         let (jar, sapisid) = load_cookies()?;
 
         let http = Client::builder()
@@ -43,7 +43,6 @@ impl YClient {
             sapisid,
             innertube_api_key: api_key.to_string(),
             client_version: client_version.to_string(),
-            app_config: config,
         })
     }
 
@@ -168,7 +167,7 @@ impl YClient {
         let raw_data = match self.get_raw_lists().await {
             Ok(raw_lists) => raw_lists,
             Err(e) => {
-                error::log_to_file(&e.to_string());
+                log_to_file(&e);
                 Value::Null
             }
         };
@@ -176,7 +175,7 @@ impl YClient {
         let (mut albums, mut playlists, mut token) = match parser::extract_lists(raw_data) {
             Ok((albums, playlists, token)) => (albums, playlists, token),
             Err(e) => {
-                error::log_to_file(&e.to_string());
+                log_to_file(&e);
                 (Vec::new(), Vec::new(), None)
             }
         };
@@ -198,14 +197,14 @@ impl YClient {
         let raw_songs = match self.get_raw_songs(id).await {
             Ok(raw_songs) => raw_songs,
             Err(e) => {
-                error::log_to_file(&e.to_string());
+                log_to_file(&e);
                 Value::Null
             }
         };
         let songs = match parser::extract_songs(raw_songs) {
             Ok(songs) => songs,
             Err(e) => {
-                error::log_to_file(&e.to_string());
+                log_to_file(&e);
                 Vec::new()
             }
         };
