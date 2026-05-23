@@ -68,7 +68,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
             .iter()
             .map(|item| {
                 let is_playing = app
-                    .playing_playlist
+                    .playing_playlist_id
                     .as_ref()
                     .map_or(false, |playing| playing.as_str() == item.browse_id);
                 let content = format!(" {} - {}", item.title, item.artist);

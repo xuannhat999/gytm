@@ -72,12 +72,12 @@ impl Player {
     }
 
     // START MPV SOCKET
-    pub fn start_mpv(&mut self, volume: u8) -> Result<()> {
+    pub fn start_mpv(&mut self) -> Result<()> {
         let child = Command::new("mpv")
             .arg("--idle")
             .arg(format!("--input-ipc-server={}", self.socket_path))
             .arg("--no-video")
-            .arg(format!("--volume={}", volume))
+            .arg(format!("--volume={}", self.volume))
             .arg("--loop-playlist=inf")
             .stdout(Stdio::null())
             .stderr(Stdio::null())

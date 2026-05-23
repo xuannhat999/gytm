@@ -32,7 +32,7 @@ impl YClient {
 
         let response_text = http.get(YTM_DOMAIN).send().await?.text().await?;
 
-        let api_key = extract_between(&response_text, "INNERTUBE_API_KEY\":\"", "\"")
+        let innertube_api_key = extract_between(&response_text, "INNERTUBE_API_KEY\":\"", "\"")
             .ok_or_else(|| YError::InvalidCookie)?;
 
         let client_version = extract_between(&response_text, "INNERTUBE_CLIENT_VERSION\":\"", "\"")
@@ -41,8 +41,8 @@ impl YClient {
         Ok(Self {
             http,
             sapisid,
-            innertube_api_key: api_key.to_string(),
-            client_version: client_version.to_string(),
+            innertube_api_key,
+            client_version,
         })
     }
 
@@ -214,7 +214,7 @@ impl YClient {
 
 pub fn load_cookies() -> Result<(Jar, String)> {
     let jar = Jar::default();
-    let url = "https://music.youtube.com".parse::<Url>()?;
+    let url = YTM_DOMAIN.parse::<Url>()?;
 
     let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
 
