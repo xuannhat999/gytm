@@ -11,20 +11,45 @@ Stream Youtube Music from your terminal !
 #  Required packages 
 - **yt-dlp**: For fetching stream URLs.
 - **mpv**   : The core media engine.
+- **sqlite**: Local database
+# Build Dependencies (Only required if building from source)
+* **Rust & Cargo** (1.75 or later)
+* **pkg-config**
+* **openssl** development headers
 ## Supported OS
-- **Linux** (Tested on **Arch Linux** with **Hyprland**)
+- **Linux** (Tested on **Arch Linux**)
 # Installation
 **- Build from source** 
 1. Clone this repository:
 ```
-git clone git@github.com:xuannhat999/gytm.git
+git clone https://github.com/xuannhat999/gytm.git
 ```
 2. Install the binary
 ```
-cd  gytm
-cargo install --path crates/gytm
+cd gytm
+cargo install --bin gytm
 ```
- 
+ **- From AUR (Arch Linux)**
+ ```
+yay -S gytm-git
+```
+##  Authentication (Personalized Content)
+
+`gytm` uses the `rookie` crate to automatically detect and fetch your YouTube Music session cookies from your local  web browsers. 
+
+**How to use:**
+1. Open any major web browser (Chrome, Firefox, Brave, etc.) and log in to your YouTube Music account.
+2. Launch `gytm`. It will automatically find the active session.
+
+# ⚠️ Troubleshooting (App freezes on startup)
+If you are using a standalone **Window Manager (Hyprland, i3, Sway, etc.)** and the app freezes on startup, your browser's secure storage is likely locked. Because these environments lack a default graphical interface to prompt for your password, the application hangs waiting for permission.
+
+To fix this, you need to ensure your system's credential store is accessible before running `gytm`:
+
+* **Option 1 (Unlock Keyring/Wallet):** Open your terminal and manually force-unlock your system's keyring or wallet daemon using its respective CLI command (e.g., `gnome-keyring-daemon --unlock` or `kwalletd6`) before launching the app.
+* **Option 2 (Launch a Polkit Agent):** Ensure you have a Polkit authentication agent installed and running in your Window Manager configuration to properly handle and display graphical password prompts.
+
+
 # Usage
 - Launch `gytm` and enjoy music
 ```
