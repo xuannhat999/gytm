@@ -5,11 +5,11 @@ use reqwest::{
     cookie::Jar,
     header::{HeaderMap, HeaderValue},
 };
-use rookie::load;
+use rookie::{any_browser, common::enums::Cookie, load};
 use serde_json::{Value, json};
 use sha1::Digest;
 use state::AppState;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 pub mod parser;
 
 pub struct YClient {
@@ -212,14 +212,18 @@ impl YClient {
     }
 }
 
+// ONLY WORKS WITH CHROMIUM BASED BROWSER ( No idea )
 pub fn load_cookies() -> Result<(Jar, String)> {
     let jar = Jar::default();
     let url = YTM_DOMAIN.parse::<Url>()?;
 
     let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
 
-    let cookies = load(Some(domains)).map_err(|_| YError::InvalidCookie)?;
+    let mut cookies = load(Some(domains)).map_err(|_| YError::InvalidCookie)?;
     let mut sapisid_extracted = String::new();
+    if cookies.is_empty() {
+        cookies = load_cookies_firefox_based()?;
+    }
 
     for cookie in cookies {
         if cookie.name == "SAPISID" {
@@ -243,4 +247,40 @@ fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
             .find(end)
             .map(|end_idx| source[start_pos..start_pos + end_idx].to_string())
     })
+}
+
+pub fn load_cookies_firefox_based() -> Result<Vec<Cookie>> {
+    let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
+    let browser_dirs = vec!["mozilla/firefox", "librewolf/librewolf", "zen"];
+
+    let config_dir = dirs::config_dir().ok_or_else(|| YError::InvalidCookie)?;
+    let mut target_db_path: Option<PathBuf> = None;
+
+    'outer: for browser in browser_dirs {
+        let base_path = config_dir.join(browser);
+        if !base_path.exists() {
+            continue;
+        }
+
+        if let Ok(entries) = std::fs::read_dir(base_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let db_path = path.join("cookies.sqlite");
+                    if db_path.exists() {
+                        target_db_path = Some(db_path);
+                        break 'outer;
+                    }
+                }
+            }
+        }
+    }
+
+    let db_path_buf = target_db_path.ok_or_else(|| YError::InvalidCookie)?;
+    let cookies_path = db_path_buf.to_str().ok_or_else(|| YError::InvalidCookie)?;
+
+    let cookies =
+        any_browser(cookies_path, Some(domains), None).map_err(|_| YError::InvalidCookie)?;
+
+    Ok(cookies)
 }
