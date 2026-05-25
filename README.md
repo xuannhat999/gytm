@@ -30,7 +30,7 @@ git clone https://github.com/xuannhat999/gytm.git
 cd gytm
 cargo install --bin gytm
 ```
-**- From AUR (Arch Linux)**  
+**- From AUR (Arch User Repository)**  
 *Using yay*
 ```
 yay -S gytm-git
@@ -39,14 +39,14 @@ yay -S gytm-git
 ```
 paru -S gytm-git
 ```
-##  Authentication (Personalized Content)
+#  Authentication (Personalized Content)
 
 `gytm` uses the `rookie` crate to automatically detect and fetch your YouTube Music session cookies from your local  web browsers. 
 ### Supported browsers
 - Chromium based ( Brave, Google Chrome, Chromium...)
 - Firefox based( Firefox, Librewolf, Zen )
-### How to use:
-1. Keep your Youtube/Youtube Music accounnt signed in on your browser.
+# How to use:
+1. Keep your Youtube/Youtube Music account signed in on your browser.
 2. Launch `gytm`. It will automatically find the active session.
 
 # ⚠️ Troubleshooting (App freezes on startup)
@@ -57,11 +57,5 @@ To fix this, you need to ensure your system's credential store is accessible bef
 * **Option 1 (Unlock Keyring/Wallet):** Open your terminal and manually force-unlock your system's keyring or wallet daemon using its respective CLI command (e.g., `gnome-keyring-daemon --unlock` or `kwalletd6`) before launching the app.
 * **Option 2 (Launch a Polkit Agent):** Ensure you have a Polkit authentication agent installed and running in your Window Manager configuration to properly handle and display graphical password prompts.
 
-
-# Usage
-- Launch `gytm` and enjoy music
-```
-gytm
-```
 # ❤️ Credits & Inspiration
 This project is inspired by: [ytermusic](https://github.com/ccgauche/ytermusic.git)
