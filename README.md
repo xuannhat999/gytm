@@ -29,9 +29,14 @@ git clone https://github.com/xuannhat999/gytm.git
 cd gytm
 cargo install --bin gytm
 ```
- **- From AUR (Arch Linux)**
- ```
+**- From AUR (Arch Linux)**  
+*Using yay*
+```
 yay -S gytm-git
+```
+*Using paru*
+```
+paru -S gytm-git
 ```
 ##  Authentication (Personalized Content)
 
