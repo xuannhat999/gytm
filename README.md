@@ -44,7 +44,7 @@ paru -S gytm-git
 `gytm` uses the `rookie` crate to automatically detect and fetch your YouTube Music session cookies from your local  web browsers. 
 ### Supported browsers
 - Chromium based ( Brave, Google Chrome, Chromium...)
-
+- Firefox based( Firefox, Librewolf, Zen)
 **How to use:**
 1. Open any major web browser (Chrome, Firefox, Brave, etc.) and log in to your YouTube Music account.
 2. Launch `gytm`. It will automatically find the active session.
