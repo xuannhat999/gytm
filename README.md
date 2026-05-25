@@ -7,6 +7,8 @@ Stream Youtube Music from your terminal !
 # Features
 - Stream songs on Youtube Music as saved album/playlist
 - Personalized Content: Seamlessly fetch your private playlists/album using local cookie authentication.
+## Supported OS
+- **Linux** (Arch Linux)
 
 #  Required packages 
 - **yt-dlp**: For fetching stream URLs.
@@ -16,8 +18,7 @@ Stream Youtube Music from your terminal !
 * **Rust & Cargo** (1.75 or later)
 * **pkg-config**
 * **openssl** development headers
-## Supported OS
-- **Linux** (Tested on **Arch Linux**)
+
 # Installation
 **- Build from source** 
 1. Clone this repository:
@@ -41,6 +42,8 @@ paru -S gytm-git
 ##  Authentication (Personalized Content)
 
 `gytm` uses the `rookie` crate to automatically detect and fetch your YouTube Music session cookies from your local  web browsers. 
+### Supported browsers
+- Chromium based ( Brave, Google Chrome, Chromium...)
 
 **How to use:**
 1. Open any major web browser (Chrome, Firefox, Brave, etc.) and log in to your YouTube Music account.
