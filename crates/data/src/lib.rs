@@ -9,18 +9,18 @@ pub struct PlayList {
     pub playlist_id: String,
 }
 
+#[derive(Default, Debug)]
+pub struct Song {
+    pub title: String,
+    pub video_id: String,
+}
+
 #[derive(Deserialize, Debug)]
 pub struct MpvResponse {
     pub event: Option<String>,
     pub name: Option<String>,
     #[serde(default)]
     pub data: Option<Value>,
-}
-
-#[derive(Default, Debug)]
-pub struct Song {
-    pub title: String,
-    pub video_id: String,
 }
 
 pub enum MpvEvent {

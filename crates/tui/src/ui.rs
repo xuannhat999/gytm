@@ -68,7 +68,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
             .iter()
             .map(|item| {
                 let is_playing = app
-                    .playing_playlist
+                    .playing_playlist_id
                     .as_ref()
                     .map_or(false, |playing| playing.as_str() == item.browse_id);
                 let content = format!(" {} - {}", item.title, item.artist);
@@ -187,11 +187,11 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
 }
 
 fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, theme: &Theme) {
-    let song_info = if player.state == PlayerStatus::Loading {
+    let song_info = if player.status == PlayerStatus::Loading {
         "Loading...".to_string()
     } else {
         if let Some(song) = &app.playing_song {
-            let status_icon = if player.state == PlayerStatus::Playing {
+            let status_icon = if player.status == PlayerStatus::Playing {
                 "▶ Playing: "
             } else {
                 "⏸ Paused: "

@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (tx, rx) = std::sync::mpsc::channel::<MpvEvent>();
 
-    if let Err(e) = player.start_mpv(config.player_state.volume) {
+    if let Err(e) = player.start_mpv() {
         println!("Error starting MPV: {}", e);
         std::process::exit(1);
     }

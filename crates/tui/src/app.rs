@@ -12,13 +12,13 @@ pub struct App {
     pub playlist_list_state: ListState,
     pub songs_list_state: ListState,
 
-    pub is_exit: bool,
-
     pub playing_song: Option<Song>,
     pub mpv_list: Vec<String>,
 
-    pub playing_playlist: Option<String>,
-    pub viewing_playlist: Option<String>,
+    pub playing_playlist_id: Option<String>,
+    pub viewing_playlist_id: Option<String>,
+
+    pub is_exit: bool,
 }
 impl Default for App {
     fn default() -> Self {
@@ -26,15 +26,21 @@ impl Default for App {
             albums: Vec::new(),
             playlists: Vec::new(),
             songs: Vec::new(),
+
             album_list_state: ListState::default(),
             playlist_list_state: ListState::default(),
             songs_list_state: ListState::default(),
+
             focus_area: FocusArea::Albums,
-            is_exit: false,
+
             playing_song: None,
+
             mpv_list: Vec::new(),
-            playing_playlist: None,
-            viewing_playlist: None,
+
+            playing_playlist_id: None,
+            viewing_playlist_id: None,
+
+            is_exit: false,
         }
     }
 }

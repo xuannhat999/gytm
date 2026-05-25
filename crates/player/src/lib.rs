@@ -11,7 +11,7 @@ use tokio::net::UnixStream;
 
 pub struct Player {
     pub current_process: Option<std::process::Child>,
-    pub state: PlayerStatus,
+    pub status: PlayerStatus,
     pub volume: u8,
     pub play_mode: PlayMode,
     pub socket_path: String,
@@ -22,7 +22,7 @@ impl Player {
     pub fn new(player_state: &PlayerState) -> Self {
         Self {
             current_process: None,
-            state: PlayerStatus::Idle,
+            status: PlayerStatus::Idle,
             volume: player_state.volume,
             play_mode: player_state.play_mode.clone(),
             socket_path: "/tmp/mpv-socket".to_string(),
@@ -41,7 +41,7 @@ impl Player {
 
     // PLAY PREVIOUS SONG IN ALBUM/PLAYLIST
     pub async fn next(&mut self) -> Result<()> {
-        self.state = PlayerStatus::Loading;
+        self.status = PlayerStatus::Loading;
         self.send_mpv_command(r#"{"command": ["playlist-next"]}"#)
             .await?;
         Ok(())
@@ -49,7 +49,7 @@ impl Player {
 
     // PLAY NEXT SONG IN ALBUM/PLAYLIST
     pub async fn prev(&mut self) -> Result<()> {
-        self.state = PlayerStatus::Loading;
+        self.status = PlayerStatus::Loading;
         self.send_mpv_command(r#"{"command": ["playlist-prev"]}"#)
             .await?;
         Ok(())
@@ -57,12 +57,12 @@ impl Player {
 
     // PAUSE PLAYING SONG
     pub async fn toggle_pause(&mut self) -> Result<()> {
-        match self.state {
+        match self.status {
             PlayerStatus::Playing => {
-                self.state = PlayerStatus::Paused;
+                self.status = PlayerStatus::Paused;
             }
             PlayerStatus::Paused => {
-                self.state = PlayerStatus::Playing;
+                self.status = PlayerStatus::Playing;
             }
             _ => {}
         };
@@ -72,12 +72,12 @@ impl Player {
     }
 
     // START MPV SOCKET
-    pub fn start_mpv(&mut self, volume: u8) -> Result<()> {
+    pub fn start_mpv(&mut self) -> Result<()> {
         let child = Command::new("mpv")
             .arg("--idle")
             .arg(format!("--input-ipc-server={}", self.socket_path))
             .arg("--no-video")
-            .arg(format!("--volume={}", volume))
+            .arg(format!("--volume={}", self.volume))
             .arg("--loop-playlist=inf")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -211,7 +211,7 @@ impl Player {
         if songs.is_empty() {
             return Err(YError::PlaylistEmpty);
         }
-        self.state = PlayerStatus::Loading;
+        self.status = PlayerStatus::Loading;
         if self.playlist_file.is_none() {
             self.playlist_file = Some(NamedTempFile::new()?);
         }
@@ -234,7 +234,7 @@ impl Player {
     }
 
     pub async fn play_at_idx(&mut self, index: &usize) -> Result<()> {
-        self.state = PlayerStatus::Loading;
+        self.status = PlayerStatus::Loading;
         let command = format!(
             r#"{{"command": ["set_property", "playlist-pos", {}]}}"#,
             index
