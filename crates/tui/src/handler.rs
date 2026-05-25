@@ -19,12 +19,12 @@ pub fn handle_mpv_event(
         MpvEvent::ListChange(list) => {
             app.mpv_list = list;
             if !app.mpv_list.is_empty() {
-                player.state = PlayerStatus::Loading;
+                player.status = PlayerStatus::Loading;
             }
         }
         MpvEvent::StartPlaying(song) => {
             app.playing_song = Some(song);
-            player.state = PlayerStatus::Playing;
+            player.status = PlayerStatus::Playing;
         }
         MpvEvent::VolumeChange(vol) => {
             config.player_state.volume = vol;
