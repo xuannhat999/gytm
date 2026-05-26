@@ -7,7 +7,6 @@ use reqwest::{
 };
 use rookie::{any_browser, common::enums::Cookie, load};
 use serde_json::{Value, json};
-use sha1::Digest;
 use state::AppState;
 use std::{path::PathBuf, sync::Arc};
 pub mod parser;
@@ -54,14 +53,15 @@ impl YClient {
             .unwrap()
             .as_secs();
 
-        let mut hasher = sha1::Sha1::new();
-        hasher.update(format!("{timestamp} {} {YTM_DOMAIN}", self.sapisid));
-        let result = hasher.finalize();
+        let mut hasher = sha1_smol::Sha1::new();
 
-        let hex_hash = result
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<String>();
+        let message = format!("{timestamp} {} {YTM_DOMAIN}", self.sapisid);
+        hasher.update(message.as_bytes());
+
+        let result = hasher.digest();
+
+        let hex_hash = result.to_string();
+
         format!("{}_{}", timestamp, hex_hash)
     }
 
