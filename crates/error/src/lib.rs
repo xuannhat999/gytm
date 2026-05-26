@@ -1,11 +1,11 @@
-use chrono::Local;
 use reqwest::header::InvalidHeaderValue;
 use std::{
-    fmt::Display,
+    fmt::{Debug, Display},
     fs::{self, OpenOptions},
     io::Write,
 };
 use thiserror::Error;
+use time::{OffsetDateTime, format_description};
 
 #[derive(Debug, Error)]
 pub enum YError {
@@ -63,7 +63,13 @@ pub fn log_to_file<T: Display>(message: T) {
             let _ = fs::create_dir_all(&log_path);
         }
         let file_path = log_path.join("log.txt");
-        let datetime = Local::now().format("%Y-%m-%d %H:%M:%S");
+
+        let now = OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc());
+
+        let format =
+            format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]").unwrap();
+
+        let datetime = now.format(&format).unwrap_or_default();
 
         let max_size = 5 * 1024 * 1024;
         let is_oversize = fs::metadata(&file_path)
