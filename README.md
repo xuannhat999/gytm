@@ -10,15 +10,13 @@ Stream Youtube Music from your terminal !
 ## Supported OS
 - **Linux** (Arch Linux)
 
-#  Required packages 
+# Build Dependencies (Only required if building from source)
+- **Rust & Cargo** (1.75 or later)
+- **pkg-config**
+- **openssl** development headers
 - **yt-dlp**: For fetching stream URLs.
 - **mpv**   : The core media engine.
 - **sqlite**: Local database
-# Build Dependencies (Only required if building from source)
-* **Rust & Cargo** (1.75 or later)
-* **pkg-config**
-* **openssl** development headers
-
 # Installation
 **- Build from source** 
 1. Clone this repository:
