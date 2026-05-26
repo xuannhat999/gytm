@@ -22,12 +22,12 @@ pub struct YClient {
 const YTM_DOMAIN: &str = "https://music.youtube.com";
 
 impl YClient {
-    pub async fn new(config: &AppState) -> Result<Self> {
+    pub async fn new(state: &AppState) -> Result<Self> {
         let (jar, sapisid) = load_cookies()?;
 
         let http = Client::builder()
             .cookie_provider(Arc::new(jar))
-            .user_agent(&config.user_agent)
+            .user_agent(&state.user_agent)
             .build()?;
 
         let response_text = http.get(YTM_DOMAIN).send().await?.text().await?;
@@ -67,16 +67,15 @@ impl YClient {
 
     // This function is adapted from: https://github.com/ccgauche/ytermusic.git
     // Original source: https://github.com/ccgauche/ytermusic/blob/master/crates/ytpapi2/src/lib.rs
-    pub fn get_api_headers(&self) -> HeaderMap {
+    pub fn get_api_headers(&self) -> Result<HeaderMap> {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
         headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
         headers.insert("X-Goog-AuthUser", HeaderValue::from_static("0"));
-        headers.insert(
-            "Authorization",
-            HeaderValue::from_str(&format!("SAPISIDHASH {}", self.compute_sapi_hash())).unwrap(),
-        );
-        headers
+        let auth_val = HeaderValue::from_str(&format!("SAPISIDHASH {}", self.compute_sapi_hash()))
+            .map_err(YError::InvalidHeader);
+        headers.insert("Authorization", auth_val?);
+        Ok(headers)
     }
 
     pub async fn get_raw_lists(&self) -> Result<Value> {
@@ -98,7 +97,7 @@ impl YClient {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers()?)
             .json(&body)
             .send()
             .await?
@@ -126,7 +125,7 @@ impl YClient {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers()?)
             .json(&body)
             .send()
             .await?
@@ -152,7 +151,7 @@ impl YClient {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers()?)
             .json(&body)
             .send()
             .await?
@@ -218,13 +217,11 @@ pub fn load_cookies() -> Result<(Jar, String)> {
     let url = YTM_DOMAIN.parse::<Url>()?;
 
     let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
-
-    let mut cookies = load(Some(domains)).map_err(|_| YError::InvalidCookie)?;
     let mut sapisid_extracted = String::new();
+    let mut cookies = load(Some(domains)).unwrap_or_else(|_| Vec::new());
     if cookies.is_empty() {
         cookies = load_cookies_firefox_based()?;
     }
-
     for cookie in cookies {
         if cookie.name == "SAPISID" {
             sapisid_extracted = cookie.value.clone();
@@ -253,7 +250,7 @@ pub fn load_cookies_firefox_based() -> Result<Vec<Cookie>> {
     let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
     let browser_dirs = vec!["mozilla/firefox", "librewolf/librewolf", "zen"];
 
-    let config_dir = dirs::config_dir().ok_or_else(|| YError::InvalidCookie)?;
+    let config_dir = dirs::config_dir().ok_or_else(|| YError::ConfigDirError)?;
     let mut target_db_path: Option<PathBuf> = None;
 
     'outer: for browser in browser_dirs {
@@ -276,11 +273,13 @@ pub fn load_cookies_firefox_based() -> Result<Vec<Cookie>> {
         }
     }
 
-    let db_path_buf = target_db_path.ok_or_else(|| YError::InvalidCookie)?;
-    let cookies_path = db_path_buf.to_str().ok_or_else(|| YError::InvalidCookie)?;
+    let cookies_path = target_db_path
+        .ok_or_else(|| YError::InvalidFilePath)?
+        .to_string_lossy()
+        .into_owned();
 
     let cookies =
-        any_browser(cookies_path, Some(domains), None).map_err(|_| YError::InvalidCookie)?;
+        any_browser(&cookies_path, Some(domains), None).map_err(|_| YError::InvalidCookie)?;
 
     Ok(cookies)
 }

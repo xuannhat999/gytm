@@ -5,6 +5,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use data::MpvEvent;
+use error::log_to_file;
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use state::AppState;
@@ -13,7 +14,7 @@ use tui::{app::App, handler, ui};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut config = match AppState::load() {
+    let mut state = match AppState::load() {
         Ok(c) => c,
         Err(e) => {
             println!("{}", e);
@@ -21,9 +22,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     println!("󱎫 Connecting to YouTube Music...");
-    let client = match YClient::new(&config).await {
+    let client = match YClient::new(&state).await {
         Ok(c) => Arc::new(c),
         Err(e) => {
+            log_to_file(&e);
             println!("{}", e);
             std::process::exit(1);
         }
@@ -31,13 +33,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (albums, playlists) = client.get_lists().await?;
 
     let mut app = App::default();
-    let mut player = Player::new(&config.player_state);
+    let mut player = Player::new(&state.player_state);
     app.albums = albums;
     app.playlists = playlists;
 
     let (tx, rx) = std::sync::mpsc::channel::<MpvEvent>();
 
     if let Err(e) = player.start_mpv() {
+        log_to_file(&e);
         println!("Error starting MPV: {}", e);
         std::process::exit(1);
     }
@@ -45,6 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     thread::sleep(Duration::from_millis(300));
 
     if let Err(e) = player.observe_mpv_changes(tx).await {
+        log_to_file(&e);
         println!("{}", e);
         std::process::exit(1);
     }
@@ -63,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         while let Ok(event) = rx.try_recv() {
-            handler::handle_mpv_event(&mut app, &mut player, &mut config, event);
+            handler::handle_mpv_event(&mut app, &mut player, &mut state, event);
         }
         if event::poll(Duration::from_millis(750))? {
             if let Event::Key(key) = event::read()? {
@@ -72,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     &mut app,
                     Arc::clone(&client),
                     &mut player,
-                    &mut config,
+                    &mut state,
                 )
                 .await;
             }

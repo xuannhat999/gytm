@@ -9,8 +9,14 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum YError {
+    #[error("Config Dir Error")]
+    ConfigDirError,
+
     #[error("State File Error")]
     StateFileError,
+
+    #[error("Invalid File Path")]
+    InvalidFilePath,
 
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
@@ -22,13 +28,10 @@ pub enum YError {
     ReqwestError(#[from] reqwest::Error),
 
     #[error("Request Header Inval: {0}")]
-    InvalidHeaderErr(#[from] InvalidHeaderValue),
+    InvalidHeader(#[from] InvalidHeaderValue),
 
     #[error("Auth Extraction Err: {0}")]
     AuthError(String),
-
-    #[error("Tokio Task Join Err: {0}")]
-    TokioJoinError(#[from] tokio::task::JoinError),
 
     #[error("MPV Socket Error: {0}")]
     MpvSocketError(String),

@@ -1,3 +1,4 @@
+use std::os::linux::raw::stat;
 use std::sync::Arc;
 
 use crate::app::App;
@@ -9,12 +10,7 @@ use error::log_to_file;
 use player::Player;
 use state::AppState;
 
-pub fn handle_mpv_event(
-    app: &mut App,
-    player: &mut Player,
-    config: &mut AppState,
-    event: MpvEvent,
-) {
+pub fn handle_mpv_event(app: &mut App, player: &mut Player, state: &mut AppState, event: MpvEvent) {
     match event {
         MpvEvent::ListChange(list) => {
             app.mpv_list = list;
@@ -27,8 +23,8 @@ pub fn handle_mpv_event(
             player.status = PlayerStatus::Playing;
         }
         MpvEvent::VolumeChange(vol) => {
-            config.player_state.volume = vol;
-            if let Err(e) = config.save() {
+            state.player_state.volume = vol;
+            if let Err(e) = state.save() {
                 log_to_file(&e);
             }
         }
@@ -39,7 +35,7 @@ pub async fn handle_key_events(
     app: &mut App,
     client: Arc<YClient>,
     player: &mut Player,
-    config: &mut AppState,
+    state: &mut AppState,
 ) {
     match key_event.code {
         KeyCode::Char('q') => app.is_exit = true,
@@ -64,8 +60,8 @@ pub async fn handle_key_events(
             if let Err(e) = player.toggle_playmode().await {
                 log_to_file(&e);
             } else {
-                config.player_state.play_mode = player.play_mode.clone();
-                if let Err(e) = config.save() {
+                state.player_state.play_mode = player.play_mode.clone();
+                if let Err(e) = state.save() {
                     log_to_file(&e);
                 }
             }
