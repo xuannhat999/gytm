@@ -28,7 +28,7 @@ sha1_smol = "1.0"
 time = { version = "0.3", features = ["formatting", "macros", "local-offset"] }
 tempfile = "3"
 rookie = { version = "0.5.6" }
-rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite = { version = "0.31" }
 url = "2.5.8"
 
 player = { path = "crates/player" }
