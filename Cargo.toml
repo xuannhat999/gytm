@@ -42,6 +42,6 @@ testing = { path = "crates/testing" }
 
 [profile.release]
 opt-level = "z"
-lto = true
+lto = "thin"
 codegen-units = 4
 strip = true
