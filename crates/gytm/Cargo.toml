@@ -16,6 +16,6 @@ state = { workspace = true }
 
 crossterm = { workspace = true }
 serde = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 serde_json = { workspace = true }
 ratatui = { workspace = true }
