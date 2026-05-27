@@ -23,7 +23,6 @@ const YTM_DOMAIN: &str = "https://music.youtube.com";
 impl YClient {
     pub async fn new(state: &AppState) -> Result<Self> {
         let (jar, sapisid) = load_cookies()?;
-
         let http = Client::builder()
             .cookie_provider(Arc::new(jar))
             .user_agent(&state.user_agent)
@@ -160,6 +159,74 @@ impl YClient {
         Ok(response)
     }
 
+    pub async fn get_raw_search_albums(&self, query: &str) -> Result<Value> {
+        const ALBUM_PARAMS: &str = "EgWKAQIYAWoSEAUQAxAJEAQQChAQEBUQDhAR";
+
+        let url = format!(
+            "{}/youtubei/v1/search?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
+
+        let body = json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": self.client_version,
+                }
+            },
+            "query": query,
+            "params": ALBUM_PARAMS,
+        });
+
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers()?)
+            .json(&body)
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+
+        Ok(response)
+    }
+    pub async fn add_to_lib(&self, playlist_id: &str) -> Result<Value> {
+        let url = format!(
+            "{}/youtubei/v1/like/like?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
+
+        let body = json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": self.client_version,
+                }
+            },
+            "target": {
+                "playlistId": playlist_id
+            },
+            "status": "LIKE"
+        });
+
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers()?)
+            .json(&body)
+            .send()
+            .await?;
+
+        let text = response.text().await?;
+
+        if text.trim().is_empty() {
+            Ok(json!({}))
+        } else {
+            let json_val: Value = serde_json::from_str(&text)?;
+            Ok(json_val)
+        }
+    }
+
     pub async fn get_lists(&self) -> Result<(Vec<PlayList>, Vec<PlayList>)> {
         let mut all_albums: Vec<PlayList> = Vec::new();
         let mut all_playlists: Vec<PlayList> = Vec::new();
@@ -209,41 +276,51 @@ impl YClient {
         };
         Ok(songs)
     }
+    pub async fn get_search_albums(&self, query: &str) -> Result<Vec<PlayList>> {
+        let raw_list = match self.get_raw_search_albums(query).await {
+            Ok(raw_data) => raw_data,
+            Err(e) => {
+                log_to_file(&e);
+                Value::Null
+            }
+        };
+        let albums = match parser::extract_search_albums(raw_list) {
+            Ok(list) => list,
+            Err(e) => {
+                log_to_file(&e);
+                Vec::new()
+            }
+        };
+        Ok(albums)
+    }
 }
 
 // ONLY WORKS WITH CHROMIUM BASED BROWSER ( No idea )
 pub fn load_cookies() -> Result<(Jar, String)> {
     let jar = Jar::default();
     let url = YTM_DOMAIN.parse::<Url>()?;
-
     let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
     let mut sapisid_extracted = String::new();
     let mut cookies = load(Some(domains)).unwrap_or_else(|_| Vec::new());
     if cookies.is_empty() {
         cookies = load_cookies_firefox_based()?;
     }
+
     for cookie in cookies {
         if cookie.name == "SAPISID" {
             sapisid_extracted = cookie.value.clone();
         }
-        let cookie_str = format!("{}={}", cookie.name, cookie.value);
+        let cookie_str = format!(
+            "{}={}; Path={}; Secure; HttpOnly",
+            cookie.name, cookie.value, cookie.path
+        );
         jar.add_cookie_str(&cookie_str, &url);
     }
-
     if sapisid_extracted.is_empty() {
         return Err(YError::InvalidCookie);
     }
 
     Ok((jar, sapisid_extracted))
-}
-
-fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
-    source.find(start).and_then(|start_idx| {
-        let start_pos = start_idx + start.len();
-        source[start_pos..]
-            .find(end)
-            .map(|end_idx| source[start_pos..start_pos + end_idx].to_string())
-    })
 }
 
 pub fn load_cookies_firefox_based() -> Result<Vec<Cookie>> {
@@ -282,4 +359,13 @@ pub fn load_cookies_firefox_based() -> Result<Vec<Cookie>> {
         any_browser(&cookies_path, Some(domains), None).map_err(|_| YError::InvalidCookie)?;
 
     Ok(cookies)
+}
+
+fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
+    source.find(start).and_then(|start_idx| {
+        let start_pos = start_idx + start.len();
+        source[start_pos..]
+            .find(end)
+            .map(|end_idx| source[start_pos..start_pos + end_idx].to_string())
+    })
 }

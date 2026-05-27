@@ -60,9 +60,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     if !app.albums.is_empty() {
-        app.album_list_state.select(Some(0));
+        app.albums_liststate.select(Some(0));
     } else {
-        app.playlist_list_state.select(Some(0));
+        app.playlists_liststate.select(Some(0));
     }
 
     loop {

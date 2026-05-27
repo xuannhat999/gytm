@@ -70,3 +70,47 @@ pub fn extract_songs(data: Value) -> Result<Vec<Song>> {
     
     Ok(songs)
 }
+
+pub fn extract_search_albums(data: Value) -> Result<Vec<PlayList>> {
+    let mut albums: Vec<PlayList> = Vec::new();
+    let contents = data
+        .pointer("/contents/tabbedSearchResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicShelfRenderer/contents")
+        .and_then(|v| v.as_array())
+        .ok_or(YError::InvalidCookie)?;
+
+    for item in contents {
+        if let Some(renderer) = item.get("musicResponsiveListItemRenderer") {
+            let title = renderer
+                .pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown")
+                .to_string();
+            let artist = renderer
+                .pointer("/flexColumns/1/musicResponsiveListItemFlexColumnRenderer/text/runs/2/text")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown")
+                .to_string();
+            let browse_id = renderer
+                .pointer("/navigationEndpoint/browseEndpoint/browseId")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            let playlist_id = renderer
+                .pointer("/overlay/musicItemThumbnailOverlayRenderer/content/musicPlayButtonRenderer/playNavigationEndpoint/watchPlaylistEndpoint/playlistId")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            if !browse_id.is_empty() {
+                albums.push(PlayList {
+                    title,
+                    artist,
+                    browse_id,
+                    playlist_id,
+                });
+            }
+        }
+    }
+    Ok(albums)
+}

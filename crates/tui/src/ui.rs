@@ -1,5 +1,5 @@
 use crate::app::App;
-use data::FocusArea;
+use data::{AppPage, FocusArea};
 use data::{PlayMode, PlayerStatus};
 use player::Player;
 use ratatui::{
@@ -30,34 +30,51 @@ impl Default for Theme {
 
 pub fn render(app: &mut App, frame: &mut Frame, player: &Player) {
     let theme = Theme::default();
-    // MAIN VERTICAL LAYOUT
-    let main_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage(40),
-            Constraint::Percentage(50),
-            Constraint::Percentage(10),
-        ])
-        .split(frame.area());
+    match app.page {
+        AppPage::Library => {
+            // MAIN VERTICAL LAYOUT
+            let main_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(10),
+                ])
+                .split(frame.area());
 
-    // HORIZONTAL LAYOUT (ALBUMS | PLAYLISTS)
-    let playlist_layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(main_layout[0]);
-    render_list(frame, app, playlist_layout[0], FocusArea::Albums, &theme);
-    render_list(frame, app, playlist_layout[1], FocusArea::Playlists, &theme);
-    render_songs(frame, app, main_layout[1], &theme);
-    render_player(frame, app, main_layout[2], player, &theme);
+            // HORIZONTAL LAYOUT (ALBUMS | PLAYLISTS)
+            let playlist_layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(main_layout[0]);
+            render_list(frame, app, playlist_layout[0], FocusArea::Albums, &theme);
+            render_list(frame, app, playlist_layout[1], FocusArea::Playlists, &theme);
+            render_songs(frame, app, main_layout[1], &theme);
+            render_player(frame, app, main_layout[2], player, &theme);
+        }
+        AppPage::Search => {
+            let main_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Percentage(10), Constraint::Percentage(90)])
+                .split(frame.area());
+
+            let playlist_layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(main_layout[1]);
+            render_search_albums(frame, app, playlist_layout[0], &theme);
+            render_search_input(frame, app, main_layout[0], &theme);
+        }
+    }
 }
 
 // RENDER ALBUM & PLAYLISTS
 fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusArea, theme: &Theme) {
     let result = match area_type {
-        FocusArea::Albums => Some((&app.albums, &mut app.album_list_state, "[1]- Albums")),
+        FocusArea::Albums => Some((&app.albums, &mut app.albums_liststate, "[1]- Albums")),
         FocusArea::Playlists => Some((
             &app.playlists,
-            &mut app.playlist_list_state,
+            &mut app.playlists_liststate,
             "[2]-󰲸 Playlists",
         )),
         _ => None,
@@ -183,7 +200,7 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
         .highlight_style(highlight_style)
         .highlight_symbol("▶");
 
-    frame.render_stateful_widget(list_widget, area, &mut app.songs_list_state);
+    frame.render_stateful_widget(list_widget, area, &mut app.songs_liststate);
 }
 
 fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, theme: &Theme) {
@@ -256,4 +273,73 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
 
     frame.render_widget(left_area, inner_chunks[0]);
     frame.render_widget(right_area, inner_chunks[1]);
+}
+
+fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
+    let items: Vec<ListItem> = app
+        .search_albums
+        .iter()
+        .map(|item| {
+            let content = format!(" {} - {}", item.title, item.artist);
+            ListItem::new(content)
+        })
+        .collect();
+
+    let is_focused = FocusArea::SearchAlbums == app.focus_area;
+    let border_style = if is_focused {
+        Style::default()
+            .fg(theme.active)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(theme.inactive)
+    };
+    let key_style = Style::default()
+        .fg(theme.secondary)
+        .add_modifier(Modifier::BOLD);
+    let text_style = Style::default().fg(theme.base);
+
+    let bottom_nav = Line::from(vec![
+        Span::styled("[ Up/Down: ", text_style),
+        Span::styled("/k, /j ", key_style),
+        Span::styled("| Add to Lib: ", text_style),
+        Span::styled("a ", key_style),
+        Span::styled("| Back to Lib: ", text_style),
+        Span::styled("<Esc>", key_style),
+        Span::styled(" ]", text_style),
+    ]);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .title(" Albums")
+        .border_style(border_style)
+        .title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Right));
+
+    let list_widget = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::Rgb(69, 71, 90))
+            .fg(theme.primary)
+            .add_modifier(Modifier::BOLD),
+    );
+
+    // Render đè trực tiếp lên toàn bộ area được truyền vào
+    frame.render_stateful_widget(list_widget, area, &mut app.search_albums_liststate);
+}
+
+fn render_search_input(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
+    let input = Paragraph::new(app.search_query.as_str())
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .title("󰍉 Search")
+                .border_style(Style::default().fg(if app.is_insert {
+                    theme.active
+                } else {
+                    theme.inactive
+                })),
+        )
+        .style(Style::default().fg(theme.base));
+
+    frame.render_widget(input, area);
 }

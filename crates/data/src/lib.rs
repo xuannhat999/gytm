@@ -51,4 +51,11 @@ pub enum FocusArea {
     Albums,
     Playlists,
     SongList,
+    SearchAlbums,
+}
+
+#[derive(PartialEq)]
+pub enum AppPage {
+    Library,
+    Search,
 }
