@@ -152,11 +152,9 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
             .border_type(BorderType::Rounded)
             .title(" Tracks")
             .border_style(Style::default().fg(theme.inactive));
-
         let message = Paragraph::new("Select an Album or Playlist to view songs")
             .block(empty_block)
             .alignment(ratatui::layout::Alignment::Center);
-
         frame.render_widget(message, area);
         return;
     }
@@ -207,26 +205,26 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
 
 fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, theme: &Theme) {
     let song_info = if player.status == PlayerStatus::Loading {
-        "Loading...".to_string()
+        "   Loading...".to_string()
     } else {
         if let Some(song) = &app.playing_song {
             let status_icon = if player.status == PlayerStatus::Playing {
                 "  "
             } else {
-                " ⏸  "
+                " ⏸ "
             };
-            format!(" {}  {} ", status_icon, song.title)
+            format!("{} {} ", status_icon, song.title)
         } else {
-            "  No song playing ".to_string()
+            "   No song is playing ".to_string()
         }
     };
     let mode_text = match player.play_mode {
-        PlayMode::DefaultMode => "Play mode:    Default",
-        PlayMode::ShuffleMode => "Play mode:    Shuffle",
+        PlayMode::DefaultMode => "Play mode:   Default ",
+        PlayMode::ShuffleMode => "Play mode:   Shuffle ",
     };
     let right_content = vec![
         Line::from(mode_text),
-        Line::from(format!("  {}%", player.volume)),
+        Line::from(format!("  {}% ", player.volume)),
     ];
     let key_map = Line::from(vec![
         Span::styled("[ ⏸ / : ", theme.text_style()),
@@ -255,8 +253,6 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
         .style(Style::default().fg(theme.base).add_modifier(Modifier::BOLD))
         .alignment(Alignment::Right);
 
-    frame.render_widget(main_block, area);
-
     let inner_area = area.inner(ratatui::layout::Margin {
         vertical: 1,
         horizontal: 1,
@@ -266,6 +262,7 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
         .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
         .split(inner_area);
 
+    frame.render_widget(main_block, area);
     frame.render_widget(left_area, inner_chunks[0]);
     frame.render_widget(right_area, inner_chunks[1]);
 }
