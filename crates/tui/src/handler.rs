@@ -324,7 +324,7 @@ pub async fn handle_key_events(
             }
         }
     }
-    if key_event.code == KeyCode::Char('q') {
+    if key_event.code == KeyCode::Char('q') && !app.is_insert {
         app.is_exit = true;
     }
     if app.focus_area == FocusArea::Albums
