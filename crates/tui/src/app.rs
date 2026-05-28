@@ -1,16 +1,16 @@
-use data::FocusArea;
-use data::{PlayList, Song};
+use data::{AppPage, FocusArea, PlayList, Song};
 use ratatui::widgets::ListState;
 
 pub struct App {
+    // PAGE LIBRARY
     pub albums: Vec<PlayList>,
     pub playlists: Vec<PlayList>,
     pub songs: Vec<Song>,
     pub focus_area: FocusArea,
 
-    pub album_list_state: ListState,
-    pub playlist_list_state: ListState,
-    pub songs_list_state: ListState,
+    pub albums_liststate: ListState,
+    pub playlists_liststate: ListState,
+    pub songs_liststate: ListState,
 
     pub playing_song: Option<Song>,
     pub mpv_list: Vec<String>,
@@ -18,18 +18,26 @@ pub struct App {
     pub playing_playlist_id: Option<String>,
     pub viewing_playlist_id: Option<String>,
 
+    // PAGE SEARCH
+    pub search_albums: Vec<PlayList>,
+    pub search_albums_liststate: ListState,
+    pub search_query: String,
+    pub is_insert: bool,
+    // OTHER
+    pub page: AppPage,
     pub is_exit: bool,
 }
 impl Default for App {
     fn default() -> Self {
         Self {
+            // PAGE LIBRARY
             albums: Vec::new(),
             playlists: Vec::new(),
             songs: Vec::new(),
 
-            album_list_state: ListState::default(),
-            playlist_list_state: ListState::default(),
-            songs_list_state: ListState::default(),
+            albums_liststate: ListState::default(),
+            playlists_liststate: ListState::default(),
+            songs_liststate: ListState::default(),
 
             focus_area: FocusArea::Albums,
 
@@ -40,7 +48,15 @@ impl Default for App {
             playing_playlist_id: None,
             viewing_playlist_id: None,
 
+            //PAGE SEARCH
+            search_albums: Vec::new(),
+            search_albums_liststate: ListState::default(),
+            search_query: String::new(),
+            is_insert: false,
+
+            //OTHER
             is_exit: false,
+            page: AppPage::Library,
         }
     }
 }
@@ -51,15 +67,19 @@ impl App {
             FocusArea::Albums => FocusArea::Playlists,
             FocusArea::Playlists => FocusArea::SongList,
             FocusArea::SongList => FocusArea::Albums,
+            FocusArea::SearchAlbums => FocusArea::SearchAlbums,
         };
     }
 
     // TOGGLE NEXT ITEM IN LISTSTATE
     pub fn next(&mut self) {
         let (state, len) = match self.focus_area {
-            FocusArea::Albums => (&mut self.album_list_state, self.albums.len()),
-            FocusArea::Playlists => (&mut self.playlist_list_state, self.playlists.len()),
-            FocusArea::SongList => (&mut self.songs_list_state, self.songs.len()),
+            FocusArea::Albums => (&mut self.albums_liststate, self.albums.len()),
+            FocusArea::Playlists => (&mut self.playlists_liststate, self.playlists.len()),
+            FocusArea::SongList => (&mut self.songs_liststate, self.songs.len()),
+            FocusArea::SearchAlbums => {
+                (&mut self.search_albums_liststate, self.search_albums.len())
+            }
         };
 
         if len == 0 {
@@ -83,9 +103,12 @@ impl App {
     // TOGGLE PREVIOUS ITEM IN LISTSTATE
     pub fn previous(&mut self) {
         let (state, len) = match self.focus_area {
-            FocusArea::Albums => (&mut self.album_list_state, self.albums.len()),
-            FocusArea::Playlists => (&mut self.playlist_list_state, self.playlists.len()),
-            FocusArea::SongList => (&mut self.songs_list_state, self.songs.len()),
+            FocusArea::Albums => (&mut self.albums_liststate, self.albums.len()),
+            FocusArea::Playlists => (&mut self.playlists_liststate, self.playlists.len()),
+            FocusArea::SongList => (&mut self.songs_liststate, self.songs.len()),
+            FocusArea::SearchAlbums => {
+                (&mut self.search_albums_liststate, self.search_albums.len())
+            }
         };
 
         if len == 0 {

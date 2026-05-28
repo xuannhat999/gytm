@@ -7,5 +7,7 @@ edition = "2024"
 api = { workspace = true }
 data = { workspace = true }
 player = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
 tui = { workspace = true }
+state = { workspace = true }
+error = { workspace = true }

@@ -4,7 +4,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use data::MpvEvent;
+use data::{MpvEvent, Theme};
 use error::log_to_file;
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
-    println!("󱎫 Connecting to YouTube Music...");
+    println!("󱘖 Connecting to YouTube Music...");
     let client = match YClient::new(&state).await {
         Ok(c) => Arc::new(c),
         Err(e) => {
@@ -30,6 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
+    println!(" Fetching data from Youtube Music...");
     let (albums, playlists) = client.get_lists().await?;
 
     let mut app = App::default();
@@ -60,11 +61,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     if !app.albums.is_empty() {
-        app.album_list_state.select(Some(0));
+        app.albums_liststate.select(Some(0));
     } else {
-        app.playlist_list_state.select(Some(0));
+        app.playlists_liststate.select(Some(0));
     }
-
+    let theme = Theme::default();
     loop {
         while let Ok(event) = rx.try_recv() {
             handler::handle_mpv_event(&mut app, &mut player, &mut state, event);
@@ -82,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        terminal.draw(|f| ui::render(&mut app, f, &player))?;
+        terminal.draw(|f| ui::render(&mut app, f, &player, &theme))?;
         if app.is_exit {
             player.kill_current_process();
             break;

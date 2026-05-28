@@ -1,5 +1,5 @@
 use data::PlayMode;
-use error::{Result, YError};
+use error::{YError, YResult};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Write, path::Path};
 
@@ -25,7 +25,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn load() -> Result<Self> {
+    pub fn load() -> YResult<Self> {
         let conf_file = Self::get_path()?;
         if !conf_file.exists() {
             return Self::create(&conf_file);
@@ -34,13 +34,13 @@ impl AppState {
         let config: AppState = serde_json::from_str(&content)?;
         Ok(config)
     }
-    pub fn save(&self) -> Result<()> {
+    pub fn save(&self) -> YResult<()> {
         let conf_file = Self::get_path()?;
         let f = fs::File::create(conf_file)?;
         serde_json::to_writer_pretty(f, self)?;
         Ok(())
     }
-    pub fn create(file: &Path) -> Result<AppState> {
+    pub fn create(file: &Path) -> YResult<AppState> {
         let dir = file.parent().ok_or(YError::StateFileError)?;
         fs::create_dir_all(dir)?;
 
@@ -55,7 +55,7 @@ impl AppState {
         Ok(default_config)
     }
 
-    pub fn get_path() -> Result<std::path::PathBuf> {
+    pub fn get_path() -> YResult<std::path::PathBuf> {
         Ok(dirs::state_dir()
             .ok_or(YError::StateFileError)?
             .join("gytm/state.json"))

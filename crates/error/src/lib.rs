@@ -30,9 +30,8 @@ pub enum YError {
     #[error("Request Header Inval: {0}")]
     InvalidHeader(#[from] InvalidHeaderValue),
 
-    #[error("Auth Extraction Err: {0}")]
-    AuthError(String),
-
+    // #[error("Auth Extraction Err: {0}")]
+    // AuthError(String),
     #[error("MPV Socket Error: {0}")]
     MpvSocketError(String),
 
@@ -55,7 +54,7 @@ pub enum YError {
     UrlParseError(#[from] url::ParseError),
 }
 
-pub type Result<T> = std::result::Result<T, YError>;
+pub type YResult<T> = std::result::Result<T, YError>;
 
 pub fn log_to_file<T: Display>(message: T) {
     if let Some(log_path) = dirs::state_dir().map(|p| p.join("gytm")) {

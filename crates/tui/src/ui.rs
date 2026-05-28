@@ -1,5 +1,5 @@
 use crate::app::App;
-use data::FocusArea;
+use data::{AppPage, FocusArea, Theme};
 use data::{PlayMode, PlayerStatus};
 use player::Player;
 use ratatui::{
@@ -9,55 +9,82 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
 };
-struct Theme {
-    primary: Color,
-    secondary: Color,
-    active: Color,
-    inactive: Color,
-    base: Color,
-}
-impl Default for Theme {
-    fn default() -> Self {
-        Theme {
-            primary: Color::LightGreen,
-            secondary: Color::LightYellow,
-            active: Color::LightCyan,
-            inactive: Color::DarkGray,
-            base: Color::White,
+pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) {
+    match app.page {
+        AppPage::Library => {
+            // MAIN VERTICAL LAYOUT
+            let main_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(10),
+                ])
+                .split(frame.area());
+
+            // HORIZONTAL LAYOUT (ALBUMS | PLAYLISTS)
+            let playlist_layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(main_layout[1]);
+
+            render_help_line(
+                frame,
+                main_layout[0],
+                theme,
+                vec![("󰈆 Exit", "q"), (" Search", "s")],
+            );
+
+            render_list(frame, app, playlist_layout[0], FocusArea::Albums, theme);
+            render_list(frame, app, playlist_layout[1], FocusArea::Playlists, theme);
+            render_songs(frame, app, main_layout[2], theme);
+            render_player(frame, app, main_layout[3], player, theme);
+        }
+        AppPage::Search => {
+            let main_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Length(3),
+                    Constraint::Percentage(95),
+                ])
+                .split(frame.area());
+            // let playlist_layout = Layout::default()
+            //     .direction(Direction::Horizontal)
+            //     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            //     .split(main_layout[1]);
+            render_help_line(
+                frame,
+                main_layout[0],
+                theme,
+                vec![("󰈆 Exit", "q"), ("󰃂 Library", "Esc")],
+            );
+            render_search_input(frame, app, main_layout[1], theme);
+            render_search_albums(frame, app, main_layout[2], theme);
         }
     }
 }
 
-pub fn render(app: &mut App, frame: &mut Frame, player: &Player) {
-    let theme = Theme::default();
-    // MAIN VERTICAL LAYOUT
-    let main_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage(40),
-            Constraint::Percentage(50),
-            Constraint::Percentage(10),
-        ])
-        .split(frame.area());
-
-    // HORIZONTAL LAYOUT (ALBUMS | PLAYLISTS)
-    let playlist_layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(main_layout[0]);
-    render_list(frame, app, playlist_layout[0], FocusArea::Albums, &theme);
-    render_list(frame, app, playlist_layout[1], FocusArea::Playlists, &theme);
-    render_songs(frame, app, main_layout[1], &theme);
-    render_player(frame, app, main_layout[2], player, &theme);
+fn render_help_line(frame: &mut Frame, area: Rect, theme: &Theme, items: Vec<(&str, &str)>) {
+    let mut spans = Vec::new();
+    for (i, (desc, key)) in items.iter().enumerate() {
+        spans.push(Span::styled(format!("{}: ", desc), theme.text_style()));
+        spans.push(Span::styled(format!("[{}]", key), theme.key_style()));
+        if i < items.len() - 1 {
+            spans.push(Span::styled(" | ", theme.text_style()));
+        }
+    }
+    let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Left);
+    frame.render_widget(p, area);
 }
-
 // RENDER ALBUM & PLAYLISTS
 fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusArea, theme: &Theme) {
     let result = match area_type {
-        FocusArea::Albums => Some((&app.albums, &mut app.album_list_state, "[1]- Albums")),
+        FocusArea::Albums => Some((&app.albums, &mut app.albums_liststate, "[1]- Albums")),
         FocusArea::Playlists => Some((
             &app.playlists,
-            &mut app.playlist_list_state,
+            &mut app.playlists_liststate,
             "[2]-󰲸 Playlists",
         )),
         _ => None,
@@ -70,7 +97,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
                 let is_playing = app
                     .playing_playlist_id
                     .as_ref()
-                    .map_or(false, |playing| playing.as_str() == item.browse_id);
+                    .map_or_else(|| false, |playing| playing.as_str() == item.browse_id);
                 let content = format!(" {} - {}", item.title, item.artist);
                 if is_playing {
                     ListItem::new(content).style(Style::default().fg(theme.secondary))
@@ -82,11 +109,9 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
 
         let is_focused = app.focus_area == area_type;
         let border_style = if is_focused {
-            Style::default()
-                .fg(theme.active)
-                .add_modifier(Modifier::BOLD)
+            theme.active_border_style()
         } else {
-            Style::default().fg(theme.inactive)
+            theme.inactive_border_style()
         };
 
         let mut block = Block::default()
@@ -94,19 +119,15 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
             .border_type(BorderType::Rounded)
             .title(title)
             .border_style(border_style);
-        let key_style = Style::default()
-            .fg(theme.secondary)
-            .add_modifier(Modifier::BOLD);
-        let text_style = Style::default().fg(theme.base);
         if area_type == FocusArea::Albums {
             let bottom_nav = Line::from(vec![
-                Span::styled("[ Up: ", text_style),
-                Span::styled("/k ", key_style),
-                Span::styled("| Down: ", text_style),
-                Span::styled("/j ", key_style),
-                Span::styled("| Play/Select: ", text_style),
-                Span::styled("<Enter>/l", key_style),
-                Span::styled(" ]", text_style),
+                Span::styled("[ Up: ", theme.text_style()),
+                Span::styled("/k ", theme.key_style()),
+                Span::styled("| Down: ", theme.text_style()),
+                Span::styled("/j ", theme.key_style()),
+                Span::styled("| Play/Select: ", theme.text_style()),
+                Span::styled("<Enter>/l", theme.key_style()),
+                Span::styled(" ]", theme.text_style()),
             ]);
 
             block = block.title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Right));
@@ -131,11 +152,9 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
             .border_type(BorderType::Rounded)
             .title(" Tracks")
             .border_style(Style::default().fg(theme.inactive));
-
         let message = Paragraph::new("Select an Album or Playlist to view songs")
             .block(empty_block)
             .alignment(ratatui::layout::Alignment::Center);
-
         frame.render_widget(message, area);
         return;
     }
@@ -159,11 +178,9 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let is_focused = FocusArea::SongList == app.focus_area;
 
     let border_style = if is_focused {
-        Style::default()
-            .fg(theme.active)
-            .add_modifier(Modifier::BOLD)
+        theme.active_border_style()
     } else {
-        Style::default().fg(theme.inactive)
+        theme.inactive_border_style()
     };
     let highlight_style = if is_focused {
         Style::default()
@@ -183,49 +200,42 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
         .highlight_style(highlight_style)
         .highlight_symbol("▶");
 
-    frame.render_stateful_widget(list_widget, area, &mut app.songs_list_state);
+    frame.render_stateful_widget(list_widget, area, &mut app.songs_liststate);
 }
 
 fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, theme: &Theme) {
     let song_info = if player.status == PlayerStatus::Loading {
-        "Loading...".to_string()
+        "   Loading...".to_string()
     } else {
         if let Some(song) = &app.playing_song {
             let status_icon = if player.status == PlayerStatus::Playing {
-                "▶ Playing: "
+                "  "
             } else {
-                "⏸ Paused: "
+                " ⏸ "
             };
-            format!(" {}  {} ", status_icon, song.title)
+            format!("{} {} ", status_icon, song.title)
         } else {
-            "  No song playing ".to_string()
+            "   No song is playing ".to_string()
         }
     };
     let mode_text = match player.play_mode {
-        PlayMode::DefaultMode => "Play mode:    Default",
-        PlayMode::ShuffleMode => "Play mode:    Shuffle",
+        PlayMode::DefaultMode => "Play mode:   Default ",
+        PlayMode::ShuffleMode => "Play mode:   Shuffle ",
     };
     let right_content = vec![
         Line::from(mode_text),
-        Line::from(format!("Volume:    {}%", player.volume)),
+        Line::from(format!("  {}% ", player.volume)),
     ];
-    let key_style = Style::default()
-        .fg(theme.secondary)
-        .add_modifier(Modifier::BOLD);
-    let text_style = Style::default().fg(theme.base);
-
     let key_map = Line::from(vec![
-        Span::styled("[ Quit: ", text_style),
-        Span::styled("q ", key_style),
-        Span::styled("| Pause/Resume: ", text_style),
-        Span::styled("Space ", key_style),
-        Span::styled("| Pause/Resume: ", text_style),
-        Span::styled("m", key_style),
-        Span::styled("| Prev/Next: ", text_style),
-        Span::styled("p/n ", key_style),
-        Span::styled("| Volume: ", text_style),
-        Span::styled("+/- ", key_style),
-        Span::styled(" ]", text_style),
+        Span::styled("[ ⏸ / : ", theme.text_style()),
+        Span::styled("<Space> ", theme.key_style()),
+        Span::styled("| Play mode: ", theme.text_style()),
+        Span::styled("m ", theme.key_style()),
+        Span::styled("| 󰒮 / 󰒭: ", theme.text_style()),
+        Span::styled("b/n ", theme.key_style()),
+        Span::styled("|  : ", theme.text_style()),
+        Span::styled("+/- ", theme.key_style()),
+        Span::styled(" ]", theme.text_style()),
     ]);
 
     let main_block = Block::default()
@@ -243,8 +253,6 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
         .style(Style::default().fg(theme.base).add_modifier(Modifier::BOLD))
         .alignment(Alignment::Right);
 
-    frame.render_widget(main_block, area);
-
     let inner_area = area.inner(ratatui::layout::Margin {
         vertical: 1,
         horizontal: 1,
@@ -254,6 +262,87 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
         .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
         .split(inner_area);
 
+    frame.render_widget(main_block, area);
     frame.render_widget(left_area, inner_chunks[0]);
     frame.render_widget(right_area, inner_chunks[1]);
+}
+
+fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
+    let items: Vec<ListItem> = app
+        .search_albums
+        .iter()
+        .map(|item| {
+            let is_saved = match item.is_saved {
+                true => "󰃂 ",
+                false => "  ",
+            };
+            let content = format!("{} {} - {}", is_saved, item.title, item.artist);
+            ListItem::new(content)
+        })
+        .collect();
+
+    let is_focused = FocusArea::SearchAlbums == app.focus_area;
+    let border_style = if is_focused && !app.is_insert {
+        theme.active_border_style()
+    } else {
+        theme.inactive_border_style()
+    };
+
+    let bottom_nav = Line::from(vec![
+        Span::styled("[ Up/Down: ", theme.text_style()),
+        Span::styled("/k, /j ", theme.key_style()),
+        Span::styled("| Add to Lib: ", theme.text_style()),
+        Span::styled("a ", theme.key_style()),
+        Span::styled("| Remove from Lib: ", theme.text_style()),
+        Span::styled("d ", theme.key_style()),
+        Span::styled(" ]", theme.text_style()),
+    ]);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .title(" Albums")
+        .border_style(border_style)
+        .title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
+
+    let list_widget = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::Rgb(69, 71, 90))
+            .fg(theme.primary)
+            .add_modifier(Modifier::BOLD),
+    );
+
+    frame.render_stateful_widget(list_widget, area, &mut app.search_albums_liststate);
+}
+
+fn render_search_input(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
+    let bottom_nav = Line::from(vec![
+        Span::styled("[ Toggle search: ", theme.text_style()),
+        Span::styled("i ", theme.key_style()),
+        Span::styled("| Exit insert: ", theme.text_style()),
+        Span::styled("Esc ", theme.key_style()),
+        Span::styled("| Search: ", theme.text_style()),
+        Span::styled("<Enter>", theme.key_style()),
+        Span::styled(" ]", theme.text_style()),
+    ]);
+    let display_text = if app.is_insert {
+        format!("{}_", app.search_query)
+    } else {
+        app.search_query.clone()
+    };
+    let input = Paragraph::new(display_text)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .title("󰍉 Search")
+                .border_style(if app.is_insert {
+                    theme.active_border_style()
+                } else {
+                    theme.inactive_border_style()
+                })
+                .title_bottom(bottom_nav.alignment(ratatui::layout::HorizontalAlignment::Center)),
+        )
+        .style(Style::default().fg(theme.base));
+    frame.render_widget(input, area);
 }
