@@ -29,7 +29,12 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
                 .split(main_layout[1]);
 
-            render_help_line(frame, main_layout[0], theme, vec![("Search", "s")]);
+            render_help_line(
+                frame,
+                main_layout[0],
+                theme,
+                vec![("󰈆 Exit", "q"), (" Search", "s")],
+            );
 
             render_list(frame, app, playlist_layout[0], FocusArea::Albums, theme);
             render_list(frame, app, playlist_layout[1], FocusArea::Playlists, theme);
@@ -53,7 +58,7 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
                 frame,
                 main_layout[0],
                 theme,
-                vec![("Back to Library", "Esc")],
+                vec![("󰈆 Exit", "q"), ("󰃂 Library", "Esc")],
             );
             render_search_input(frame, app, main_layout[1], theme);
             render_search_albums(frame, app, main_layout[2], theme);
@@ -64,10 +69,10 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
 fn render_help_line(frame: &mut Frame, area: Rect, theme: &Theme, items: Vec<(&str, &str)>) {
     let mut spans = Vec::new();
     for (i, (desc, key)) in items.iter().enumerate() {
-        spans.push(Span::styled(format!(" {}: ", desc), theme.text_style()));
-        spans.push(Span::styled(format!("[{}] ", key), theme.key_style()));
+        spans.push(Span::styled(format!("{}: ", desc), theme.text_style()));
+        spans.push(Span::styled(format!("[{}]", key), theme.key_style()));
         if i < items.len() - 1 {
-            spans.push(Span::styled(" |", theme.text_style()));
+            spans.push(Span::styled(" | ", theme.text_style()));
         }
     }
     let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Left);
@@ -206,9 +211,9 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
     } else {
         if let Some(song) = &app.playing_song {
             let status_icon = if player.status == PlayerStatus::Playing {
-                "▶ Playing: "
+                "  "
             } else {
-                "⏸ Paused: "
+                " ⏸  "
             };
             format!(" {}  {} ", status_icon, song.title)
         } else {
@@ -221,18 +226,16 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
     };
     let right_content = vec![
         Line::from(mode_text),
-        Line::from(format!("Volume:    {}%", player.volume)),
+        Line::from(format!("  {}%", player.volume)),
     ];
     let key_map = Line::from(vec![
-        Span::styled("[ Quit: ", theme.text_style()),
-        Span::styled("q ", theme.key_style()),
-        Span::styled("| Pause/Resume: ", theme.text_style()),
-        Span::styled("Space ", theme.key_style()),
+        Span::styled("[ ⏸ / : ", theme.text_style()),
+        Span::styled("<Space> ", theme.key_style()),
         Span::styled("| Play mode: ", theme.text_style()),
-        Span::styled("m", theme.key_style()),
-        Span::styled("| Prev/Next: ", theme.text_style()),
-        Span::styled("p/n ", theme.key_style()),
-        Span::styled("| Volume: ", theme.text_style()),
+        Span::styled("m ", theme.key_style()),
+        Span::styled("| 󰒮 / 󰒭: ", theme.text_style()),
+        Span::styled("b/n ", theme.key_style()),
+        Span::styled("|  : ", theme.text_style()),
         Span::styled("+/- ", theme.key_style()),
         Span::styled(" ]", theme.text_style()),
     ]);
@@ -273,7 +276,7 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
         .iter()
         .map(|item| {
             let is_saved = match item.is_saved {
-                true => " ",
+                true => "󰃂 ",
                 false => "  ",
             };
             let content = format!("{} {} - {}", is_saved, item.title, item.artist);

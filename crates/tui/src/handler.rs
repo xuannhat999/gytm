@@ -80,7 +80,7 @@ pub async fn handle_key_events(
                         log_to_file(&e);
                     }
                 }
-                KeyCode::Char('p') => {
+                KeyCode::Char('b') => {
                     if !app.songs.is_empty()
                         && let Err(e) = player.prev().await
                     {

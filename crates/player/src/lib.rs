@@ -113,7 +113,7 @@ impl Player {
         let socket_path = self.socket_path.clone();
         tokio::spawn(async move {
             let process_events = async {
-                let mut s = UnixStream::connect(&socket_path)
+                let mut s = UnixStream::connect(socket_path)
                     .await
                     .map_err(|e| YError::MpvSocketError(e.to_string()))?;
 
@@ -144,11 +144,13 @@ impl Player {
                                             i["filename"].as_str().map(get_vid_id_from_url)
                                         })
                                         .collect();
+
                                     tx.send(MpvEvent::ListChange(mpv_ids))
                                         .map_err(|e| YError::ChannelSendError(e.to_string()))?;
+
                                     if let Some(item) = items.iter().find(|i| {
                                         i["playing"].as_bool() == Some(true)
-                                            || i["current"].as_bool() == Some(true)
+                                        // || i["current"].as_bool() == Some(true)
                                     }) {
                                         if let (Some(url), Some(title)) =
                                             (item["filename"].as_str(), item["title"].as_str())

@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
-    println!("󱎫 Connecting to YouTube Music...");
+    println!("󱘖 Connecting to YouTube Music...");
     let client = match YClient::new(&state).await {
         Ok(c) => Arc::new(c),
         Err(e) => {
@@ -30,6 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
+    println!(" Fetching data from Youtube Music...");
     let (albums, playlists) = client.get_lists().await?;
 
     let mut app = App::default();
