@@ -1,16 +1,16 @@
 use data::{MpvEvent, MpvResponse, PlayMode, PlayerStatus, Song};
-use error::{Result, YError, log_to_file};
+use error::{YError, YResult, log_to_file};
 use state::PlayerState;
 use std::{
     io::Write,
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
 };
 use tempfile::NamedTempFile;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
 
 pub struct Player {
-    pub current_process: Option<std::process::Child>,
+    pub current_process: Option<Child>,
     pub status: PlayerStatus,
     pub volume: u8,
     pub play_mode: PlayMode,
@@ -40,7 +40,7 @@ impl Player {
     }
 
     // PLAY PREVIOUS SONG IN ALBUM/PLAYLIST
-    pub async fn next(&mut self) -> Result<()> {
+    pub async fn next(&mut self) -> YResult<()> {
         self.status = PlayerStatus::Loading;
         self.send_mpv_command(r#"{"command": ["playlist-next"]}"#)
             .await?;
@@ -48,7 +48,7 @@ impl Player {
     }
 
     // PLAY NEXT SONG IN ALBUM/PLAYLIST
-    pub async fn prev(&mut self) -> Result<()> {
+    pub async fn prev(&mut self) -> YResult<()> {
         self.status = PlayerStatus::Loading;
         self.send_mpv_command(r#"{"command": ["playlist-prev"]}"#)
             .await?;
@@ -56,7 +56,7 @@ impl Player {
     }
 
     // PAUSE PLAYING SONG
-    pub async fn toggle_pause(&mut self) -> Result<()> {
+    pub async fn toggle_pause(&mut self) -> YResult<()> {
         match self.status {
             PlayerStatus::Playing => {
                 self.status = PlayerStatus::Paused;
@@ -72,7 +72,7 @@ impl Player {
     }
 
     // START MPV SOCKET
-    pub fn start_mpv(&mut self) -> Result<()> {
+    pub fn start_mpv(&mut self) -> YResult<()> {
         let child = Command::new("mpv")
             .arg("--idle")
             .arg(format!("--input-ipc-server={}", self.socket_path))
@@ -87,21 +87,21 @@ impl Player {
         Ok(())
     }
 
-    pub async fn increase_volume(&mut self) -> Result<()> {
+    pub async fn increase_volume(&mut self) -> YResult<()> {
         self.volume = self.volume.saturating_add(5).min(100);
         self.send_mpv_command(r#"{"command": ["add", "volume", 5]}"#)
             .await?;
         Ok(())
     }
 
-    pub async fn decrease_volume(&mut self) -> Result<()> {
+    pub async fn decrease_volume(&mut self) -> YResult<()> {
         self.volume = self.volume.saturating_sub(5);
         self.send_mpv_command(r#"{"command": ["add", "volume", -5]}"#)
             .await?;
         Ok(())
     }
 
-    async fn send_mpv_command(&self, command: &str) -> Result<()> {
+    async fn send_mpv_command(&self, command: &str) -> YResult<()> {
         let mut stream = UnixStream::connect(&self.socket_path)
             .await
             .map_err(|e| YError::MpvSocketError(e.to_string()))?;
@@ -109,7 +109,7 @@ impl Player {
         stream.write_all(b"\n").await?;
         Ok(())
     }
-    pub async fn observe_mpv_changes(&self, tx: std::sync::mpsc::Sender<MpvEvent>) -> Result<()> {
+    pub async fn observe_mpv_changes(&self, tx: std::sync::mpsc::Sender<MpvEvent>) -> YResult<()> {
         let socket_path = self.socket_path.clone();
         tokio::spawn(async move {
             let process_events = async {
@@ -185,7 +185,7 @@ impl Player {
         Ok(())
     }
 
-    pub async fn toggle_playmode(&mut self) -> Result<()> {
+    pub async fn toggle_playmode(&mut self) -> YResult<()> {
         match self.play_mode {
             PlayMode::DefaultMode => {
                 self.play_mode = PlayMode::ShuffleMode;
@@ -201,13 +201,13 @@ impl Player {
         Ok(())
     }
 
-    pub async fn shuffle(&self) -> Result<()> {
+    pub async fn shuffle(&self) -> YResult<()> {
         self.send_mpv_command(r#"{"command": ["playlist-shuffle"]}"#)
             .await?;
         Ok(())
     }
 
-    pub async fn load_playlist(&mut self, songs: &[Song]) -> Result<()> {
+    pub async fn load_playlist(&mut self, songs: &[Song]) -> YResult<()> {
         if songs.is_empty() {
             return Err(YError::PlaylistEmpty);
         }
@@ -233,7 +233,7 @@ impl Player {
         Ok(())
     }
 
-    pub async fn play_at_idx(&mut self, index: &usize) -> Result<()> {
+    pub async fn play_at_idx(&mut self, index: &usize) -> YResult<()> {
         self.status = PlayerStatus::Loading;
         let command = format!(
             r#"{{"command": ["set_property", "playlist-pos", {}]}}"#,

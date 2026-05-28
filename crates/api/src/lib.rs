@@ -1,5 +1,5 @@
 use data::{PlayList, Song};
-use error::{Result, YError, log_to_file};
+use error::{YError, YResult, log_to_file};
 use reqwest::{
     Client, Url,
     cookie::Jar,
@@ -21,7 +21,7 @@ pub struct YClient {
 const YTM_DOMAIN: &str = "https://music.youtube.com";
 
 impl YClient {
-    pub async fn new(state: &AppState) -> Result<Self> {
+    pub async fn new(state: &AppState) -> YResult<Self> {
         let (jar, sapisid) = load_cookies()?;
         let http = Client::builder()
             .cookie_provider(Arc::new(jar))
@@ -66,7 +66,7 @@ impl YClient {
 
     // This function is adapted from: https://github.com/ccgauche/ytermusic.git
     // Original source: https://github.com/ccgauche/ytermusic/blob/master/crates/ytpapi2/src/lib.rs
-    pub fn get_api_headers(&self) -> Result<HeaderMap> {
+    pub fn get_api_headers(&self) -> YResult<HeaderMap> {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
         headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
@@ -77,7 +77,7 @@ impl YClient {
         Ok(headers)
     }
 
-    pub async fn get_raw_lists(&self) -> Result<Value> {
+    pub async fn get_raw_lists(&self) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -105,7 +105,7 @@ impl YClient {
         Ok(response)
     }
 
-    pub async fn get_continuation_data(&self, token: &str) -> Result<Value> {
+    pub async fn get_continuation_data(&self, token: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -133,7 +133,7 @@ impl YClient {
 
         Ok(response)
     }
-    pub async fn get_raw_songs(&self, id: &str) -> Result<Value> {
+    pub async fn get_raw_songs(&self, id: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -159,7 +159,7 @@ impl YClient {
         Ok(response)
     }
 
-    pub async fn get_raw_search_albums(&self, query: &str) -> Result<Value> {
+    pub async fn get_raw_search_albums(&self, query: &str) -> YResult<Value> {
         const ALBUM_PARAMS: &str = "EgWKAQIYAWoSEAUQAxAJEAQQChAQEBUQDhAR";
 
         let url = format!(
@@ -190,12 +190,11 @@ impl YClient {
 
         Ok(response)
     }
-    pub async fn add_to_lib(&self, playlist_id: &str) -> Result<Value> {
+    pub async fn add_to_lib(&self, playlist_id: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/like/like?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
-
         let body = json!({
             "context": {
                 "client": {
@@ -226,8 +225,41 @@ impl YClient {
             Ok(json_val)
         }
     }
+    pub async fn remove_from_lib(&self, playlist_id: &str) -> YResult<Value> {
+        let url = format!(
+            "{}/youtubei/v1/like/removelike?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
+        let body = json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": self.client_version,
+                }
+            },
+            "target": {
+                "playlistId": playlist_id
+            },
+        });
 
-    pub async fn get_lists(&self) -> Result<(Vec<PlayList>, Vec<PlayList>)> {
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers()?)
+            .json(&body)
+            .send()
+            .await?;
+
+        let text = response.text().await?;
+
+        if text.trim().is_empty() {
+            Ok(json!({}))
+        } else {
+            let json_val: Value = serde_json::from_str(&text)?;
+            Ok(json_val)
+        }
+    }
+    pub async fn get_lists(&self) -> YResult<(Vec<PlayList>, Vec<PlayList>)> {
         let mut all_albums: Vec<PlayList> = Vec::new();
         let mut all_playlists: Vec<PlayList> = Vec::new();
         let raw_data = match self.get_raw_lists().await {
@@ -259,7 +291,7 @@ impl YClient {
         Ok((all_albums, all_playlists))
     }
 
-    pub async fn get_songs(&self, id: &str) -> Result<Vec<Song>> {
+    pub async fn get_songs(&self, id: &str) -> YResult<Vec<Song>> {
         let raw_songs = match self.get_raw_songs(id).await {
             Ok(raw_songs) => raw_songs,
             Err(e) => {
@@ -276,7 +308,7 @@ impl YClient {
         };
         Ok(songs)
     }
-    pub async fn get_search_albums(&self, query: &str) -> Result<Vec<PlayList>> {
+    pub async fn get_search_albums(&self, query: &str) -> YResult<Vec<PlayList>> {
         let raw_list = match self.get_raw_search_albums(query).await {
             Ok(raw_data) => raw_data,
             Err(e) => {
@@ -296,7 +328,7 @@ impl YClient {
 }
 
 // ONLY WORKS WITH CHROMIUM BASED BROWSER ( No idea )
-pub fn load_cookies() -> Result<(Jar, String)> {
+pub fn load_cookies() -> YResult<(Jar, String)> {
     let jar = Jar::default();
     let url = YTM_DOMAIN.parse::<Url>()?;
     let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
@@ -323,7 +355,7 @@ pub fn load_cookies() -> Result<(Jar, String)> {
     Ok((jar, sapisid_extracted))
 }
 
-pub fn load_cookies_firefox_based() -> Result<Vec<Cookie>> {
+pub fn load_cookies_firefox_based() -> YResult<Vec<Cookie>> {
     let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
     let browser_dirs = vec!["mozilla/firefox", "librewolf/librewolf", "zen"];
 

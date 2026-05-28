@@ -4,7 +4,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use data::MpvEvent;
+use data::{MpvEvent, Theme};
 use error::log_to_file;
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         app.playlists_liststate.select(Some(0));
     }
-
+    let theme = Theme::default();
     loop {
         while let Ok(event) = rx.try_recv() {
             handler::handle_mpv_event(&mut app, &mut player, &mut state, event);
@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        terminal.draw(|f| ui::render(&mut app, f, &player))?;
+        terminal.draw(|f| ui::render(&mut app, f, &player, &theme))?;
         if app.is_exit {
             player.kill_current_process();
             break;

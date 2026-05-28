@@ -1,10 +1,10 @@
 use data::{PlayList, Song};
 use serde_json::Value;
-use error::{YError,Result};
+use error::{YError,YResult};
 
 
 // EXTRACT PLAYLISTS/ALBUMS FROM RESPONSED DATA (JSON TYPE)
-pub fn extract_lists(data: Value) -> Result<(Vec<PlayList>, Vec<PlayList>, Option<String>)> {
+pub fn extract_lists(data: Value) -> YResult<(Vec<PlayList>, Vec<PlayList>, Option<String>)> {
     let mut albums: Vec<PlayList> = Vec::new();
     let mut playlists: Vec<PlayList> = Vec::new();
 
@@ -25,6 +25,7 @@ pub fn extract_lists(data: Value) -> Result<(Vec<PlayList>, Vec<PlayList>, Optio
                         playlist_id: rerender.pointer("/thumbnailOverlay/musicItemThumbnailOverlayRenderer/content/musicPlayButtonRenderer/playNavigationEndpoint/watchPlaylistEndpoint/playlistId")
                             .and_then(|v| v.as_str())
                             .unwrap_or("").to_string(),
+                        is_saved: true
                     };
                     match page_type_str {
                         "MUSIC_PAGE_TYPE_ALBUM" => albums.push(album),
@@ -43,13 +44,12 @@ pub fn extract_lists(data: Value) -> Result<(Vec<PlayList>, Vec<PlayList>, Optio
 }
 
 // EXTRACT SONGS FROM RESPONSED DATA (JSON TYPE)
-pub fn extract_songs(data: Value) -> Result<Vec<Song>> {
+pub fn extract_songs(data: Value) -> YResult<Vec<Song>> {
     let mut songs = Vec::new();
 
     let track_list = data.pointer("/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicShelfRenderer/contents")
         .or_else(|| data.pointer("/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicPlaylistShelfRenderer/contents"))
         .and_then(|v| v.as_array())
-        // Nếu không tìm thấy danh sách bài hát, báo lỗi phân tích dữ liệu ngay
         .ok_or(YError::InvalidCookie)?; 
 
     for item in track_list {
@@ -71,7 +71,7 @@ pub fn extract_songs(data: Value) -> Result<Vec<Song>> {
     Ok(songs)
 }
 
-pub fn extract_search_albums(data: Value) -> Result<Vec<PlayList>> {
+pub fn extract_search_albums(data: Value) -> YResult<Vec<PlayList>> {
     let mut albums: Vec<PlayList> = Vec::new();
     let contents = data
         .pointer("/contents/tabbedSearchResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicShelfRenderer/contents")
@@ -102,12 +102,25 @@ pub fn extract_search_albums(data: Value) -> Result<Vec<PlayList>> {
                 .unwrap_or("")
                 .to_string();
 
+            let mut is_saved = false;
+            if let Some(items) = renderer.pointer("/menu/menuRenderer/items").and_then(|v| v.as_array()) {
+                for menu_item in items {
+                    if let Some(toggle) = menu_item.get("toggleMenuServiceItemRenderer") {
+                        if let Some(status) = toggle.pointer("/defaultServiceEndpoint/likeEndpoint/status").and_then(|v| v.as_str()) {
+                            if status == "INDIFFERENT" {
+                                is_saved = true;
+                            }
+                        }
+                    }
+                }
+            }
             if !browse_id.is_empty() {
                 albums.push(PlayList {
                     title,
                     artist,
                     browse_id,
                     playlist_id,
+                    is_saved,
                 });
             }
         }
