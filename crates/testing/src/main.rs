@@ -1,22 +1,38 @@
-use api::load_cookies_firefox_based;
+use std::sync::Arc;
+
+use api::YClient;
+use error::{YResult, log_to_file};
+use player::Player;
+use state::AppState;
+use tui::app::App;
 
 #[tokio::main]
-async fn main() {
-    println!("=== BẮT ĐẦU TEST LOAD COOKIE FIREFOX TỪ .CONFIG ===");
-    println!("Lưu ý: Hãy chắc chắn đã tắt Firefox (pkill firefox) trước khi chạy.");
-    println!("--------------------------------------------------");
-
-    match load_cookies_firefox_based() {
-        Ok(cookies) => {
-            println!("  THÀNH CÔNG RỰC RỠ!");
-            println!("- Đang kiểm tra Cookie Jar...");
-        }
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let state = match AppState::load() {
+        Ok(c) => c,
         Err(e) => {
-            eprintln!("  THẤT BẠI: {:?}", e);
-            eprintln!("Nguyên nhân có thể do:");
-            eprintln!("1. Thư mục ~/.config/mozilla/firefox không tồn tại hoặc trống.");
-            eprintln!("2. Firefox đang mở và khóa file cookies.sqlite.");
-            eprintln!("3. Bạn chưa đăng nhập YouTube trên Firefox.");
+            println!("{}", e);
+            std::process::exit(1);
         }
-    }
+    };
+    println!("󱎫 Connecting to YouTube Music...");
+    let client = match YClient::new(&state).await {
+        Ok(c) => Arc::new(c),
+        Err(e) => {
+            log_to_file(&e);
+            println!("{}", e);
+            std::process::exit(1);
+        }
+    };
+    // let (albums, playlists) = client.get_lists().await?;
+    //
+    // let mut app = App::default();
+    // app.albums = albums;
+    // app.playlists = playlists;
+    //
+    let res = client
+        .remove_from_lib("OLAK5uy_nSFpJd6fk5g2u7CcljXZCqauq_CHCoP58")
+        .await?;
+    println!("{}", res);
+    Ok(())
 }

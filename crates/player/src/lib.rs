@@ -25,7 +25,7 @@ impl Player {
             status: PlayerStatus::Idle,
             volume: player_state.volume,
             play_mode: player_state.play_mode.clone(),
-            socket_path: "/tmp/mpv-socket".to_string(),
+            socket_path: "/tmp/gytm-mpv-socket".to_string(),
             playlist_file: None,
         }
     }
@@ -79,6 +79,10 @@ impl Player {
             .arg("--no-video")
             .arg(format!("--volume={}", self.volume))
             .arg("--loop-playlist=inf")
+            .arg("--cache=yes")
+            .arg("--cache-secs=5")
+            .arg("--demuxer-max-bytes=5MiB")
+            .arg("--demuxer-max-back-bytes=1MiB")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
