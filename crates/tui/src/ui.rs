@@ -17,9 +17,9 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
                 .direction(Direction::Vertical)
                 .constraints([
                     Constraint::Length(1),
-                    Constraint::Percentage(40),
                     Constraint::Percentage(50),
-                    Constraint::Percentage(10),
+                    Constraint::Percentage(50),
+                    Constraint::Length(4),
                 ])
                 .split(frame.area());
 
@@ -163,14 +163,13 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
         .iter()
         .enumerate()
         .map(|(i, song)| {
-            let content = format!("{:>3}. {}", i + 1, song.title);
-            if app
-                .playing_song
-                .as_ref()
-                .map_or(false, |playing| playing.video_id == song.video_id)
-            {
+            if Option::map_or(app.playing_song.as_ref(), false, |playing| {
+                playing.video_id == song.video_id
+            }) {
+                let content = format!("{:>3}. {}", i + 1, song.title);
                 ListItem::new(content).style(Style::default().fg(theme.primary))
             } else {
+                let content = format!(" {:>3}. {}", i + 1, song.title);
                 ListItem::new(content)
             }
         })
@@ -197,8 +196,7 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
                 .title(format!("[3]- Tracks ({})", app.songs.len()))
                 .border_style(border_style),
         )
-        .highlight_style(highlight_style)
-        .highlight_symbol("▶");
+        .highlight_style(highlight_style);
 
     frame.render_stateful_widget(list_widget, area, &mut app.songs_liststate);
 }
