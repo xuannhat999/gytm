@@ -49,8 +49,6 @@ pub async fn handle_key_events(
                 KeyCode::Tab => app.toggle_focus(),
                 KeyCode::Char('1') => {
                     app.focus_area = FocusArea::Albums;
-                    app.albums_liststate
-                        .select(app.albums_liststate.selected().or(Some(0)));
                 }
                 KeyCode::Char('2') => {
                     app.focus_area = FocusArea::Playlists;
@@ -130,11 +128,6 @@ pub async fn handle_key_events(
                                             if let Err(e) = player.shuffle().await {
                                                 log_to_file(&e);
                                             }
-                                        }
-                                        if is_album {
-                                            app.playlists_liststate.select(None);
-                                        } else {
-                                            app.albums_liststate.select(None);
                                         }
                                     }
                                 }
@@ -239,7 +232,7 @@ pub async fn handle_key_events(
                 }
             } else {
                 match key_event.code {
-                    KeyCode::Char('i') => {
+                    KeyCode::Char('s') => {
                         app.is_insert = true;
                     }
                     KeyCode::Esc => {
