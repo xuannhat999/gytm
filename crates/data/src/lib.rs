@@ -97,4 +97,7 @@ impl Theme {
     pub fn inactive_border_style(&self) -> Style {
         Style::default().fg(self.inactive)
     }
+    pub fn selected_item(&self) -> Style {
+        Style::default().bg(Color::Rgb(69, 71, 90)).fg(self.primary)
+    }
 }

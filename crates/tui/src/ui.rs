@@ -5,7 +5,7 @@ use player::Player;
 use ratatui::{
     self, Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
 };
@@ -17,9 +17,9 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
                 .direction(Direction::Vertical)
                 .constraints([
                     Constraint::Length(1),
-                    Constraint::Percentage(40),
                     Constraint::Percentage(50),
-                    Constraint::Percentage(10),
+                    Constraint::Percentage(50),
+                    Constraint::Length(4),
                 ])
                 .split(frame.area());
 
@@ -33,7 +33,7 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
                 frame,
                 main_layout[0],
                 theme,
-                vec![("󰈆 Exit", "q"), (" Search", "s")],
+                vec![("󰈆 Quit", "q"), (" Search", "s")],
             );
 
             render_list(frame, app, playlist_layout[0], FocusArea::Albums, theme);
@@ -58,7 +58,7 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
                 frame,
                 main_layout[0],
                 theme,
-                vec![("󰈆 Exit", "q"), ("󰃂 Library", "Esc")],
+                vec![("󰈆 Quit", "q"), ("󰃂 Library", "Esc")],
             );
             render_search_input(frame, app, main_layout[1], theme);
             render_search_albums(frame, app, main_layout[2], theme);
@@ -132,13 +132,15 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
 
             block = block.title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Right));
         }
-
-        let list_widget = List::new(items).block(block).highlight_style(
+        let highlight_style = if is_focused {
+            theme.selected_item()
+        } else {
             Style::default()
-                .bg(Color::Rgb(69, 71, 90))
-                .fg(theme.primary)
-                .add_modifier(Modifier::BOLD),
-        );
+        };
+
+        let list_widget = List::new(items)
+            .block(block)
+            .highlight_style(highlight_style);
 
         frame.render_stateful_widget(list_widget, area, list);
     }
@@ -163,14 +165,13 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
         .iter()
         .enumerate()
         .map(|(i, song)| {
-            let content = format!("{:>3}. {}", i + 1, song.title);
-            if app
-                .playing_song
-                .as_ref()
-                .map_or(false, |playing| playing.video_id == song.video_id)
-            {
+            if Option::map_or(app.playing_song.as_ref(), false, |playing| {
+                playing.video_id == song.video_id
+            }) {
+                let content = format!("{:>3}. {}", i + 1, song.title);
                 ListItem::new(content).style(Style::default().fg(theme.primary))
             } else {
+                let content = format!(" {:>3}. {}", i + 1, song.title);
                 ListItem::new(content)
             }
         })
@@ -183,9 +184,7 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
         theme.inactive_border_style()
     };
     let highlight_style = if is_focused {
-        Style::default()
-            .bg(Color::Rgb(69, 71, 90))
-            .fg(theme.primary)
+        theme.selected_item()
     } else {
         Style::default()
     };
@@ -197,8 +196,7 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
                 .title(format!("[3]- Tracks ({})", app.songs.len()))
                 .border_style(border_style),
         )
-        .highlight_style(highlight_style)
-        .highlight_symbol("▶");
+        .highlight_style(highlight_style);
 
     frame.render_stateful_widget(list_widget, area, &mut app.songs_liststate);
 }
@@ -305,12 +303,9 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
         .border_style(border_style)
         .title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
 
-    let list_widget = List::new(items).block(block).highlight_style(
-        Style::default()
-            .bg(Color::Rgb(69, 71, 90))
-            .fg(theme.primary)
-            .add_modifier(Modifier::BOLD),
-    );
+    let list_widget = List::new(items)
+        .block(block)
+        .highlight_style(theme.selected_item());
 
     frame.render_stateful_widget(list_widget, area, &mut app.search_albums_liststate);
 }
@@ -318,7 +313,7 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
 fn render_search_input(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let bottom_nav = Line::from(vec![
         Span::styled("[ Toggle search: ", theme.text_style()),
-        Span::styled("i ", theme.key_style()),
+        Span::styled("s ", theme.key_style()),
         Span::styled("| Exit insert: ", theme.text_style()),
         Span::styled("Esc ", theme.key_style()),
         Span::styled("| Search: ", theme.text_style()),
