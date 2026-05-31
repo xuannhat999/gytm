@@ -10,7 +10,7 @@ pub struct PlayList {
     pub playlist_id: String,
     pub is_saved: bool,
 }
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Song {
     pub title: String,
     pub video_id: String,
@@ -53,6 +53,7 @@ pub enum FocusArea {
     Playlists,
     SongList,
     SearchAlbums,
+    SearchSongs,
 }
 
 #[derive(PartialEq)]

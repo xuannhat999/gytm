@@ -155,7 +155,7 @@ impl Player {
 
                                     if let Some(item) = items.iter().find(|i| {
                                         i["playing"].as_bool() == Some(true)
-                                        // || i["current"].as_bool() == Some(true)
+                                            || i["current"].as_bool() == Some(true)
                                     }) {
                                         if let (Some(url), Some(title)) =
                                             (item["filename"].as_str(), item["title"].as_str())

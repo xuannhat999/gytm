@@ -47,13 +47,14 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
                 .constraints([
                     Constraint::Length(1),
                     Constraint::Length(3),
-                    Constraint::Percentage(95),
+                    Constraint::Percentage(100),
                 ])
                 .split(frame.area());
-            // let playlist_layout = Layout::default()
-            //     .direction(Direction::Horizontal)
-            //     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            //     .split(main_layout[1]);
+            let result_layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(main_layout[2]);
+
             render_help_line(
                 frame,
                 main_layout[0],
@@ -61,7 +62,8 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
                 vec![("󰈆 Quit", "q"), ("󰃂 Library", "Esc")],
             );
             render_search_input(frame, app, main_layout[1], theme);
-            render_search_albums(frame, app, main_layout[2], theme);
+            render_search_albums(frame, app, result_layout[0], theme);
+            render_search_songs(frame, app, result_layout[1], theme);
         }
     }
 }
@@ -125,8 +127,8 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
                 Span::styled("/k ", theme.key_style()),
                 Span::styled("| Down: ", theme.text_style()),
                 Span::styled("/j ", theme.key_style()),
-                Span::styled("| Play/Select: ", theme.text_style()),
-                Span::styled("<Enter>/l", theme.key_style()),
+                Span::styled("| Play: ", theme.text_style()),
+                Span::styled("<Enter>", theme.key_style()),
                 Span::styled(" ]", theme.text_style()),
             ]);
 
@@ -193,7 +195,7 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .title(format!("[3]- Tracks ({})", app.songs.len()))
+                .title(format!("[3]- Queue ({})", app.songs.len()))
                 .border_style(border_style),
         )
         .highlight_style(highlight_style);
@@ -265,6 +267,36 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
     frame.render_widget(right_area, inner_chunks[1]);
 }
 
+fn render_search_input(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
+    let bottom_nav = Line::from(vec![
+        Span::styled("[ Exit insert: ", theme.text_style()),
+        Span::styled("Esc ", theme.key_style()),
+        Span::styled("| Search: ", theme.text_style()),
+        Span::styled("<Enter>", theme.key_style()),
+        Span::styled(" ]", theme.text_style()),
+    ]);
+    let display_text = if app.is_insert {
+        format!("{}_", app.search_query)
+    } else {
+        app.search_query.clone()
+    };
+    let input = Paragraph::new(display_text)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .title("[s]-󰍉 Search")
+                .border_style(if app.is_insert {
+                    theme.active_border_style()
+                } else {
+                    theme.inactive_border_style()
+                })
+                .title_bottom(bottom_nav.alignment(ratatui::layout::HorizontalAlignment::Center)),
+        )
+        .style(Style::default().fg(theme.base));
+    frame.render_widget(input, area);
+}
+
 fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let items: Vec<ListItem> = app
         .search_albums
@@ -299,45 +331,57 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .title(" Albums")
+        .title("[1]- Albums")
+        .border_style(border_style)
+        .title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
+    let list_widget = List::new(items)
+        .block(block)
+        .highlight_style(if is_focused {
+            theme.selected_item()
+        } else {
+            Style::default()
+        });
+
+    frame.render_stateful_widget(list_widget, area, &mut app.search_albums_liststate);
+}
+
+fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
+    let items: Vec<ListItem> = app
+        .search_songs
+        .iter()
+        .map(|item| {
+            let content = item.title.to_string();
+            ListItem::new(content)
+        })
+        .collect();
+
+    let is_focused = FocusArea::SearchSongs == app.focus_area;
+    let border_style = if is_focused && !app.is_insert {
+        theme.active_border_style()
+    } else {
+        theme.inactive_border_style()
+    };
+
+    let bottom_nav = Line::from(vec![
+        Span::styled("[ Up/Down: ", theme.text_style()),
+        Span::styled("/k, /j ", theme.key_style()),
+        Span::styled(" ]", theme.text_style()),
+    ]);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .title("[2]-󰎇 Songs")
         .border_style(border_style)
         .title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
 
     let list_widget = List::new(items)
         .block(block)
-        .highlight_style(theme.selected_item());
+        .highlight_style(if is_focused {
+            theme.selected_item()
+        } else {
+            Style::default()
+        });
 
-    frame.render_stateful_widget(list_widget, area, &mut app.search_albums_liststate);
-}
-
-fn render_search_input(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
-    let bottom_nav = Line::from(vec![
-        Span::styled("[ Toggle search: ", theme.text_style()),
-        Span::styled("s ", theme.key_style()),
-        Span::styled("| Exit insert: ", theme.text_style()),
-        Span::styled("Esc ", theme.key_style()),
-        Span::styled("| Search: ", theme.text_style()),
-        Span::styled("<Enter>", theme.key_style()),
-        Span::styled(" ]", theme.text_style()),
-    ]);
-    let display_text = if app.is_insert {
-        format!("{}_", app.search_query)
-    } else {
-        app.search_query.clone()
-    };
-    let input = Paragraph::new(display_text)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .title("󰍉 Search")
-                .border_style(if app.is_insert {
-                    theme.active_border_style()
-                } else {
-                    theme.inactive_border_style()
-                })
-                .title_bottom(bottom_nav.alignment(ratatui::layout::HorizontalAlignment::Center)),
-        )
-        .style(Style::default().fg(theme.base));
-    frame.render_widget(input, area);
+    frame.render_stateful_widget(list_widget, area, &mut app.search_songs_liststate);
 }

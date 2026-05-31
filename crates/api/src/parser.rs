@@ -4,7 +4,7 @@ use error::{YError,YResult};
 
 
 // EXTRACT PLAYLISTS/ALBUMS FROM RESPONSED DATA (JSON TYPE)
-pub fn extract_lists(data: Value) -> YResult<(Vec<PlayList>, Vec<PlayList>, Option<String>)> {
+pub fn parse_lists(data: Value) -> YResult<(Vec<PlayList>, Vec<PlayList>, Option<String>)> {
     let mut albums: Vec<PlayList> = Vec::new();
     let mut playlists: Vec<PlayList> = Vec::new();
 
@@ -44,7 +44,7 @@ pub fn extract_lists(data: Value) -> YResult<(Vec<PlayList>, Vec<PlayList>, Opti
 }
 
 // EXTRACT SONGS FROM RESPONSED DATA (JSON TYPE)
-pub fn extract_songs(data: Value) -> YResult<Vec<Song>> {
+pub fn parse_songs(data: Value) -> YResult<Vec<Song>> {
     let mut songs = Vec::new();
 
     let track_list = data.pointer("/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicShelfRenderer/contents")
@@ -61,6 +61,7 @@ pub fn extract_songs(data: Value) -> YResult<Vec<Song>> {
                 video_id: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId")
                     .or_else(|| renderer.pointer("/playlistItemData/videoId"))
                     .and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                
             };
             if !song.video_id.is_empty() {
                 songs.push(song);
@@ -71,7 +72,7 @@ pub fn extract_songs(data: Value) -> YResult<Vec<Song>> {
     Ok(songs)
 }
 
-pub fn extract_search_albums(data: Value) -> YResult<Vec<PlayList>> {
+pub fn parse_search_albums(data: Value) -> YResult<Vec<PlayList>> {
     let mut albums: Vec<PlayList> = Vec::new();
     let contents = data
         .pointer("/contents/tabbedSearchResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicShelfRenderer/contents")
@@ -127,6 +128,38 @@ pub fn extract_search_albums(data: Value) -> YResult<Vec<PlayList>> {
     }
     Ok(albums)
 }
+
+pub fn parse_search_songs(data: Value) -> YResult<Vec<Song>> {
+    let mut songs = Vec::new();
+    if let Some(contents) = data["contents"]["tabbedSearchResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"].as_array() {
+        for section in contents {
+            if let Some(items) = section["musicShelfRenderer"]["contents"].as_array() {
+                for item in items {
+                    if let Some(renderer) = item.get("musicResponsiveListItemRenderer") {
+                        let title = renderer["flexColumns"][0]["musicResponsiveListItemFlexColumnRenderer"]["text"]["runs"][0]["text"]
+                            .as_str()
+                            .unwrap_or("Unknown")
+                            .to_string();
+
+                        let video_id = renderer["overlay"]["musicItemThumbnailOverlayRenderer"]["content"]["musicPlayButtonRenderer"]["playNavigationEndpoint"]["watchEndpoint"]["videoId"]
+                            .as_str()
+                            .unwrap_or("")
+                            .to_string();
+
+                        if !video_id.is_empty() {
+                            songs.push(Song {
+                                video_id,
+                                title,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(songs)
+}
+
 pub fn parse_params(data: Value) -> YResult<String> {
     let params = data
         .pointer("/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents/1/automixPreviewVideoRenderer/content/automixPlaylistVideoRenderer/navigationEndpoint/watchPlaylistEndpoint/params")
@@ -134,6 +167,7 @@ pub fn parse_params(data: Value) -> YResult<String> {
         .map(|s| s.to_string()); 
     params.ok_or(YError::InvalidCookie) 
 }
+
 pub fn parse_related_songs(data: Value) -> YResult<Vec<Song>> {
     let mut songs = Vec::new();
     if let Some(contents) = data

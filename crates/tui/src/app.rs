@@ -21,6 +21,9 @@ pub struct App {
     // PAGE SEARCH
     pub search_albums: Vec<PlayList>,
     pub search_albums_liststate: ListState,
+    pub search_songs: Vec<Song>,
+    pub search_songs_liststate: ListState,
+
     pub search_query: String,
     pub is_insert: bool,
     // OTHER
@@ -51,6 +54,8 @@ impl Default for App {
             //PAGE SEARCH
             search_albums: Vec::new(),
             search_albums_liststate: ListState::default(),
+            search_songs: Vec::new(),
+            search_songs_liststate: ListState::default(),
             search_query: String::new(),
             is_insert: false,
 
@@ -61,16 +66,6 @@ impl Default for App {
     }
 }
 impl App {
-    // FOCUS NEXT AREA
-    pub fn toggle_focus(&mut self) {
-        self.focus_area = match self.focus_area {
-            FocusArea::Albums => FocusArea::Playlists,
-            FocusArea::Playlists => FocusArea::SongList,
-            FocusArea::SongList => FocusArea::Albums,
-            FocusArea::SearchAlbums => FocusArea::SearchAlbums,
-        };
-    }
-
     // TOGGLE NEXT ITEM IN LISTSTATE
     pub fn next(&mut self) {
         let (state, len) = match self.focus_area {
@@ -80,6 +75,7 @@ impl App {
             FocusArea::SearchAlbums => {
                 (&mut self.search_albums_liststate, self.search_albums.len())
             }
+            FocusArea::SearchSongs => (&mut self.search_songs_liststate, self.search_songs.len()),
         };
 
         if len == 0 {
@@ -109,6 +105,7 @@ impl App {
             FocusArea::SearchAlbums => {
                 (&mut self.search_albums_liststate, self.search_albums.len())
             }
+            FocusArea::SearchSongs => (&mut self.search_songs_liststate, self.search_songs.len()),
         };
 
         if len == 0 {
