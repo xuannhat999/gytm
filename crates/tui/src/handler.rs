@@ -113,8 +113,6 @@ pub async fn handle_key_events(
                                     app.songs = songs;
                                     app.songs_liststate.select(Some(0));
                                     app.focus_area = FocusArea::SongList;
-                                    // app.viewing_playlist_id = Some(browse_id.clone());
-                                    // app.playing_playlist_id = app.viewing_playlist_id.clone();
                                     app.playing_playlist_id = Some(browse_id.clone());
                                     if let Err(e) = player.load_playlist(&app.songs).await {
                                         log_to_file(&e);
@@ -135,7 +133,6 @@ pub async fn handle_key_events(
                     FocusArea::SongList => {
                         if let Some(i) = app.songs_liststate.selected() {
                             let target_id = &app.songs[i].video_id;
-                            // if app.playing_playlist_id == app.viewing_playlist_id {
                             if let Some(pos) = app.get_mpv_idx(target_id) {
                                 if let Err(e) = player.play_at_idx(&pos).await {
                                     log_to_file(&e);
@@ -143,23 +140,6 @@ pub async fn handle_key_events(
                             } else {
                                 log_to_file("Failed to get mpv index");
                             }
-                            // } else {
-                            //     if let Err(e) = player.load_playlist(&app.songs).await {
-                            //         log_to_file(&e);
-                            //     }
-                            //     tokio::time::sleep(tokio::time::Duration::from_millis(120)).await;
-                            //     if let Err(e) = player.play_at_idx(&i).await {
-                            //         log_to_file(&e);
-                            //     }
-                            //     app.playing_playlist_id = app.viewing_playlist_id.clone();
-                            //     if player.play_mode == PlayMode::ShuffleMode {
-                            //         tokio::time::sleep(tokio::time::Duration::from_millis(50))
-                            //             .await;
-                            //         if let Err(e) = player.shuffle().await {
-                            //             log_to_file(&e);
-                            //         }
-                            //     }
-                            // }
                         }
                     }
                     _ => {}
@@ -308,7 +288,6 @@ pub async fn handle_key_events(
                                         app.songs_liststate.select(Some(0));
                                         app.page = AppPage::Library;
                                         app.focus_area = FocusArea::SongList;
-                                        app.viewing_playlist_id = Some(browse_id.clone());
                                         app.playing_playlist_id = Some(browse_id.clone());
                                         app.albums_liststate.select(None);
                                         app.playlists_liststate.select(None);
@@ -343,7 +322,6 @@ pub async fn handle_key_events(
                                         app.songs_liststate.select(Some(0));
                                         app.page = AppPage::Library;
                                         app.focus_area = FocusArea::SongList;
-                                        app.viewing_playlist_id = None;
                                         app.playing_playlist_id = None;
                                         app.albums_liststate.select(None);
                                         app.playlists_liststate.select(None);

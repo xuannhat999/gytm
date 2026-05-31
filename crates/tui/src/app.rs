@@ -16,7 +16,6 @@ pub struct App {
     pub mpv_list: Vec<String>,
 
     pub playing_playlist_id: Option<String>,
-    pub viewing_playlist_id: Option<String>,
 
     // PAGE SEARCH
     pub search_albums: Vec<PlayList>,
@@ -49,7 +48,6 @@ impl Default for App {
             mpv_list: Vec::new(),
 
             playing_playlist_id: None,
-            viewing_playlist_id: None,
 
             //PAGE SEARCH
             search_albums: Vec::new(),
