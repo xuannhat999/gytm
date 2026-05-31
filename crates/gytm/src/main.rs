@@ -45,8 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Error starting MPV: {}", e);
         std::process::exit(1);
     }
-
-    thread::sleep(Duration::from_millis(300));
+    thread::sleep(Duration::from_millis(350));
 
     if let Err(e) = player.observe_mpv_changes(tx).await {
         log_to_file(&e);
@@ -60,11 +59,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    if !app.albums.is_empty() {
-        app.albums_liststate.select(Some(0));
-    } else {
-        app.playlists_liststate.select(Some(0));
-    }
+    app.albums_liststate.select(Some(0));
+    app.playlists_liststate.select(Some(0));
+
     let theme = Theme::default();
     loop {
         while let Ok(event) = rx.try_recv() {
