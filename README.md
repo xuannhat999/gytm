@@ -12,9 +12,10 @@ Stream Youtube Music from your terminal !
 - Stream songs on Youtube Music as saved album/playlist
 - Personalized Content: Seamlessly fetch your private playlists/album using local cookie authentication.
 - Search albums, save / delete albums in accounts's Library
-- Stream albums from search result
+- Stream albums in search result
+- Stream selected song in search result with related songs 
 ## Supported OS
-- **Linux** (Arch Linux)
+- **Linux** (Tested on Arch Linux)
 
 # Build Dependencies (Only required if building from source)
 - **Rust & Cargo** (1.75 or later)
