@@ -190,6 +190,64 @@ impl YClient {
 
         Ok(response)
     }
+    pub async fn get_raw_params(&self, video_id: &str) -> YResult<Value> {
+        let url = format!(
+            "{}/youtubei/v1/next?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
+        let body = json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": self.client_version,
+                }
+            },
+            "videoId": video_id
+        });
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers()?)
+            .json(&body)
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+
+        Ok(response)
+    }
+
+    pub async fn get_raw_related_songs(&self, playlist_id: &str, params: &str) -> YResult<Value> {
+        let url = format!(
+            "{}/youtubei/v1/next?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
+
+        let body = json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": self.client_version,
+                }
+            },
+            "playlistId": playlist_id,
+            "params": params
+        });
+
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers()?)
+            .json(&body)
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+
+        Ok(response)
+    }
+
+    // SAVE ALBUM TO LIBRARY
     pub async fn add_to_lib(&self, playlist_id: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/like/like?key={}&alt=json",
