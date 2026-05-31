@@ -25,7 +25,7 @@ impl Player {
             status: PlayerStatus::Idle,
             volume: player_state.volume,
             play_mode: player_state.play_mode.clone(),
-            socket_path: "/tmp/gytm-mpv-socket".to_string(),
+            socket_path: String::from("/tmp/gytm-mpv-socket"),
             playlist_file: None,
         }
     }
@@ -155,7 +155,7 @@ impl Player {
 
                                     if let Some(item) = items.iter().find(|i| {
                                         i["playing"].as_bool() == Some(true)
-                                        // || i["current"].as_bool() == Some(true)
+                                            || i["current"].as_bool() == Some(true)
                                     }) {
                                         if let (Some(url), Some(title)) =
                                             (item["filename"].as_str(), item["title"].as_str())

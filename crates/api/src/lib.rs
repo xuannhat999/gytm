@@ -159,9 +159,12 @@ impl YClient {
         Ok(response)
     }
 
-    pub async fn get_raw_search_albums(&self, query: &str) -> YResult<Value> {
-        const ALBUM_PARAMS: &str = "EgWKAQIYAWoSEAUQAxAJEAQQChAQEBUQDhAR";
-
+    pub async fn get_raw_search_albums(&self, query: &str, rtype: u8) -> YResult<Value> {
+        let params = if rtype == 1 {
+            "EgWKAQIIAWoSEAQQAxAFEAoQDhAJEBUQEBAR" // SONG
+        } else {
+            "EgWKAQIYAWoSEAUQAxAJEAQQChAQEBUQDhAR" // ALBUM
+        };
         let url = format!(
             "{}/youtubei/v1/search?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -175,7 +178,63 @@ impl YClient {
                 }
             },
             "query": query,
-            "params": ALBUM_PARAMS,
+            "params": params,
+        });
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers()?)
+            .json(&body)
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+
+        Ok(response)
+    }
+
+    pub async fn get_raw_params(&self, video_id: &str) -> YResult<Value> {
+        let url = format!(
+            "{}/youtubei/v1/next?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
+        let body = json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": self.client_version,
+                }
+            },
+            "videoId": video_id
+        });
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers()?)
+            .json(&body)
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+        Ok(response)
+    }
+
+    pub async fn get_raw_related_songs(&self, playlist_id: &str, params: &str) -> YResult<Value> {
+        let url = format!(
+            "{}/youtubei/v1/next?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
+
+        let body = json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": self.client_version,
+                }
+            },
+            "playlistId": playlist_id,
+            "params": params,
+            "tunerSettingValue": "AUTOMIX_SETTING_NORMAL"
         });
 
         let response = self
@@ -190,6 +249,8 @@ impl YClient {
 
         Ok(response)
     }
+
+    // SAVE ALBUM TO LIBRARY
     pub async fn add_to_lib(&self, playlist_id: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/like/like?key={}&alt=json",
@@ -225,6 +286,8 @@ impl YClient {
             Ok(json_val)
         }
     }
+
+    // REMOVE SAVED ALBUM IN LIBRARY
     pub async fn remove_from_lib(&self, playlist_id: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/like/removelike?key={}&alt=json",
@@ -259,6 +322,8 @@ impl YClient {
             Ok(json_val)
         }
     }
+
+    // FETCH ALBUMS/PLAYLIST IN LIBRARY
     pub async fn get_lists(&self) -> YResult<(Vec<PlayList>, Vec<PlayList>)> {
         let mut all_albums: Vec<PlayList> = Vec::new();
         let mut all_playlists: Vec<PlayList> = Vec::new();
@@ -270,7 +335,7 @@ impl YClient {
             }
         };
 
-        let (mut albums, mut playlists, mut token) = match parser::extract_lists(raw_data) {
+        let (mut albums, mut playlists, mut token) = match parser::parse_lists(raw_data) {
             Ok((albums, playlists, token)) => (albums, playlists, token),
             Err(e) => {
                 log_to_file(&e);
@@ -283,7 +348,7 @@ impl YClient {
         while let Some(current_token) = token {
             let next_raw_data = self.get_continuation_data(&current_token).await?;
             let (mut next_albums, mut next_playlists, next_token) =
-                parser::extract_lists(next_raw_data)?;
+                parser::parse_lists(next_raw_data)?;
             all_albums.append(&mut next_albums);
             all_playlists.append(&mut next_playlists);
             token = next_token;
@@ -291,15 +356,16 @@ impl YClient {
         Ok((all_albums, all_playlists))
     }
 
-    pub async fn get_songs(&self, id: &str) -> YResult<Vec<Song>> {
-        let raw_songs = match self.get_raw_songs(id).await {
+    // FETCH SONGS FROM ALBUM/PLAYLIST
+    pub async fn get_songs(&self, browse_id: &str) -> YResult<Vec<Song>> {
+        let raw_songs = match self.get_raw_songs(browse_id).await {
             Ok(raw_songs) => raw_songs,
             Err(e) => {
                 log_to_file(&e);
                 Value::Null
             }
         };
-        let songs = match parser::extract_songs(raw_songs) {
+        let songs = match parser::parse_songs(raw_songs) {
             Ok(songs) => songs,
             Err(e) => {
                 log_to_file(&e);
@@ -308,15 +374,17 @@ impl YClient {
         };
         Ok(songs)
     }
+
+    // FETCH SEARCH RESULT ALBUMS
     pub async fn get_search_albums(&self, query: &str) -> YResult<Vec<PlayList>> {
-        let raw_list = match self.get_raw_search_albums(query).await {
+        let raw_list = match self.get_raw_search_albums(query, 2).await {
             Ok(raw_data) => raw_data,
             Err(e) => {
                 log_to_file(&e);
                 Value::Null
             }
         };
-        let albums = match parser::extract_search_albums(raw_list) {
+        let albums = match parser::parse_search_albums(raw_list) {
             Ok(list) => list,
             Err(e) => {
                 log_to_file(&e);
@@ -324,6 +392,64 @@ impl YClient {
             }
         };
         Ok(albums)
+    }
+
+    // FETCH SEARCH REUSLT SONGS
+    pub async fn get_search_songs(&self, query: &str) -> YResult<Vec<Song>> {
+        let raw_data = match self.get_raw_search_albums(query, 1).await {
+            Ok(raw) => raw,
+            Err(e) => {
+                log_to_file(&e);
+                Value::Null
+            }
+        };
+        let songs = match parser::parse_search_songs(raw_data) {
+            Ok(songs) => songs,
+            Err(e) => {
+                log_to_file(&e);
+                Vec::new()
+            }
+        };
+        Ok(songs)
+    }
+
+    // FETCH PARAMS
+    pub async fn get_params(&self, video_id: &str) -> YResult<String> {
+        let raw_data = match self.get_raw_params(video_id).await {
+            Ok(raw) => raw,
+            Err(e) => {
+                log_to_file(&e);
+                Value::Null
+            }
+        };
+        let params = match parser::parse_params(raw_data) {
+            Ok(params) => params,
+            Err(e) => {
+                log_to_file(&e);
+                String::new()
+            }
+        };
+        Ok(params)
+    }
+
+    // FETCH RELATED SONGS
+    pub async fn get_related_songs(&self, video_id: &str, params: &str) -> YResult<Vec<Song>> {
+        let playlist_id = format!("RDAMVM{}", video_id);
+        let raw_data = match self.get_raw_related_songs(&playlist_id, params).await {
+            Ok(raw) => raw,
+            Err(e) => {
+                log_to_file(&e);
+                Value::Null
+            }
+        };
+        let songs = match parser::parse_related_songs(raw_data) {
+            Ok(songs) => songs,
+            Err(e) => {
+                log_to_file(&e);
+                Vec::new()
+            }
+        };
+        Ok(songs)
     }
 }
 
