@@ -51,8 +51,6 @@ pub async fn handle_key_events(
                 }
                 KeyCode::Char('2') => {
                     app.focus_area = FocusArea::Playlists;
-                    app.playlists_liststate
-                        .select(app.playlists_liststate.selected().or(Some(0)));
                 }
                 KeyCode::Char('3') => app.focus_area = FocusArea::SongList,
                 KeyCode::Char(' ') if app.playing_song.is_some() => {
@@ -289,8 +287,6 @@ pub async fn handle_key_events(
                                         app.page = AppPage::Library;
                                         app.focus_area = FocusArea::SongList;
                                         app.playing_playlist_id = Some(browse_id.clone());
-                                        app.albums_liststate.select(None);
-                                        app.playlists_liststate.select(None);
                                         if let Err(e) = player.load_playlist(&app.songs).await {
                                             log_to_file(&e);
                                         }
@@ -323,8 +319,6 @@ pub async fn handle_key_events(
                                         app.page = AppPage::Library;
                                         app.focus_area = FocusArea::SongList;
                                         app.playing_playlist_id = None;
-                                        app.albums_liststate.select(None);
-                                        app.playlists_liststate.select(None);
                                         if let Err(e) = player.load_playlist(&app.songs).await {
                                             log_to_file(&e);
                                         }

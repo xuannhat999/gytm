@@ -319,9 +319,7 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
     };
 
     let bottom_nav = Line::from(vec![
-        Span::styled("[ Up/Down: ", theme.text_style()),
-        Span::styled("/k, /j ", theme.key_style()),
-        Span::styled("| Add to Lib: ", theme.text_style()),
+        Span::styled("[ Add to Lib: ", theme.text_style()),
         Span::styled("a ", theme.key_style()),
         Span::styled("| Remove from Lib: ", theme.text_style()),
         Span::styled("d ", theme.key_style()),
@@ -361,19 +359,11 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
     } else {
         theme.inactive_border_style()
     };
-
-    let bottom_nav = Line::from(vec![
-        Span::styled("[ Up/Down: ", theme.text_style()),
-        Span::styled("/k, /j ", theme.key_style()),
-        Span::styled(" ]", theme.text_style()),
-    ]);
-
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .title("[2]-󰎇 Songs")
-        .border_style(border_style)
-        .title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
+        .border_style(border_style);
 
     let list_widget = List::new(items)
         .block(block)
