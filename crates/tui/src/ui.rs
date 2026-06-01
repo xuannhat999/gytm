@@ -38,7 +38,7 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
 
             render_list(frame, app, playlist_layout[0], FocusArea::Albums, theme);
             render_list(frame, app, playlist_layout[1], FocusArea::Playlists, theme);
-            render_songs(frame, app, main_layout[2], theme);
+            render_queue(frame, app, main_layout[2], theme);
             render_player(frame, app, main_layout[3], player, theme);
         }
         AppPage::Search => {
@@ -132,7 +132,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
                 Span::styled(" ]", theme.text_style()),
             ]);
 
-            block = block.title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Right));
+            block = block.title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
         }
         let highlight_style = if is_focused {
             theme.selected_item()
@@ -148,8 +148,8 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
     }
 }
 
-// RENDER SONGS FROM ALBUM/PLAYLIST
-fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
+// RENDER QUEUE
+fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     if app.songs.is_empty() {
         let empty_block = Block::default()
             .borders(Borders::ALL)
@@ -178,7 +178,7 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
             }
         })
         .collect();
-    let is_focused = FocusArea::SongList == app.focus_area;
+    let is_focused = FocusArea::Queue == app.focus_area;
 
     let border_style = if is_focused {
         theme.active_border_style()
@@ -190,13 +190,21 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     } else {
         Style::default()
     };
+    let key_map = Line::from(vec![
+        Span::styled("[ Remove from queue: ", theme.text_style()),
+        Span::styled("d ", theme.key_style()),
+        Span::styled("]", theme.text_style()),
+    ]);
+
     let list_widget = List::new(items)
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .title(format!("[3]- Queue ({})", app.songs.len()))
-                .border_style(border_style),
+                .title_bottom(key_map)
+                .border_style(border_style)
+                .title_alignment(ratatui::layout::HorizontalAlignment::Center),
         )
         .highlight_style(highlight_style);
 

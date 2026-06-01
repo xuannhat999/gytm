@@ -240,6 +240,12 @@ impl Player {
         Ok(())
     }
 
+    pub async fn remove_from_queue(&mut self, idx: usize) -> YResult<()> {
+        let command = format!(r#"{{"command": ["playlist-remove", {}]}}"#, idx);
+        self.send_mpv_command(&command).await?;
+        Ok(())
+    }
+
     pub async fn play_at_idx(&mut self, index: &usize) -> YResult<()> {
         self.status = PlayerStatus::Loading;
         let command = format!(

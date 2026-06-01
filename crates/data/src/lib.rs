@@ -51,7 +51,7 @@ pub enum PlayMode {
 pub enum FocusArea {
     Albums,
     Playlists,
-    SongList,
+    Queue,
     SearchAlbums,
     SearchSongs,
 }
