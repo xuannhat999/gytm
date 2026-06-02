@@ -32,6 +32,35 @@ pub async fn handle_key_events(
     player: &mut Player,
     state: &mut AppState,
 ) {
+    if key_event.code == KeyCode::Tab {
+        handle_page_event(app);
+    }
+    if !app.is_insert || app.page == AppPage::Library {
+        match key_event.code {
+            KeyCode::Char('q') => {
+                app.is_exit = true;
+            }
+            KeyCode::Char('3') => {
+                app.focus_area = FocusArea::Queue;
+                if app.songs_liststate.selected().is_none() && !app.songs.is_empty() {
+                    app.songs_liststate.select(Some(0));
+                }
+            }
+            _ => {}
+        }
+        if app.focus_area == FocusArea::Queue {
+            handle_queue_event(key_event, app, player).await;
+        }
+        handle_player_event(key_event, app, player, state).await
+    }
+    if app.focus_area == FocusArea::Albums
+        || app.focus_area == FocusArea::Playlists
+        || app.focus_area == FocusArea::Queue
+        || (app.focus_area == FocusArea::SearchAlbums && !app.is_insert)
+        || (app.focus_area == FocusArea::SearchSongs && !app.is_insert)
+    {
+        handle_lists_event(key_event, app);
+    }
     match app.page {
         AppPage::Library => match key_event.code {
             KeyCode::Char('1') => {
@@ -280,35 +309,6 @@ pub async fn handle_key_events(
             }
         }
     }
-    if !app.is_insert {
-        match key_event.code {
-            KeyCode::Tab => {
-                handle_page_event(app);
-            }
-            KeyCode::Char('q') => {
-                app.is_exit = true;
-            }
-            KeyCode::Char('3') => {
-                app.focus_area = FocusArea::Queue;
-                if app.songs_liststate.selected().is_none() && !app.songs.is_empty() {
-                    app.songs_liststate.select(Some(0));
-                }
-            }
-            _ => {}
-        }
-        if app.focus_area == FocusArea::Queue {
-            handle_queue_event(key_event, app, player).await;
-        }
-        handle_player_event(key_event, app, player, state).await
-    }
-    if app.focus_area == FocusArea::Albums
-        || app.focus_area == FocusArea::Playlists
-        || app.focus_area == FocusArea::Queue
-        || (app.focus_area == FocusArea::SearchAlbums && !app.is_insert)
-        || (app.focus_area == FocusArea::SearchSongs && !app.is_insert)
-    {
-        handle_lists_event(key_event, app);
-    }
 }
 
 fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
@@ -366,6 +366,7 @@ fn handle_page_event(app: &mut App) {
             }
         }
         AppPage::Search => {
+            // app.is_insert = false;
             app.page = AppPage::Library;
             if app.focus_area != FocusArea::Queue {
                 app.focus_area = FocusArea::Albums;

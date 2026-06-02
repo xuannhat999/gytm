@@ -160,7 +160,8 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
 
 // RENDER QUEUE
 fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
-    let is_focused = FocusArea::Queue == app.focus_area && !app.is_insert;
+    let is_focused = FocusArea::Queue == app.focus_area
+        && ((!app.is_insert && app.page == AppPage::Search) || app.page == AppPage::Library);
     let border_style = if is_focused {
         theme.active_border_style()
     } else {
