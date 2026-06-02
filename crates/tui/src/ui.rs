@@ -160,8 +160,8 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
 
 // RENDER QUEUE
 fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
-    let is_focused = FocusArea::Queue == app.focus_area;
-    let border_style = if is_focused && !app.is_insert {
+    let is_focused = FocusArea::Queue == app.focus_area && !app.is_insert;
+    let border_style = if is_focused {
         theme.active_border_style()
     } else {
         theme.inactive_border_style()
@@ -202,7 +202,7 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
             }
         })
         .collect();
-    let highlight_style = if is_focused && !app.is_insert {
+    let highlight_style = if is_focused {
         theme.selected_item()
     } else {
         Style::default()
@@ -330,8 +330,8 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
         })
         .collect();
 
-    let is_focused = FocusArea::SearchAlbums == app.focus_area;
-    let border_style = if is_focused && !app.is_insert {
+    let is_focused = FocusArea::SearchAlbums == app.focus_area && !app.is_insert;
+    let border_style = if is_focused {
         theme.active_border_style()
     } else {
         theme.inactive_border_style()
@@ -378,8 +378,8 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         Span::styled(" ]", theme.text_style()),
     ]);
 
-    let is_focused = FocusArea::SearchSongs == app.focus_area;
-    let border_style = if is_focused && !app.is_insert {
+    let is_focused = FocusArea::SearchSongs == app.focus_area && !app.is_insert;
+    let border_style = if is_focused {
         theme.active_border_style()
     } else {
         theme.inactive_border_style()
