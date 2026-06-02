@@ -61,6 +61,14 @@ pub enum AppPage {
     Library,
     Search,
 }
+impl AppPage {
+    pub fn index(&self) -> usize {
+        match self {
+            AppPage::Library => 0,
+            AppPage::Search => 1,
+        }
+    }
+}
 
 pub struct Theme {
     pub primary: Color,
