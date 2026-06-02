@@ -1,10 +1,10 @@
 # gytm: TUI based Youtube Music player
 Stream Youtube Music from your terminal !
 # Demo 
-<img width="1920" height="1080" alt="2026-05-31-215529_hyprshot" src="https://github.com/user-attachments/assets/1b512a75-ebb9-490f-94d4-b1633b9d561a" />
-
+<img width="1920" height="1080" alt="2026-06-02-122659_hyprshot" src="https://github.com/user-attachments/assets/7636c314-09f6-4455-9f7e-5f63f8a7f293" />
 <br></br>
-<img width="1920" height="1080" alt="2026-05-31-215546_hyprshot" src="https://github.com/user-attachments/assets/d8b68cd2-4b26-42a5-a866-505e5cfc08e6" />
+<img width="1920" height="1080" alt="2026-06-02-122725_hyprshot" src="https://github.com/user-attachments/assets/d2ed3390-bf0d-498e-aea1-da1f0ecb1283" />
+
 
 <br><br>
 
