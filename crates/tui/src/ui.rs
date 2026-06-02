@@ -161,7 +161,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
 // RENDER QUEUE
 fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let is_focused = FocusArea::Queue == app.focus_area;
-    let border_style = if is_focused {
+    let border_style = if is_focused && !app.is_insert {
         theme.active_border_style()
     } else {
         theme.inactive_border_style()
@@ -202,7 +202,7 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
             }
         })
         .collect();
-    let highlight_style = if is_focused {
+    let highlight_style = if is_focused && !app.is_insert {
         theme.selected_item()
     } else {
         Style::default()
