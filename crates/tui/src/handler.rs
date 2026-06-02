@@ -1,6 +1,5 @@
 use crate::app::App;
 use api::YClient;
-use crossterm::event::Event::Key;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::{AppPage, FocusArea};
 use data::{MpvEvent, PlayMode, PlayerStatus};
