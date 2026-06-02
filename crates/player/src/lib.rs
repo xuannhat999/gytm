@@ -247,7 +247,6 @@ impl Player {
     }
 
     pub async fn append_to_queue(&mut self, video_id: &str) -> YResult<()> {
-        log_to_file(video_id);
         let command = format!(
             r#"{{"command": ["loadfile", "https://www.youtube.com/watch?v={}", "append"]}}"#,
             video_id

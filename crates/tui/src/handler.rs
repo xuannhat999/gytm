@@ -12,9 +12,6 @@ pub fn handle_mpv_event(app: &mut App, player: &mut Player, state: &mut AppState
     match event {
         MpvEvent::ListChange(list) => {
             app.mpv_list = list;
-            if !app.mpv_list.is_empty() {
-                player.status = PlayerStatus::Loading;
-            }
         }
         MpvEvent::StartPlaying(song) => {
             app.playing_song = Some(song);
@@ -291,7 +288,12 @@ pub async fn handle_key_events(
             KeyCode::Char('q') => {
                 app.is_exit = true;
             }
-            KeyCode::Char('3') => app.focus_area = FocusArea::Queue,
+            KeyCode::Char('3') => {
+                app.focus_area = FocusArea::Queue;
+                if app.songs_liststate.selected().is_none() && !app.songs.is_empty() {
+                    app.songs_liststate.select(Some(0));
+                }
+            }
             _ => {}
         }
         if app.focus_area == FocusArea::Queue {
@@ -345,8 +347,6 @@ async fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Pla
                     if let Err(e) = player.play_at_idx(&pos).await {
                         log_to_file(&e);
                     }
-                } else {
-                    log_to_file("Failed to get mpv index");
                 }
             }
         }
@@ -358,12 +358,15 @@ fn handle_page_event(app: &mut App) {
         AppPage::Library => {
             app.page = AppPage::Search;
             if app.focus_area != FocusArea::Queue {
-                app.focus_area = FocusArea::SearchAlbums;
+                if app.search_songs.is_empty() {
+                    app.is_insert = true;
+                } else {
+                    app.focus_area = FocusArea::SearchAlbums;
+                }
             }
         }
         AppPage::Search => {
             app.page = AppPage::Library;
-
             if app.focus_area != FocusArea::Queue {
                 app.focus_area = FocusArea::Albums;
             }
