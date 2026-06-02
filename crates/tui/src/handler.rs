@@ -164,10 +164,6 @@ pub async fn handle_key_events(
                     KeyCode::Char('s') => {
                         app.is_insert = true;
                     }
-                    KeyCode::Esc => {
-                        app.page = AppPage::Library;
-                        app.focus_area = FocusArea::Albums;
-                    }
                     KeyCode::Char('a') => {
                         if app.focus_area == FocusArea::SearchAlbums {
                             if let Some(i) = app.search_albums_liststate.selected() {
