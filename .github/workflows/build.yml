@@ -3,8 +3,19 @@ name: Build GYTM
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'crates/**'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - '.github/workflows/**'
   pull_request:
     branches: [ "main" ]
+    paths:
+      - 'crates/**'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - '.github/workflows/**'
+
 env: 
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:

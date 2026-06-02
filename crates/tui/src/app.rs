@@ -69,7 +69,7 @@ impl App {
         let (state, len) = match self.focus_area {
             FocusArea::Albums => (&mut self.albums_liststate, self.albums.len()),
             FocusArea::Playlists => (&mut self.playlists_liststate, self.playlists.len()),
-            FocusArea::SongList => (&mut self.songs_liststate, self.songs.len()),
+            FocusArea::Queue => (&mut self.songs_liststate, self.songs.len()),
             FocusArea::SearchAlbums => {
                 (&mut self.search_albums_liststate, self.search_albums.len())
             }
@@ -99,7 +99,7 @@ impl App {
         let (state, len) = match self.focus_area {
             FocusArea::Albums => (&mut self.albums_liststate, self.albums.len()),
             FocusArea::Playlists => (&mut self.playlists_liststate, self.playlists.len()),
-            FocusArea::SongList => (&mut self.songs_liststate, self.songs.len()),
+            FocusArea::Queue => (&mut self.songs_liststate, self.songs.len()),
             FocusArea::SearchAlbums => {
                 (&mut self.search_albums_liststate, self.search_albums.len())
             }

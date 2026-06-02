@@ -240,6 +240,22 @@ impl Player {
         Ok(())
     }
 
+    pub async fn remove_from_queue(&mut self, idx: usize) -> YResult<()> {
+        let command = format!(r#"{{"command": ["playlist-remove", {}]}}"#, idx);
+        self.send_mpv_command(&command).await?;
+        Ok(())
+    }
+
+    pub async fn append_to_queue(&mut self, video_id: &str) -> YResult<()> {
+        log_to_file(video_id);
+        let command = format!(
+            r#"{{"command": ["loadfile", "https://www.youtube.com/watch?v={}", "append"]}}"#,
+            video_id
+        );
+        self.send_mpv_command(&command).await?;
+        Ok(())
+    }
+
     pub async fn play_at_idx(&mut self, index: &usize) -> YResult<()> {
         self.status = PlayerStatus::Loading;
         let command = format!(
