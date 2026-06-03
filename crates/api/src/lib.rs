@@ -482,25 +482,30 @@ pub fn load_cookies() -> YResult<(Jar, String)> {
 
 pub fn load_cookies_firefox_based() -> YResult<Vec<Cookie>> {
     let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
-    let browser_dirs = vec!["mozilla/firefox", "librewolf/librewolf", "zen"];
-
+    let browser_dirs = vec![
+        "mozilla/firefox",
+        "librewolf/librewolf",
+        "zen",
+        "BraveSoftware/Brave-Origin",
+    ];
+    let target_filename = vec!["cookies.sql", "Cookies"];
     let config_dir = dirs::config_dir().ok_or_else(|| YError::ConfigDirError)?;
     let mut target_db_path: Option<PathBuf> = None;
-
     'outer: for browser in browser_dirs {
         let base_path = config_dir.join(browser);
         if !base_path.exists() {
             continue;
         }
-
         if let Ok(entries) = std::fs::read_dir(base_path) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_dir() {
-                    let db_path = path.join("cookies.sqlite");
-                    if db_path.exists() {
-                        target_db_path = Some(db_path);
-                        break 'outer;
+                    for file_name in &target_filename {
+                        let db_path = path.join(file_name);
+                        if db_path.exists() {
+                            target_db_path = Some(db_path);
+                            break 'outer;
+                        }
                     }
                 }
             }
