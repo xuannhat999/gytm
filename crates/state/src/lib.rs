@@ -20,7 +20,6 @@ impl Default for PlayerState {
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct AppState {
-    pub user_agent: String,
     pub player_state: PlayerState,
 }
 
@@ -45,8 +44,7 @@ impl AppState {
         fs::create_dir_all(dir)?;
 
         let default_config = AppState {
-            user_agent : "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36".to_string(),
-            player_state: PlayerState::default()
+            player_state: PlayerState::default(),
         };
         let content = serde_json::to_string_pretty(&default_config)?;
         let mut f = fs::File::create(file)?;

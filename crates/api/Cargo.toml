@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-state = { workspace = true }
 data = { workspace = true }
 error = { workspace = true }
 sha1_smol = { workspace = true }

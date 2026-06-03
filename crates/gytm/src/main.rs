@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     println!("󱘖 Connecting to YouTube Music...");
-    let client = match YClient::new(&state).await {
+    let client = match YClient::new().await {
         Ok(c) => Arc::new(c),
         Err(e) => {
             log_to_file(&e);
