@@ -11,3 +11,4 @@ tokio = { workspace = true }
 dirs = { workspace = true }
 time = { workspace = true }
 url = { workspace = true }
+data = { workspace = true }

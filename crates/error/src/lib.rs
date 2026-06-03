@@ -1,3 +1,4 @@
+use data::MpvEvent;
 use reqwest::header::InvalidHeaderValue;
 use std::{
     fmt::{Debug, Display},
@@ -30,28 +31,26 @@ pub enum YError {
     #[error("Request Header Inval: {0}")]
     InvalidHeader(#[from] InvalidHeaderValue),
 
-    // #[error("Auth Extraction Err: {0}")]
-    // AuthError(String),
     #[error("MPV Socket Error: {0}")]
     MpvSocketError(String),
 
-    #[error("MPV Not Running: Failed to spawn process")]
+    #[error("MPV spawning error")]
     MpvSpawnError,
 
     #[error("Playlist Empty: Cannot perform this action")]
     PlaylistEmpty,
-
-    #[error("Channel Send Error: {0}")]
-    ChannelSendError(String),
-
-    #[error("Channel Recieve Error: {0}")]
-    ChannelReceiveError(String),
 
     #[error("Invalid Cookie")]
     InvalidCookie,
 
     #[error("URL parsing failed: {0}")]
     UrlParseError(#[from] url::ParseError),
+
+    #[error("Event Sender errror: {0}")]
+    EventSenderError(#[from] tokio::sync::mpsc::error::SendError<MpvEvent>),
+
+    #[error("Command Sender errror: {0}")]
+    CmdSenderError(#[from] tokio::sync::mpsc::error::SendError<String>),
 }
 
 pub type YResult<T> = std::result::Result<T, YError>;

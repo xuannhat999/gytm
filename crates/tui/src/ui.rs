@@ -170,6 +170,8 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let key_map = Line::from(vec![
         Span::styled("[ Remove from queue: ", theme.text_style()),
         Span::styled("d ", theme.key_style()),
+        Span::styled("| Clear Queue: ", theme.text_style()),
+        Span::styled("c ", theme.key_style()),
         Span::styled("]", theme.text_style()),
     ]);
 
@@ -224,18 +226,22 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
 }
 
 fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, theme: &Theme) {
-    let song_info = if player.status == PlayerStatus::Loading {
-        "   Loading...".to_string()
-    } else {
-        if let Some(song) = &app.playing_song {
-            let status_icon = if player.status == PlayerStatus::Playing {
-                "  "
+    let song_info = match player.status {
+        PlayerStatus::Idle => "   No song is playing ".to_string(),
+        PlayerStatus::Loading => "   Loading...".to_string(),
+        PlayerStatus::Playing => {
+            if let Some(song) = &app.playing_song {
+                format!("   {} ", song.title)
             } else {
-                " ⏸ "
-            };
-            format!("{} {} ", status_icon, song.title)
-        } else {
-            "   No song is playing ".to_string()
+                String::new()
+            }
+        }
+        PlayerStatus::Paused => {
+            if let Some(song) = &app.playing_song {
+                format!(" ⏸  {} ", song.title)
+            } else {
+                String::new()
+            }
         }
     };
     let mode_text = match player.play_mode {
