@@ -488,7 +488,7 @@ pub fn load_cookies_firefox_based() -> YResult<Vec<Cookie>> {
         "zen",
         "BraveSoftware/Brave-Origin",
     ];
-    let target_filename = vec!["cookies.sql", "Cookies"];
+    let target_filename = vec!["cookies.sqlite", "Cookies"];
     let config_dir = dirs::config_dir().ok_or_else(|| YError::ConfigDirError)?;
     let mut target_db_path: Option<PathBuf> = None;
     'outer: for browser in browser_dirs {
