@@ -56,18 +56,10 @@ pub enum FocusArea {
     SearchSongs,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum AppPage {
-    Library,
-    Search,
-}
-impl AppPage {
-    pub fn index(&self) -> usize {
-        match self {
-            AppPage::Library => 0,
-            AppPage::Search => 1,
-        }
-    }
+    Library = 0,
+    Search = 1,
 }
 
 pub struct Theme {

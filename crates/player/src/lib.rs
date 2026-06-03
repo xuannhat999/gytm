@@ -81,7 +81,6 @@ impl Player {
         tx_event: tokio::sync::mpsc::Sender<MpvEvent>,
     ) -> YResult<()> {
         let socket_path = String::from("/tmp/gytm-mpv-socket");
-        // std::fs::remove_file(&socket_path)?;
         let child = Command::new("mpv")
             .arg("--idle")
             .arg(format!("--input-ipc-server={}", socket_path))

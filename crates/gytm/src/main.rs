@@ -55,6 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.playlists_liststate.select(Some(0));
 
     let theme = Theme::default();
+
     let mut render = true;
     let mut last_tick = std::time::Instant::now();
     loop {
@@ -66,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             handler::handle_mpv_event(&mut app, &mut player, &mut state, event);
             render = true;
         }
-        if event::poll(Duration::from_millis(30))? {
+        if event::poll(Duration::from_millis(50))? {
             match event::read()? {
                 Event::Key(key) => {
                     handler::handle_key_events(
@@ -85,6 +86,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => {}
             }
         }
+        if app.is_exit {
+            player.kill_current_process();
+            break;
+        }
         if app.noti.has_notification() || had_notification {
             render = true;
         }
@@ -94,10 +99,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 app.noti.render(f, f.area());
             })?;
             render = false;
-        }
-        if app.is_exit {
-            player.kill_current_process();
-            break;
         }
     }
     disable_raw_mode()?;

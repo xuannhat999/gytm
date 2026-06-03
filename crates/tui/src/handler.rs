@@ -101,6 +101,7 @@ pub async fn handle_key_events(
                                 app.songs_liststate.select(Some(0));
                                 app.focus_area = FocusArea::Queue;
                                 app.playing_playlist_id = Some(browse_id.clone());
+                                app.playing_song = None;
                                 if let Err(e) = player.load_playlist(&app.songs).await {
                                     log_to_file(&e);
                                 }
@@ -278,6 +279,7 @@ pub async fn handle_key_events(
                                         app.songs_liststate.select(Some(0));
                                         app.focus_area = FocusArea::Queue;
                                         app.playing_playlist_id = Some(browse_id.clone());
+                                        app.playing_song = None;
                                         if let Err(e) = player.load_playlist(&app.songs).await {
                                             log_to_file(&e);
                                         }
@@ -309,6 +311,7 @@ pub async fn handle_key_events(
                                         app.songs_liststate.select(Some(0));
                                         app.focus_area = FocusArea::Queue;
                                         app.playing_playlist_id = None;
+                                        app.playing_song = None;
                                         if let Err(e) = player.load_playlist(&app.songs).await {
                                             log_to_file(&e);
                                         }

@@ -144,8 +144,8 @@ impl App {
             .anchor(Anchor::TopRight)
             .auto_dismiss(AutoDismiss::After(Duration::from_millis(1500)))
             .max_size(
-                ratatui_notifications::SizeConstraint::Percentage(15.0),
-                ratatui_notifications::SizeConstraint::Absolute(3),
+                ratatui_notifications::SizeConstraint::Percentage(25.0),
+                ratatui_notifications::SizeConstraint::Absolute(4),
             )
             .timing(
                 ratatui_notifications::Timing::Fixed(Duration::from_millis(50)),
