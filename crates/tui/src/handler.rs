@@ -12,7 +12,7 @@ pub fn handle_mpv_event(app: &mut App, player: &mut Player, state: &mut AppState
     match event {
         MpvEvent::ListChange(list) => {
             app.mpv_list = list;
-            if !app.mpv_list.is_empty() {
+            if !app.mpv_list.is_empty() && app.playing_song.is_some() {
                 player.status = PlayerStatus::Loading;
             }
         }
@@ -35,6 +35,44 @@ pub async fn handle_key_events(
     player: &mut Player,
     state: &mut AppState,
 ) {
+    if key_event.code == KeyCode::Tab {
+        handle_page_event(app);
+    }
+    if !app.is_insert || app.page == AppPage::Library {
+        match key_event.code {
+            KeyCode::Char('q') => {
+                app.is_exit = true;
+            }
+            KeyCode::Char('3') => {
+                app.focus_area = FocusArea::Queue;
+                if app.songs_liststate.selected().is_none() && !app.songs.is_empty() {
+                    app.songs_liststate.select(Some(0));
+                }
+            }
+            KeyCode::Char('c') => {
+                if let Err(e) = player.clear_queue().await {
+                    log_to_file(&e);
+                } else {
+                    app.playing_song = None;
+                    app.songs = Vec::new();
+                    app.playing_playlist_id = None;
+                }
+            }
+            _ => {}
+        }
+        if app.focus_area == FocusArea::Queue {
+            handle_queue_event(key_event, app, player).await;
+        }
+        handle_player_event(key_event, app, player, state).await
+    }
+    if app.focus_area == FocusArea::Albums
+        || app.focus_area == FocusArea::Playlists
+        || app.focus_area == FocusArea::Queue
+        || (app.focus_area == FocusArea::SearchAlbums && !app.is_insert)
+        || (app.focus_area == FocusArea::SearchSongs && !app.is_insert)
+    {
+        handle_lists_event(key_event, app);
+    }
     match app.page {
         AppPage::Library => match key_event.code {
             KeyCode::Char('1') => {
@@ -283,30 +321,6 @@ pub async fn handle_key_events(
             }
         }
     }
-    if !app.is_insert {
-        match key_event.code {
-            KeyCode::Tab => {
-                handle_page_event(app);
-            }
-            KeyCode::Char('q') => {
-                app.is_exit = true;
-            }
-            KeyCode::Char('3') => app.focus_area = FocusArea::Queue,
-            _ => {}
-        }
-        if app.focus_area == FocusArea::Queue {
-            handle_queue_event(key_event, app, player).await;
-        }
-        handle_player_event(key_event, app, player, state).await
-    }
-    if app.focus_area == FocusArea::Albums
-        || app.focus_area == FocusArea::Playlists
-        || app.focus_area == FocusArea::Queue
-        || (app.focus_area == FocusArea::SearchAlbums && !app.is_insert)
-        || (app.focus_area == FocusArea::SearchSongs && !app.is_insert)
-    {
-        handle_lists_event(key_event, app);
-    }
 }
 
 fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
@@ -336,17 +350,29 @@ async fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Pla
                         }
                     }
                 }
+                if app.songs.is_empty() {
+                    player.status = PlayerStatus::Idle;
+                    app.playing_song = None;
+                }
             }
         }
         KeyCode::Enter => {
             if let Some(i) = app.songs_liststate.selected() {
-                let target_id = &app.songs[i].video_id;
-                if let Some(pos) = app.get_mpv_idx(target_id) {
-                    if let Err(e) = player.play_at_idx(&pos).await {
+                if player.play_mode == PlayMode::DefaultMode {
+                    if let Err(e) = player.play_at_idx(&i).await {
                         log_to_file(&e);
                     }
                 } else {
-                    log_to_file("Failed to get mpv index");
+                    let target_id = &app.songs[i].video_id;
+                    if let Some(pos) = app.get_mpv_idx(target_id) {
+                        if let Err(e) = player.play_at_idx(&pos).await {
+                            log_to_file(&e);
+                        } else {
+                            if let Err(e) = player.shuffle().await {
+                                log_to_file(&e);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -358,12 +384,16 @@ fn handle_page_event(app: &mut App) {
         AppPage::Library => {
             app.page = AppPage::Search;
             if app.focus_area != FocusArea::Queue {
-                app.focus_area = FocusArea::SearchAlbums;
+                if app.search_songs.is_empty() {
+                    app.is_insert = true;
+                } else {
+                    app.focus_area = FocusArea::SearchAlbums;
+                }
             }
         }
         AppPage::Search => {
+            // app.is_insert = false;
             app.page = AppPage::Library;
-
             if app.focus_area != FocusArea::Queue {
                 app.focus_area = FocusArea::Albums;
             }

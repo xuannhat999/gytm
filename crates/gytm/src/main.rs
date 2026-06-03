@@ -9,7 +9,7 @@ use error::log_to_file;
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use state::AppState;
-use std::{io, sync::Arc, thread, time::Duration};
+use std::{io, sync::Arc, time::Duration};
 use tui::{app::App, handler, ui};
 
 #[tokio::main]
@@ -38,21 +38,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.albums = albums;
     app.playlists = playlists;
 
-    let (tx, rx) = std::sync::mpsc::channel::<MpvEvent>();
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<MpvEvent>(32);
 
-    if let Err(e) = player.start_mpv() {
+    if let Err(e) = player.start_mpv_and_observe(tx) {
         log_to_file(&e);
         println!("Error starting MPV: {}", e);
         std::process::exit(1);
     }
-    thread::sleep(Duration::from_millis(350));
-
-    if let Err(e) = player.observe_mpv_changes(tx).await {
-        log_to_file(&e);
-        println!("{}", e);
-        std::process::exit(1);
-    }
-
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
