@@ -56,13 +56,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let theme = Theme::default();
     let mut render = true;
+    let mut last_tick = std::time::Instant::now();
     loop {
-        app.noti.tick(std::time::Duration::from_millis(20));
+        let had_notification = app.noti.has_notification();
+        let elapsed = last_tick.elapsed();
+        last_tick = std::time::Instant::now();
+        app.noti.tick(elapsed);
         while let Ok(event) = rx.try_recv() {
             handler::handle_mpv_event(&mut app, &mut player, &mut state, event);
             render = true;
         }
-        if event::poll(Duration::from_millis(20))? {
+        if event::poll(Duration::from_millis(30))? {
             match event::read()? {
                 Event::Key(key) => {
                     handler::handle_key_events(
@@ -81,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => {}
             }
         }
-        if app.noti.has_notification() {
+        if app.noti.has_notification() || had_notification {
             render = true;
         }
         if render {

@@ -149,7 +149,7 @@ impl App {
             )
             .timing(
                 ratatui_notifications::Timing::Fixed(Duration::from_millis(50)),
-                ratatui_notifications::Timing::Fixed(Duration::from_millis(1500)),
+                ratatui_notifications::Timing::Fixed(Duration::from_millis(1000)),
                 ratatui_notifications::Timing::Fixed(Duration::from_millis(50)),
             )
             .build()
