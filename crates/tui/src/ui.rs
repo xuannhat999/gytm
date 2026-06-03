@@ -179,7 +179,7 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
         let empty_block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .title("[3]- Tracks")
+            .title("[3]- Queue")
             .title_bottom(key_map.centered())
             .border_style(border_style);
 

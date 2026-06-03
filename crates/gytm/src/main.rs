@@ -55,24 +55,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.playlists_liststate.select(Some(0));
 
     let theme = Theme::default();
+    let mut render = true;
     loop {
+        app.noti.tick(std::time::Duration::from_millis(20));
         while let Ok(event) = rx.try_recv() {
             handler::handle_mpv_event(&mut app, &mut player, &mut state, event);
+            render = true;
         }
-        if event::poll(Duration::from_millis(750))? {
-            if let Event::Key(key) = event::read()? {
-                handler::handle_key_events(
-                    key,
-                    &mut app,
-                    Arc::clone(&client),
-                    &mut player,
-                    &mut state,
-                )
-                .await;
+        if event::poll(Duration::from_millis(20))? {
+            match event::read()? {
+                Event::Key(key) => {
+                    handler::handle_key_events(
+                        key,
+                        &mut app,
+                        Arc::clone(&client),
+                        &mut player,
+                        &mut state,
+                    )
+                    .await;
+                    render = true;
+                }
+                Event::Resize(_, _) => {
+                    render = true;
+                }
+                _ => {}
             }
         }
-
-        terminal.draw(|f| ui::render(&mut app, f, &player, &theme))?;
+        if app.noti.has_notification() {
+            render = true;
+        }
+        if render {
+            terminal.draw(|f| {
+                ui::render(&mut app, f, &player, &theme);
+                app.noti.render(f, f.area());
+            })?;
+            render = false;
+        }
         if app.is_exit {
             player.kill_current_process();
             break;

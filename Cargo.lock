@@ -2519,6 +2519,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ratatui-notifications"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c4609db8ce75b7b451ac301c6c104753602a4f13e9c66149f143a906ef17a0e"
+dependencies = [
+ "chrono",
+ "crossterm",
+ "log",
+ "ratatui",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "ratatui-termwiz"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3423,6 +3436,7 @@ dependencies = [
  "error",
  "player",
  "ratatui",
+ "ratatui-notifications",
  "serde_json",
  "state",
  "tokio",

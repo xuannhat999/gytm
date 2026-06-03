@@ -1,5 +1,8 @@
+use std::time::Duration;
+
 use data::{AppPage, FocusArea, PlayList, Song};
 use ratatui::widgets::ListState;
+use ratatui_notifications::{Anchor, AutoDismiss, Level, Notification, Notifications};
 
 pub struct App {
     // PAGE LIBRARY
@@ -25,7 +28,9 @@ pub struct App {
 
     pub search_query: String,
     pub is_insert: bool,
+
     // OTHER
+    pub noti: Notifications,
     pub page: AppPage,
     pub is_exit: bool,
 }
@@ -58,11 +63,13 @@ impl Default for App {
             is_insert: false,
 
             //OTHER
+            noti: Notifications::new(),
             is_exit: false,
             page: AppPage::Library,
         }
     }
 }
+
 impl App {
     // TOGGLE NEXT ITEM IN LISTSTATE
     pub fn next(&mut self) {
@@ -129,5 +136,25 @@ impl App {
             }
         }
         None
+    }
+    pub fn notify_success(&mut self, msg: String) {
+        if let Ok(notif) = Notification::new(msg)
+            .title("Success")
+            .level(Level::Info)
+            .anchor(Anchor::TopRight)
+            .auto_dismiss(AutoDismiss::After(Duration::from_millis(1500)))
+            .max_size(
+                ratatui_notifications::SizeConstraint::Percentage(15.0),
+                ratatui_notifications::SizeConstraint::Absolute(3),
+            )
+            .timing(
+                ratatui_notifications::Timing::Fixed(Duration::from_millis(50)),
+                ratatui_notifications::Timing::Fixed(Duration::from_millis(1500)),
+                ratatui_notifications::Timing::Fixed(Duration::from_millis(50)),
+            )
+            .build()
+        {
+            let _ = self.noti.add(notif);
+        }
     }
 }
