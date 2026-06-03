@@ -24,7 +24,7 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(main_layout[0]);
-    render_tabs(frame, top_layout[0], theme, &app.page);
+    render_tabs(frame, top_layout[0], theme, app.page as usize);
     render_help_line(
         frame,
         top_layout[1],
@@ -71,7 +71,7 @@ fn render_help_line(frame: &mut Frame, area: Rect, theme: &Theme, items: Vec<(&s
     let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Right);
     frame.render_widget(p, area);
 }
-fn render_tabs(frame: &mut Frame, area: Rect, theme: &Theme, current_page: &AppPage) {
+fn render_tabs(frame: &mut Frame, area: Rect, theme: &Theme, current_idx: usize) {
     let titles = vec![Line::from("  Library "), Line::from("  Search ")];
     let tabs = Tabs::new(titles)
         .style(theme.text_style())
@@ -85,7 +85,7 @@ fn render_tabs(frame: &mut Frame, area: Rect, theme: &Theme, current_page: &AppP
                 .fg(ratatui::style::Color::Black)
                 .add_modifier(Modifier::BOLD),
         )
-        .select(current_page.index())
+        .select(current_idx)
         .divider("|");
     frame.render_widget(tabs, area);
 }
@@ -179,7 +179,7 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
         let empty_block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .title("[3]- Tracks")
+            .title("[3]- Queue")
             .title_bottom(key_map.centered())
             .border_style(border_style);
 

@@ -55,27 +55,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.playlists_liststate.select(Some(0));
 
     let theme = Theme::default();
+
+    let mut render = true;
+    let mut last_tick = std::time::Instant::now();
     loop {
+        let had_notification = app.noti.has_notification();
+        let elapsed = last_tick.elapsed();
+        last_tick = std::time::Instant::now();
+        app.noti.tick(elapsed);
         while let Ok(event) = rx.try_recv() {
             handler::handle_mpv_event(&mut app, &mut player, &mut state, event);
+            render = true;
         }
-        if event::poll(Duration::from_millis(750))? {
-            if let Event::Key(key) = event::read()? {
-                handler::handle_key_events(
-                    key,
-                    &mut app,
-                    Arc::clone(&client),
-                    &mut player,
-                    &mut state,
-                )
-                .await;
+        if event::poll(Duration::from_millis(50))? {
+            match event::read()? {
+                Event::Key(key) => {
+                    handler::handle_key_events(
+                        key,
+                        &mut app,
+                        Arc::clone(&client),
+                        &mut player,
+                        &mut state,
+                    )
+                    .await;
+                    render = true;
+                }
+                Event::Resize(_, _) => {
+                    render = true;
+                }
+                _ => {}
             }
         }
-
-        terminal.draw(|f| ui::render(&mut app, f, &player, &theme))?;
         if app.is_exit {
             player.kill_current_process();
             break;
+        }
+        if app.noti.has_notification() || had_notification {
+            render = true;
+        }
+        if render {
+            terminal.draw(|f| {
+                ui::render(&mut app, f, &player, &theme);
+                app.noti.render(f, f.area());
+            })?;
+            render = false;
         }
     }
     disable_raw_mode()?;
