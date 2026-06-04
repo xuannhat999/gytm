@@ -93,7 +93,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         if app.is_exit {
-            player.kill_current_process();
             break;
         }
         if app.noti.has_notification() || had_notification {

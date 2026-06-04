@@ -46,10 +46,10 @@ pub enum YError {
     #[error("URL parsing failed: {0}")]
     UrlParseError(#[from] url::ParseError),
 
-    #[error("Event Sender errror: {0}")]
+    #[error("Event Sender Error: {0}")]
     EventSenderError(#[from] tokio::sync::mpsc::error::SendError<MpvEvent>),
 
-    #[error("Command Sender errror: {0}")]
+    #[error("Command Sender Error: {0}")]
     CmdSenderError(#[from] tokio::sync::mpsc::error::SendError<String>),
 }
 
