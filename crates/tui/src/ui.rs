@@ -1,15 +1,13 @@
 use crate::app::App;
 use crate::theme::Theme;
-use data::{AppPage, FocusArea};
-use data::{PlayMode, PlayerStatus};
+use data::{AppPage, FocusArea, PlayMode, PlayerStatus};
 use player::Player;
-use ratatui::widgets::Tabs;
 use ratatui::{
     self, Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
+    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Tabs},
 };
 
 pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) {
