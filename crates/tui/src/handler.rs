@@ -1,8 +1,7 @@
 use crate::app::App;
 use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
-use data::{AppPage, FocusArea};
-use data::{MpvEvent, PlayMode, PlayerStatus};
+use data::{AppPage, FocusArea, MpvEvent, PlayMode, PlayerStatus};
 use error::log_to_file;
 use player::Player;
 use state::AppState;

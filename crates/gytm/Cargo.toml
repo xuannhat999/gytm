@@ -15,7 +15,5 @@ player = { workspace = true }
 state = { workspace = true }
 
 crossterm = { workspace = true }
-serde = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 ratatui = { workspace = true }

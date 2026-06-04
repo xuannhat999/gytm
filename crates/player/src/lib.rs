@@ -6,9 +6,9 @@ use std::{
     process::{Child, Command, Stdio},
 };
 use tempfile::NamedTempFile;
-use tokio::net::UnixStream;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    net::UnixStream,
     sync::mpsc,
 };
 
