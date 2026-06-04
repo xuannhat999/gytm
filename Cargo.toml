@@ -6,14 +6,13 @@ members = [
   "crates/data",
   "crates/error",
   "crates/player",
-  "crates/testing",
   "crates/gytm",
   "crates/state",
 ]
 
 [workspace.dependencies]
-tokio = { version = "1.35" }
-serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.52.3", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_json = "1.0"
 reqwest = { version = "0.13", default-features = false, features = [
   "json",
@@ -26,10 +25,12 @@ crossterm = "0.29.0"
 dirs = "6.0.0"
 thiserror = "2.0.18"
 sha1_smol = "1.0"
-time = { version = "0.3", features = ["formatting", "macros", "local-offset"] }
+time = { version = "0.3", default-features = false, features = [
+  "formatting",
+  "local-offset",
+] }
 tempfile = "3"
 rookie = { version = "0.5.6" }
-rusqlite = { version = "0.31" }
 url = "2.5.8"
 
 player = { path = "crates/player" }
@@ -39,7 +40,6 @@ data = { path = "crates/data" }
 error = { path = "crates/error" }
 gytm = { path = "crates/gytm" }
 state = { path = "crates/state" }
-testing = { path = "crates/testing" }
 
 [profile.release]
 opt-level = "z"

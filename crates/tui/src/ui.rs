@@ -1,5 +1,6 @@
 use crate::app::App;
-use data::{AppPage, FocusArea, Theme};
+use crate::theme::Theme;
+use data::{AppPage, FocusArea};
 use data::{PlayMode, PlayerStatus};
 use player::Player;
 use ratatui::widgets::Tabs;
@@ -10,6 +11,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
 };
+
 pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) {
     let main_layout = Layout::default()
         .direction(Direction::Vertical)

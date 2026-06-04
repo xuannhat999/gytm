@@ -4,13 +4,19 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use data::{MpvEvent, Theme};
+use data::MpvEvent;
 use error::log_to_file;
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use state::AppState;
 use std::{io, sync::Arc, time::Duration};
-use tui::{app::App, handler, ui};
+use tokio::sync::mpsc;
+use tui::{
+    app::App,
+    handler,
+    theme::Theme,
+    ui::{self},
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.albums = albums;
     app.playlists = playlists;
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<MpvEvent>(32);
+    let (tx, mut rx) = mpsc::channel::<MpvEvent>(32);
 
     if let Err(e) = player.start_mpv_and_observe(tx) {
         log_to_file(&e);

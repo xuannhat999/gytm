@@ -7,7 +7,12 @@ edition = "2024"
 data = { workspace = true }
 error = { workspace = true }
 serde_json = { workspace = true }
-serde = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = [
+  "rt",
+  "sync",
+  "net",
+  "io-util",
+  "time",
+] }
 tempfile = { workspace = true }
 state = { workspace = true }

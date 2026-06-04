@@ -10,7 +10,7 @@ error = { workspace = true }
 player = { workspace = true }
 state = { workspace = true }
 
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["time", "macros"] }
 serde_json = { workspace = true }
 ratatui = { workspace = true }
 crossterm = { workspace = true }

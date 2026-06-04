@@ -695,8 +695,6 @@ dependencies = [
 name = "data"
 version = "0.1.0"
 dependencies = [
- "dirs",
- "ratatui",
  "serde",
  "serde_json",
 ]
@@ -1204,8 +1202,6 @@ dependencies = [
  "error",
  "player",
  "ratatui",
- "serde",
- "serde_json",
  "state",
  "tokio",
  "tui",
@@ -2275,7 +2271,6 @@ version = "0.1.0"
 dependencies = [
  "data",
  "error",
- "serde",
  "serde_json",
  "state",
  "tempfile",
@@ -3185,19 +3180,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "testing"
-version = "0.1.0"
-dependencies = [
- "api",
- "data",
- "error",
- "player",
- "state",
- "tokio",
- "tui",
-]
-
-[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3291,16 +3273,14 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.52.1"
+version = "1.52.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b67dee974fe86fd92cc45b7a95fdd2f99a36a6d7b0d431a231178d3d670bbcc6"
+checksum = "8fc7f01b389ac15039e4dc9531aa973a135d7a4135281b12d7c1bc79fd57fffe"
 dependencies = [
  "bytes",
  "libc",
  "mio",
- "parking_lot",
  "pin-project-lite",
- "signal-hook-registry",
  "socket2 0.6.3",
  "tokio-macros",
  "windows-sys 0.61.2",
