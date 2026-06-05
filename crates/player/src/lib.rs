@@ -2,6 +2,7 @@ use data::{MpvEvent, MpvResponse, PlayMode, PlayerStatus, Song};
 use error::{YError, YResult, log_to_file};
 use state::PlayerState;
 use std::{
+    fs,
     io::Write,
     process::{Child, Command, Stdio},
 };
@@ -21,6 +22,12 @@ pub struct Player {
     mpv_conn: Option<mpsc::UnboundedSender<String>>,
 }
 
+impl Drop for Player {
+    fn drop(&mut self) {
+        self.kill_current_process();
+    }
+}
+
 impl Player {
     pub fn new(player_state: &PlayerState) -> Self {
         Self {
@@ -34,13 +41,14 @@ impl Player {
     }
 
     // KILL CURRENT MPV PROCESS
-    pub fn kill_current_process(&mut self) {
+    fn kill_current_process(&mut self) {
         if let Some(mut child) = self.current_process.take() {
             let _ = child.kill();
             let _ = child.wait();
         }
         self.playlist_file = None;
         self.mpv_conn = None;
+        let _ = fs::remove_file(String::from("/tmp/gytm-mpv-socket"));
     }
 
     // PLAY PREVIOUS SONG IN ALBUM/PLAYLIST
@@ -279,11 +287,14 @@ impl Player {
             }
             file.sync_all()?;
             let playlist_path = tempfile.path().to_string_lossy().to_string();
-            let load_cmd = format!(
-                r#"{{"command": ["loadlist", "{}", "replace"]}}{}"#,
-                playlist_path, "\n"
-            );
+            let cmd = serde_json::json!({"command": ["loadlist", playlist_path, "replace"]});
+            let load_cmd = serde_json::to_string(&cmd)?;
             self.send_mpv_command(&load_cmd).await?;
+            if self.play_mode == PlayMode::ShuffleMode {
+                if let Err(e) = self.shuffle().await {
+                    log_to_file(&e);
+                }
+            }
         }
         Ok(())
     }
@@ -295,10 +306,9 @@ impl Player {
     }
 
     pub async fn append_to_queue(&mut self, video_id: &str) -> YResult<()> {
-        let command = format!(
-            r#"{{"command": ["loadfile", "https://www.youtube.com/watch?v={}", "append"]}}"#,
-            video_id
-        );
+        let url = format!("https://www.youtube.com/watch?v={}", video_id);
+        let json = serde_json::json!({"command": ["loadfile", url, "append"]});
+        let command = serde_json::to_string(&json)?;
         self.send_mpv_command(&command).await?;
         Ok(())
     }

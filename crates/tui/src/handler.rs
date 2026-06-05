@@ -104,13 +104,6 @@ pub async fn handle_key_events(
                                 if let Err(e) = player.load_playlist(&app.songs).await {
                                     log_to_file(&e);
                                 }
-                                if player.play_mode == PlayMode::ShuffleMode {
-                                    tokio::time::sleep(tokio::time::Duration::from_millis(50))
-                                        .await;
-                                    if let Err(e) = player.shuffle().await {
-                                        log_to_file(&e);
-                                    }
-                                }
                             }
                         } else {
                             log_to_file("Fetching songs Error");
@@ -282,15 +275,6 @@ pub async fn handle_key_events(
                                         if let Err(e) = player.load_playlist(&app.songs).await {
                                             log_to_file(&e);
                                         }
-                                        if player.play_mode == PlayMode::ShuffleMode {
-                                            tokio::time::sleep(tokio::time::Duration::from_millis(
-                                                50,
-                                            ))
-                                            .await;
-                                            if let Err(e) = player.shuffle().await {
-                                                log_to_file(&e);
-                                            }
-                                        }
                                     }
                                 }
                             }
@@ -313,15 +297,6 @@ pub async fn handle_key_events(
                                         app.playing_song = None;
                                         if let Err(e) = player.load_playlist(&app.songs).await {
                                             log_to_file(&e);
-                                        }
-                                        if player.play_mode == PlayMode::ShuffleMode {
-                                            tokio::time::sleep(tokio::time::Duration::from_millis(
-                                                50,
-                                            ))
-                                            .await;
-                                            if let Err(e) = player.shuffle().await {
-                                                log_to_file(&e);
-                                            }
                                         }
                                     }
                                 }
