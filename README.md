@@ -9,11 +9,11 @@ Stream Youtube Music from your terminal !
 <br><br>
 
 # Features
-- Stream songs on Youtube Music as saved album/playlist
 - Personalized Content: Seamlessly fetch your private playlists/album using local cookie authentication.
-- Search albums, save / delete albums in accounts's Library
-- Stream albums in search result
-- Stream selected song in search result with related songs 
+- Stream / Save / Remove albums in your Youtube Music Library
+- Search Albums & Songs and stream it
+- Add / Remove Songs in Queue 
+- When select to stream a song in search result, it will automatically add song list that related to your selected song 
 ## Supported OS
 - **Linux** (Tested on Arch Linux)
 
