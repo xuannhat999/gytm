@@ -5,7 +5,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use data::MpvEvent;
-use error::log_to_file;
+use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use state::AppState;
@@ -19,7 +19,7 @@ use tui::{
 };
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> YResult<()> {
     let mut state = match AppState::load() {
         Ok(c) => c,
         Err(e) => {

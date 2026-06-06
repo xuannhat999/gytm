@@ -10,20 +10,22 @@ Stream Youtube Music from your terminal !
 
 # Features
 - Personalized Content: Seamlessly fetch your private playlists/album using local cookie authentication.
-- Stream / Save / Remove albums in your Youtube Music Library
+- Play / Save / Remove albums in your Youtube Music Library
 - Search Albums & Songs and stream it
 - Add / Remove Songs in Queue 
-- When select to stream a song in search result, it will automatically add song list that related to your selected song 
+- When select to play a song in search result, it will automatically load list of related songs into Queue
 ## Supported OS
 - **Linux** (Tested on Arch Linux)
 
 # Build Dependencies (Only required if building from source)
-- **Rust & Cargo** (1.75 or later)
+- **Rust & Cargo** (1.85 or later)
 - **pkg-config**
 - **openssl** development headers
-- **yt-dlp**: For fetching stream URLs.
-- **mpv**   : The core media engine.
-- **sqlite**: Local database
+- **yt-dlp**: for fetching stream URLs.
+- **mpv**   : the core media engine.
+- **sqlite**: local database
+# Optional Dependencies
+- **A Nerd Font**: for icon rendering
 # Installation
 **- Build from source** 
 1. Clone this repository:

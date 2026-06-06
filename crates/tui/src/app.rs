@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use data::{AppPage, FocusArea, PlayList, Song};
+use error::log_to_file;
 use ratatui::widgets::ListState;
 use ratatui_notifications::{Anchor, AutoDismiss, Level, Notification, Notifications};
 
@@ -142,19 +143,21 @@ impl App {
             .title("Success")
             .level(Level::Info)
             .anchor(Anchor::TopRight)
-            .auto_dismiss(AutoDismiss::After(Duration::from_millis(1500)))
+            .auto_dismiss(AutoDismiss::After(Duration::from_millis(1600)))
             .max_size(
                 ratatui_notifications::SizeConstraint::Percentage(25.0),
                 ratatui_notifications::SizeConstraint::Absolute(4),
             )
             .timing(
                 ratatui_notifications::Timing::Fixed(Duration::from_millis(50)),
-                ratatui_notifications::Timing::Fixed(Duration::from_millis(1000)),
+                ratatui_notifications::Timing::Fixed(Duration::from_millis(1500)),
                 ratatui_notifications::Timing::Fixed(Duration::from_millis(50)),
             )
             .build()
         {
-            let _ = self.noti.add(notif);
+            if let Err(e) = self.noti.add(notif) {
+                log_to_file(&e);
+            }
         }
     }
 }
