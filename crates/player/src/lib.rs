@@ -194,10 +194,10 @@ impl Player {
                                             {
                                                 log_to_file(&e);
                                             }
-                                            if let Some(item) = items.iter().find(|i| {
-                                                i["playing"].as_bool() == Some(true)
-                                                    || i["current"].as_bool() == Some(true)
-                                            }) {
+                                            if let Some(item) = items
+                                                .iter()
+                                                .find(|i| i["playing"].as_bool() == Some(true))
+                                            {
                                                 if let Some(url) = item["filename"].as_str() {
                                                     let video_id = get_vid_id_from_url(url);
                                                     if let Err(e) = tx_event
