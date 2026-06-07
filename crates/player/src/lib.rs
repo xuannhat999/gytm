@@ -82,7 +82,17 @@ impl Player {
             .await?;
         Ok(())
     }
+    pub async fn forward(&mut self) -> YResult<()> {
+        self.send_mpv_command(r#"{"command": ["seek", 5, "relative"]}"#)
+            .await?;
+        Ok(())
+    }
 
+    pub async fn backward(&mut self) -> YResult<()> {
+        self.send_mpv_command(r#"{"command": ["seek", -5, "relative"]}"#)
+            .await?;
+        Ok(())
+    }
     // START MPV SOCKET
     pub fn start_mpv_and_observe(
         &mut self,
@@ -108,13 +118,12 @@ impl Player {
         self.current_process = Some(child);
         let (tx, mut rx) = mpsc::unbounded_channel::<String>();
         self.mpv_conn = Some(tx);
-
+        let tx_poll = self.mpv_conn.clone();
         // CONNECT TO MPV SOCKET
         tokio::spawn(async move {
             let mut stream: Option<UnixStream> = None;
             let mut retries = 0;
             const MAX_RETRIES: u32 = 50;
-
             while retries < MAX_RETRIES {
                 match UnixStream::connect(&socket_path).await {
                     Ok(s) => {
@@ -129,7 +138,7 @@ impl Player {
             }
             if let Some(s) = stream {
                 let (raw_reader, mut writer) = tokio::io::split(s);
-                // SPAWN OBSERVE CMD
+                // PLAYLIST CHANGE
                 if writer
                     .write_all(b"{\"command\": [\"observe_property\", 1, \"playlist\"]}\n")
                     .await
@@ -140,7 +149,7 @@ impl Player {
                     ));
                     return;
                 }
-
+                // VOLUME CHANGE
                 if writer
                     .write_all(b"{\"command\": [\"observe_property\", 2, \"volume\"]}\n")
                     .await
@@ -151,11 +160,22 @@ impl Player {
                     ));
                     return;
                 }
-                // OBSERVE MPV RESPONSE AND SEND EVENT
+
+                // REVECEIVE MPV RESPONSE AND SEND EVENT
                 tokio::spawn(async move {
                     let reader = BufReader::new(raw_reader);
                     let mut lines = reader.lines();
                     while let Ok(Some(line)) = lines.next_line().await {
+                        if let Ok(reply) = serde_json::from_str::<serde_json::Value>(&line) {
+                            if reply.get("event").is_none() {
+                                if let (Some("success"), Some(v)) = (
+                                    reply.get("error").and_then(|e| e.as_str()),
+                                    reply.get("data").and_then(|d| d.as_f64()),
+                                ) {
+                                    let _ = tx_event.send(MpvEvent::TimePos(v)).await;
+                                }
+                            }
+                        }
                         if let Ok(msg) = serde_json::from_str::<MpvResponse>(&line) {
                             if msg.event.as_deref() == Some("property-change") {
                                 match msg.name.as_deref() {
@@ -178,16 +198,10 @@ impl Player {
                                                 i["playing"].as_bool() == Some(true)
                                                     || i["current"].as_bool() == Some(true)
                                             }) {
-                                                if let (Some(url), Some(title)) = (
-                                                    item["filename"].as_str(),
-                                                    item["title"].as_str(),
-                                                ) {
-                                                    let song = Song {
-                                                        title: title.to_string(),
-                                                        video_id: get_vid_id_from_url(url),
-                                                    };
+                                                if let Some(url) = item["filename"].as_str() {
+                                                    let video_id = get_vid_id_from_url(url);
                                                     if let Err(e) = tx_event
-                                                        .send(MpvEvent::StartPlaying(song))
+                                                        .send(MpvEvent::StartPlaying(video_id))
                                                         .await
                                                     {
                                                         log_to_file(&e);
@@ -213,7 +227,21 @@ impl Player {
                     }
                 });
 
-                // RECEIVE MPV COMMAND AND SEND TO SOCKET
+                if let Some(tx_poll) = tx_poll {
+                    tokio::spawn(async move {
+                        let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
+                        tick.tick().await;
+                        loop {
+                            tick.tick().await;
+                            let cmd =
+                                r#"{"command": ["get_property", "time-pos"]}"#.to_string() + "\n";
+                            if tx_poll.send(cmd).is_err() {
+                                break;
+                            }
+                        }
+                    });
+                }
+                // WRITE MPV OBSERVE COMMAND
                 while let Some(cmd) = rx.recv().await {
                     if writer.write_all(cmd.as_bytes()).await.is_err() {
                         break;
@@ -225,6 +253,7 @@ impl Player {
                 ));
             }
         });
+
         Ok(())
     }
 

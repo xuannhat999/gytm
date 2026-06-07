@@ -15,8 +15,13 @@ pub fn handle_mpv_event(app: &mut App, player: &mut Player, state: &mut AppState
                 player.status = PlayerStatus::Loading;
             }
         }
-        MpvEvent::StartPlaying(song) => {
-            app.playing_song = Some(song);
+        MpvEvent::StartPlaying(video_id) => {
+            for song in &app.songs {
+                if song.video_id == video_id {
+                    app.playing_song = Some(song.clone());
+                    app.time_pos = Some(0.0);
+                }
+            }
             player.status = PlayerStatus::Playing;
         }
         MpvEvent::VolumeChange(vol) => {
@@ -24,6 +29,9 @@ pub fn handle_mpv_event(app: &mut App, player: &mut Player, state: &mut AppState
             if let Err(e) = state.save() {
                 log_to_file(&e);
             }
+        }
+        MpvEvent::TimePos(pos) => {
+            app.time_pos = Some(pos);
         }
     }
 }
@@ -430,6 +438,16 @@ async fn handle_player_event(
         }
         KeyCode::Char('+') => {
             if let Err(e) = player.increase_volume().await {
+                log_to_file(&e);
+            }
+        }
+        KeyCode::Left => {
+            if let Err(e) = player.backward().await {
+                log_to_file(&e);
+            }
+        }
+        KeyCode::Right => {
+            if let Err(e) = player.forward().await {
                 log_to_file(&e);
             }
         }

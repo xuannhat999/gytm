@@ -227,20 +227,22 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
 
 fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, theme: &Theme) {
     let song_info = match player.status {
-        PlayerStatus::Idle => "   No song is playing ".to_string(),
-        PlayerStatus::Loading => "   Loading...".to_string(),
-        PlayerStatus::Playing => {
-            if let Some(song) = &app.playing_song {
-                format!("   {} ", song.title)
+        PlayerStatus::Idle => vec![Line::from("   No song is playing ".to_string())],
+        PlayerStatus::Loading => vec![Line::from("   Loading...".to_string())],
+        _ => {
+            let icon = if player.status == PlayerStatus::Playing {
+                ""
             } else {
-                String::new()
-            }
-        }
-        PlayerStatus::Paused => {
-            if let Some(song) = &app.playing_song {
-                format!(" ⏸  {} ", song.title)
+                ""
+            };
+            if let (Some(song), Some(time_pos)) = (&app.playing_song, app.time_pos) {
+                let time_pos_text = format_time(time_pos);
+                vec![
+                    Line::from(format!(" {}  {} ", icon, song.title)),
+                    Line::from(format!("    {} / {}", time_pos_text, song.duration)),
+                ]
             } else {
-                String::new()
+                vec![Line::from(String::new())]
             }
         }
     };
@@ -257,10 +259,12 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
         Span::styled("<Space> ", theme.key_style()),
         Span::styled("| Play mode: ", theme.text_style()),
         Span::styled("m ", theme.key_style()),
-        Span::styled("| 󰒮 / 󰒭: ", theme.text_style()),
+        Span::styled("|  / : ", theme.text_style()),
         Span::styled("b/n ", theme.key_style()),
         Span::styled("|  : ", theme.text_style()),
         Span::styled("+/- ", theme.key_style()),
+        Span::styled("|  /  : ", theme.text_style()),
+        Span::styled(" /  ", theme.key_style()),
         Span::styled(" ]", theme.text_style()),
     ]);
 
@@ -407,4 +411,9 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         });
 
     frame.render_stateful_widget(list_widget, area, &mut app.search_songs_liststate);
+}
+
+fn format_time(secs: f64) -> String {
+    let s = secs as u64;
+    format!("{}:{:02}", s / 60, s % 60)
 }

@@ -61,7 +61,8 @@ pub fn parse_songs(data: Value) -> YResult<Vec<Song>> {
                 video_id: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId")
                     .or_else(|| renderer.pointer("/playlistItemData/videoId"))
                     .and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                
+
+                duration: renderer.pointer("/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text").and_then(|v| v.as_str()).unwrap_or("").to_string()                 
             };
             if !song.video_id.is_empty() {
                 songs.push(song);
@@ -146,10 +147,19 @@ pub fn parse_search_songs(data: Value) -> YResult<Vec<Song>> {
                             .unwrap_or("")
                             .to_string();
 
+                        let mut duration = String::new();
+                        if let Some(runs) = renderer.pointer("/flexColumns/1/musicResponsiveListItemFlexColumnRenderer/text/runs").and_then(|v| v.as_array()) {
+                            if let Some(last_run_text) = runs.last().and_then(|r| r["text"].as_str()) {
+                                if last_run_text.contains(':') {
+                                    duration = last_run_text.trim().to_string();
+                                }
+                            }
+                        }
                         if !video_id.is_empty() {
                             songs.push(Song {
                                 video_id,
                                 title,
+                                duration
                             });
                         }
                     }
@@ -196,10 +206,16 @@ pub fn parse_related_songs(data: Value) -> YResult<Vec<Song>> {
                     .and_then(|arr| arr.first())
                     .and_then(|run| run.get("text"))
                     .and_then(|t| t.as_str());
+                let duration = video
+                    .pointer("/lengthText/runs/0/text")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 if let (Some(vid), Some(t)) = (video_id, title) {
                     songs.push(Song {
                         video_id: vid.to_string(),
                         title: t.to_string(),
+                        duration
                     });
                 }
             }

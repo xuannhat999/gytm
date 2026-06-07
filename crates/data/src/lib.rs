@@ -13,6 +13,7 @@ pub struct PlayList {
 pub struct Song {
     pub title: String,
     pub video_id: String,
+    pub duration: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -25,8 +26,9 @@ pub struct MpvResponse {
 
 pub enum MpvEvent {
     ListChange(Vec<String>),
-    StartPlaying(Song),
+    StartPlaying(String),
     VolumeChange(u8),
+    TimePos(f64),
 }
 
 #[derive(Default, PartialEq)]

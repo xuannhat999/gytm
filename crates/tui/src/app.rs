@@ -16,6 +16,7 @@ pub struct App {
     pub playlists_liststate: ListState,
     pub songs_liststate: ListState,
 
+    pub time_pos: Option<f64>,
     pub playing_song: Option<Song>,
     pub mpv_list: Vec<String>,
 
@@ -49,6 +50,7 @@ impl Default for App {
 
             focus_area: FocusArea::Albums,
 
+            time_pos: None,
             playing_song: None,
 
             mpv_list: Vec::new(),
