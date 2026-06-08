@@ -110,7 +110,11 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
                     .playing_playlist_id
                     .as_ref()
                     .map_or_else(|| false, |playing| playing.as_str() == item.browse_id);
-                let content = format!(" {} - {}", item.title, item.artist);
+                let content = if is_playing {
+                    format!(" {} - {}", item.title, item.artist)
+                } else {
+                    format!("  {} - {}", item.title, item.artist)
+                };
                 if is_playing {
                     ListItem::new(content).style(Style::default().fg(theme.secondary))
                 } else {
