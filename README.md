@@ -63,6 +63,27 @@ paru -S gytm-git
 1. Keep your Youtube/Youtube Music account signed in on your browser.
 2. Launch `gytm`. It will automatically find the active session.
 
+# Keymap:
+- <kbd>q</kbd>: Quit app
+- <kbd>Tab</kbd>: Switch tab 
+- <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>: Toggle focus area
+- (<kbd>arrow up</kbd>/<kbd>k</kbd>) / (<kbd>arrow down</kbd>/<kbd>j</kbd>): Navigate up/down list items
+- <kbd>Enter</kbd>: Play Album/Playlist/Song
+- <kbd>Space</kbd>: Pause/Resume
+- <kbd>m</kbd>: Toggle playmode (Default/Shuffle)
+-  <kbd>b</kbd>/<kbd>n</kbd>: Play previous/next song in Queue ( If playmode is Shuffle, next song will be random )
+- <kbd>+</kbd>/<kbd>-</kbd>: Increase/Decrease volume
+- <kbd>arrow left</kbd>/<kbd>arrow right</kbd>: Go Back/Forward 5s
+- <kbd>s</kbd>: Toggle search input ( in Search Tab )
+- <kbd>Esc</kbd>: Exit insert mode ( in search input )
+- <kbd>Enter</kbd>: Submit and search ( in search input )
+- <kbd>a</kbd>:
+  -  In Song search result: Add song to Queue
+  -  In Album search result: Save Album to Library
+- <kbd>d</kbd>: 
+  -  In albums search result or Library: Remove saved album from Library
+  -  In Queue: Remove song from Queue
+- <kbd>c</kbd>: Clear Queue
 # ⚠️ Troubleshooting (App freezes on startup)
 If you are using a standalone **Window Manager (Hyprland, i3, Sway, etc.)** and the app freezes on startup, your browser's secure storage is likely locked. Because these environments lack a default graphical interface to prompt for your password, the application hangs waiting for permission.
 
