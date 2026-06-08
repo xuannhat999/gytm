@@ -6,6 +6,13 @@ Stream Youtube Music from your terminal !
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/398677ae-d35f-406c-adf2-50dca21952d6" />
 
 
+https://github.com/user-attachments/assets/b9e58baa-c24d-47c4-826a-e26c765b0905
+
+
+
+
+
+
 <br><br>
 
 # Features
