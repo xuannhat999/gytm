@@ -125,7 +125,7 @@ pub async fn handle_key_events(
                     if let Some(i) = app.albums_liststate.selected() {
                         let playlist_id = app.albums.get(i).map(|a| a.playlist_id.clone());
                         if let Some(id) = playlist_id {
-                            if let Err(e) = client.remove_from_lib(&id).await {
+                            if let Err(e) = client.remove_saved_list(&id).await {
                                 log_to_file(&e);
                             } else {
                                 app.albums.remove(i);
@@ -141,13 +141,21 @@ pub async fn handle_key_events(
                 }
                 FocusArea::Playlists => {
                     if let Some(i) = app.playlists_liststate.selected() {
-                        let playlist_id = app.playlists.get(i).map(|a| a.playlist_id.clone());
-                        if let Some(id) = playlist_id {
-                            if let Err(e) = client.remove_from_lib(&id).await {
-                                log_to_file(&e);
+                        if let Some(playlist) = app.playlists.get(i) {
+                            let id = &playlist.playlist_id;
+                            let result = if playlist.is_custom {
+                                client.remove_saved_cus_list(id).await
                             } else {
-                                app.playlists.remove(i);
-                                app.notify_success(String::from("Removed playlist from Library"));
+                                client.remove_saved_list(id).await
+                            };
+                            match result {
+                                Ok(_) => {
+                                    app.playlists.remove(i);
+                                    app.notify_success(String::from(
+                                        "Removed playlist from Library",
+                                    ));
+                                }
+                                Err(e) => log_to_file(&e),
                             }
                         }
                     }
@@ -245,7 +253,7 @@ pub async fn handle_key_events(
                                 if let Some(selected) = app.search_albums.get_mut(i) {
                                     if selected.is_saved {
                                         if let Err(e) =
-                                            client.remove_from_lib(&selected.playlist_id).await
+                                            client.remove_saved_list(&selected.playlist_id).await
                                         {
                                             log_to_file(&e);
                                         } else {

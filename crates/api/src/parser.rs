@@ -18,6 +18,16 @@ pub fn parse_lists(data: Value) -> YResult<(Vec<PlayList>, Vec<PlayList>, Option
             if let Some(rerender) = item.get("musicTwoRowItemRenderer") {
                 let page_type = rerender.pointer("/navigationEndpoint/browseEndpoint/browseEndpointContextSupportedConfigs/browseEndpointContextMusicConfig/pageType");
                 if let Some(page_type_str) = page_type.and_then(|p| p.as_str()) {
+                    let is_custom = rerender
+                        .pointer("/menu/menuRenderer/items")
+                        .and_then(|v| v.as_array())
+                        .is_some_and(|items| {
+                            items.iter().any(|item| {
+                                item.pointer("/menuNavigationItemRenderer/navigationEndpoint/confirmDialogEndpoint/content/confirmDialogRenderer/confirmButton/buttonRenderer/serviceEndpoint/deletePlaylistEndpoint").is_some()
+                                || item.pointer("/menuNavigationItemRenderer/navigationEndpoint/playlistEditorEndpoint").is_some()
+                            })
+                        });
+
                     let album = PlayList {
                         title: rerender.pointer("/title/runs/0/text").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
                         artist: rerender.pointer("/subtitle/runs/2/text").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
@@ -25,7 +35,8 @@ pub fn parse_lists(data: Value) -> YResult<(Vec<PlayList>, Vec<PlayList>, Option
                         playlist_id: rerender.pointer("/thumbnailOverlay/musicItemThumbnailOverlayRenderer/content/musicPlayButtonRenderer/playNavigationEndpoint/watchPlaylistEndpoint/playlistId")
                             .and_then(|v| v.as_str())
                             .unwrap_or("").to_string(),
-                        is_saved: true
+                        is_saved: true,
+                        is_custom,
                     };
                     match page_type_str {
                         "MUSIC_PAGE_TYPE_ALBUM" => albums.push(album),
@@ -123,6 +134,7 @@ pub fn parse_search_albums(data: Value) -> YResult<Vec<PlayList>> {
                     browse_id,
                     playlist_id,
                     is_saved,
+                    is_custom: false,
                 });
             }
         }
