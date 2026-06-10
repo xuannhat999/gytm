@@ -63,3 +63,8 @@ pub enum AppPage {
     Library = 0,
     Search = 1,
 }
+
+pub enum NotifyType {
+    Success,
+    Error,
+}
