@@ -63,7 +63,7 @@ pub async fn handle_key_events(
                     app.playing_song = None;
                     app.songs = Vec::new();
                     app.playing_playlist_id = None;
-                    app.notify_success(String::from("Cleared Queue"));
+                    app.notify(data::NotifyType::Success, String::from("Cleared Queue"));
                 }
             }
             _ => {}
@@ -129,7 +129,10 @@ pub async fn handle_key_events(
                                 log_to_file(&e);
                             } else {
                                 app.albums.remove(i);
-                                app.notify_success(String::from("Removed album from Library"));
+                                app.notify(
+                                    data::NotifyType::Success,
+                                    String::from("Removed album from Library"),
+                                );
                                 if let Some(pos) =
                                     app.search_albums.iter().position(|a| id == a.playlist_id)
                                 {
@@ -141,7 +144,12 @@ pub async fn handle_key_events(
                 }
                 FocusArea::Playlists => {
                     if let Some(i) = app.playlists_liststate.selected() {
-                        if let Some(playlist) = app.playlists.get(i) {
+                        if i == 0 || i == app.playlists.len() - 1 {
+                            app.notify(
+                                data::NotifyType::Error,
+                                String::from("Can not remove this playlist"),
+                            );
+                        } else if let Some(playlist) = app.playlists.get(i) {
                             let id = &playlist.playlist_id;
                             let result = if playlist.is_custom {
                                 client.remove_saved_cus_list(id).await
@@ -151,9 +159,10 @@ pub async fn handle_key_events(
                             match result {
                                 Ok(_) => {
                                     app.playlists.remove(i);
-                                    app.notify_success(String::from(
-                                        "Removed playlist from Library",
-                                    ));
+                                    app.notify(
+                                        data::NotifyType::Success,
+                                        String::from("Removed playlist from Library"),
+                                    );
                                 }
                                 Err(e) => log_to_file(&e),
                             }
@@ -226,9 +235,10 @@ pub async fn handle_key_events(
                                             selected.is_saved = true;
                                             let new_album = selected.clone();
                                             app.albums.push(new_album);
-                                            app.notify_success(String::from(
-                                                "Saved album to Library",
-                                            ));
+                                            app.notify(
+                                                data::NotifyType::Success,
+                                                String::from("Saved album to Library"),
+                                            );
                                         }
                                     }
                                 }
@@ -241,7 +251,10 @@ pub async fn handle_key_events(
                                     } else {
                                         let new_song = song.clone();
                                         app.songs.push(new_song);
-                                        app.notify_success(String::from("Added song to Queue"));
+                                        app.notify(
+                                            data::NotifyType::Success,
+                                            String::from("Added song to Queue"),
+                                        );
                                     }
                                 }
                             }
@@ -264,9 +277,10 @@ pub async fn handle_key_events(
                                                 .position(|a| a.playlist_id == selected.playlist_id)
                                             {
                                                 app.albums.remove(pos);
-                                                app.notify_success(String::from(
-                                                    "Removed Album from Library",
-                                                ));
+                                                app.notify(
+                                                    data::NotifyType::Success,
+                                                    String::from("Removed Album from Library"),
+                                                );
                                             }
                                         }
                                     }
@@ -342,7 +356,10 @@ async fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Pla
                         log_to_file(&e);
                     } else {
                         app.songs.remove(i);
-                        app.notify_success(String::from("Removed song from Queue"));
+                        app.notify(
+                            data::NotifyType::Success,
+                            String::from("Removed song from Queue"),
+                        );
                     }
                 } else {
                     let video_id = &app.songs[i].video_id;
@@ -351,7 +368,10 @@ async fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Pla
                             log_to_file(&e);
                         } else {
                             app.songs.remove(i);
-                            app.notify_success(String::from("Removed song from Queue"));
+                            app.notify(
+                                data::NotifyType::Success,
+                                String::from("Removed song from Queue"),
+                            );
                         }
                     }
                 }
