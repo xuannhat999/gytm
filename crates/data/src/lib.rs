@@ -8,6 +8,7 @@ pub struct PlayList {
     pub browse_id: String,
     pub playlist_id: String,
     pub is_saved: bool,
+    pub is_custom: bool,
 }
 #[derive(Default, Debug, Clone)]
 pub struct Song {
@@ -61,4 +62,9 @@ pub enum FocusArea {
 pub enum AppPage {
     Library = 0,
     Search = 1,
+}
+
+pub enum NotifyType {
+    Success,
+    Error,
 }

@@ -1,6 +1,7 @@
 use std::time::Duration;
 
-use data::{AppPage, FocusArea, PlayList, Song};
+use crate::theme::{error_style, success_style};
+use data::{AppPage, FocusArea, NotifyType, PlayList, Song};
 use error::log_to_file;
 use ratatui::widgets::ListState;
 use ratatui_notifications::{Anchor, AutoDismiss, Level, Notification, Notifications};
@@ -140,9 +141,12 @@ impl App {
         }
         None
     }
-    pub fn notify_success(&mut self, msg: String) {
+    pub fn notify(&mut self, noti_type: NotifyType, msg: String) {
+        let style = match noti_type {
+            NotifyType::Error => error_style(),
+            NotifyType::Success => success_style(),
+        };
         if let Ok(notif) = Notification::new(msg)
-            .title("Success")
             .level(Level::Info)
             .anchor(Anchor::TopRight)
             .auto_dismiss(AutoDismiss::After(Duration::from_millis(1600)))
@@ -155,6 +159,8 @@ impl App {
                 ratatui_notifications::Timing::Fixed(Duration::from_millis(1500)),
                 ratatui_notifications::Timing::Fixed(Duration::from_millis(50)),
             )
+            .style(style)
+            .border_style(style)
             .build()
         {
             if let Err(e) = self.noti.add(notif) {
