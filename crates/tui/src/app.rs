@@ -1,8 +1,9 @@
 use std::time::Duration;
 
+use crate::theme::{error_style, success_style};
 use data::{AppPage, FocusArea, NotifyType, PlayList, Song};
 use error::log_to_file;
-use ratatui::{style::Style, widgets::ListState};
+use ratatui::widgets::ListState;
 use ratatui_notifications::{Anchor, AutoDismiss, Level, Notification, Notifications};
 
 pub struct App {
@@ -167,10 +168,4 @@ impl App {
             }
         }
     }
-}
-fn success_style() -> Style {
-    Style::default().fg(ratatui::style::Color::Green)
-}
-fn error_style() -> Style {
-    Style::default().fg(ratatui::style::Color::Red)
 }

@@ -40,3 +40,9 @@ impl Theme {
         Style::default().bg(Color::Rgb(69, 71, 90)).fg(self.primary)
     }
 }
+pub fn success_style() -> Style {
+    Style::default().fg(ratatui::style::Color::Green)
+}
+pub fn error_style() -> Style {
+    Style::default().fg(ratatui::style::Color::Red)
+}
