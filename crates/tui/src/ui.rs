@@ -7,7 +7,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Tabs},
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs},
 };
 
 pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) {
@@ -36,12 +36,13 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
     match app.page {
         AppPage::Library => {
             // HORIZONTAL LAYOUT (ALBUMS | PLAYLISTS)
-            let playlist_layout = Layout::default()
+            let hor_layout = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
                 .split(main_layout[1]);
-            render_list(frame, app, playlist_layout[0], FocusArea::Albums, theme);
-            render_list(frame, app, playlist_layout[1], FocusArea::Playlists, theme);
+
+            render_list(frame, app, hor_layout[0], FocusArea::Albums, theme);
+            render_list(frame, app, hor_layout[1], FocusArea::Playlists, theme);
         }
         AppPage::Search => {
             let search_layout = Layout::default()
@@ -56,6 +57,9 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
             render_search_albums(frame, app, result_layout[0], theme);
             render_search_songs(frame, app, result_layout[1], theme);
         }
+    }
+    if app.is_popup {
+        render_save_song_to_playlist_popup(frame, app, frame.area(), theme);
     }
 }
 
@@ -142,7 +146,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
                 Span::styled("| Down: ", theme.text_style()),
                 Span::styled("/j ", theme.key_style()),
                 Span::styled("| Play: ", theme.text_style()),
-                Span::styled("<Enter> ", theme.key_style()),
+                Span::styled("Enter ", theme.key_style()),
                 Span::styled("| Unsave: ", theme.text_style()),
                 Span::styled("x ", theme.key_style()),
                 Span::styled(" ]", theme.text_style()),
@@ -167,6 +171,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
 // RENDER QUEUE
 fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let is_focused = FocusArea::Queue == app.focus_area
+        && !app.is_popup
         && ((!app.is_insert && app.page == AppPage::Search) || app.page == AppPage::Library);
     let border_style = if is_focused {
         theme.active_border_style()
@@ -181,7 +186,7 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
         Span::styled("]", theme.text_style()),
     ]);
 
-    if app.songs.is_empty() {
+    if app.queue.is_empty() {
         let empty_block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -196,7 +201,7 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
         return;
     }
     let items: Vec<ListItem> = app
-        .songs
+        .queue
         .iter()
         .enumerate()
         .map(|(i, song)| {
@@ -222,7 +227,7 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .title(format!("[3]- Queue ({})", app.songs.len()))
+                .title(format!("[3]- Queue ({})", app.queue.len()))
                 .title_bottom(key_map.centered())
                 .border_style(border_style),
         )
@@ -262,7 +267,7 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
     ];
     let key_map = Line::from(vec![
         Span::styled("[ ⏸ / : ", theme.text_style()),
-        Span::styled("<Space> ", theme.key_style()),
+        Span::styled("Space ", theme.key_style()),
         Span::styled("| Play mode: ", theme.text_style()),
         Span::styled("m ", theme.key_style()),
         Span::styled("|  / : ", theme.text_style()),
@@ -308,7 +313,7 @@ fn render_search_input(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         Span::styled("[ Exit insert: ", theme.text_style()),
         Span::styled("Esc ", theme.key_style()),
         Span::styled("| Search: ", theme.text_style()),
-        Span::styled("<Enter>", theme.key_style()),
+        Span::styled("Enter", theme.key_style()),
         Span::styled(" ]", theme.text_style()),
     ]);
     let display_text = if app.is_insert {
@@ -347,7 +352,7 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
         })
         .collect();
 
-    let is_focused = FocusArea::SearchAlbums == app.focus_area && !app.is_insert;
+    let is_focused = FocusArea::SearchAlbums == app.focus_area && !app.is_insert && !app.is_popup;
     let border_style = if is_focused {
         theme.active_border_style()
     } else {
@@ -357,6 +362,8 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
     let bottom_nav = Line::from(vec![
         Span::styled("[ Save/Unsave: ", theme.text_style()),
         Span::styled("x ", theme.key_style()),
+        Span::styled("| Play: ", theme.text_style()),
+        Span::styled("Enter ", theme.key_style()),
         Span::styled(" ]", theme.text_style()),
     ]);
 
@@ -382,18 +389,20 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         .search_songs
         .iter()
         .map(|item| {
-            let content = item.title.to_string();
+            let content = format!(" {}", item.title);
             ListItem::new(content)
         })
         .collect();
 
-    let bottom_nav = Line::from(vec![
+    let keymap = Line::from(vec![
         Span::styled("[ Add to Queue: ", theme.text_style()),
         Span::styled("a ", theme.key_style()),
+        Span::styled("| Save to Playlist: ", theme.text_style()),
+        Span::styled("x ", theme.key_style()),
         Span::styled(" ]", theme.text_style()),
     ]);
 
-    let is_focused = FocusArea::SearchSongs == app.focus_area && !app.is_insert;
+    let is_focused = FocusArea::SearchSongs == app.focus_area && !app.is_insert && !app.is_popup;
     let border_style = if is_focused {
         theme.active_border_style()
     } else {
@@ -403,7 +412,7 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .title("[2]-󰎇 Songs")
-        .title_bottom(bottom_nav.centered())
+        .title_bottom(keymap.centered())
         .border_style(border_style);
 
     let list_widget = List::new(items)
@@ -416,7 +425,66 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
 
     frame.render_stateful_widget(list_widget, area, &mut app.search_songs_liststate);
 }
+fn render_save_song_to_playlist_popup(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
+    let items: Vec<ListItem> = app
+        .cus_playlists
+        .iter()
+        .filter_map(|&idx| app.playlists.get(idx))
+        .map(|p| {
+            if p.playlist_id == "LM" {
+                ListItem::new(format!("  {}", p.title))
+            } else {
+                ListItem::new(format!(" 󰲸 {}", p.title))
+            }
+        })
+        .collect();
 
+    let keymap = Line::from(vec![
+        Span::styled("[ Save: ", theme.text_style()),
+        Span::styled("Enter ", theme.key_style()),
+        Span::styled("| Close: ", theme.text_style()),
+        Span::styled("Esc ", theme.key_style()),
+        Span::styled("]", theme.text_style()),
+    ]);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(theme.active_border_style())
+        .title_bottom(keymap.centered());
+
+    let center_area = area.centered(Constraint::Percentage(30), Constraint::Percentage(30));
+    let inner_area = block.inner(center_area);
+
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ])
+        .split(inner_area);
+
+    let list_widget = List::new(items).highlight_style(theme.selected_item());
+
+    let title = if let Some(song) = app.selected_save_song.clone() {
+        song.title
+    } else {
+        String::new()
+    };
+
+    let helper = Line::from(vec![
+        Span::raw(" Select playlist to save "),
+        Span::styled(title, theme.key_style()),
+        Span::raw(" to:"),
+    ]);
+    let line = Block::default().borders(Borders::TOP);
+    frame.render_widget(Clear, center_area);
+    frame.render_widget(block, center_area);
+    frame.render_widget(helper, layout[0]);
+    frame.render_widget(line, layout[1]);
+    frame.render_stateful_widget(list_widget, layout[2], &mut app.cus_playlists_liststate);
+}
 fn format_time(secs: f64) -> String {
     let s = secs as u64;
     format!("{}:{:02}", s / 60, s % 60)

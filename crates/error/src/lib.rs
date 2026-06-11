@@ -51,6 +51,12 @@ pub enum YError {
 
     #[error("Command Sender Error: {0}")]
     CmdSenderError(#[from] tokio::sync::mpsc::error::SendError<String>),
+
+    #[error("Song alredy saved in playlist")]
+    AlreadyInPlaylist,
+
+    #[error("Bad Status from: {0}")]
+    BadStatus(String),
 }
 
 pub type YResult<T> = std::result::Result<T, YError>;

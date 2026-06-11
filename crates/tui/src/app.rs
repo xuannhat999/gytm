@@ -10,7 +10,7 @@ pub struct App {
     // PAGE LIBRARY
     pub albums: Vec<PlayList>,
     pub playlists: Vec<PlayList>,
-    pub songs: Vec<Song>,
+    pub queue: Vec<Song>,
     pub focus_area: FocusArea,
 
     pub albums_liststate: ListState,
@@ -31,8 +31,12 @@ pub struct App {
 
     pub search_query: String,
     pub is_insert: bool,
-
+    //POPUP
+    pub cus_playlists: Vec<usize>,
+    pub cus_playlists_liststate: ListState,
+    pub selected_save_song: Option<Song>,
     // OTHER
+    pub is_popup: bool,
     pub noti: Notifications,
     pub page: AppPage,
     pub is_exit: bool,
@@ -43,7 +47,7 @@ impl Default for App {
             // PAGE LIBRARY
             albums: Vec::new(),
             playlists: Vec::new(),
-            songs: Vec::new(),
+            queue: Vec::new(),
 
             albums_liststate: ListState::default(),
             playlists_liststate: ListState::default(),
@@ -66,7 +70,12 @@ impl Default for App {
             search_query: String::new(),
             is_insert: false,
 
+            //POPUP
+            selected_save_song: None,
+            cus_playlists: Vec::new(),
+            cus_playlists_liststate: ListState::default(),
             //OTHER
+            is_popup: false,
             noti: Notifications::new(),
             is_exit: false,
             page: AppPage::Library,
@@ -77,16 +86,21 @@ impl Default for App {
 impl App {
     // TOGGLE NEXT ITEM IN LISTSTATE
     pub fn next(&mut self) {
-        let (state, len) = match self.focus_area {
-            FocusArea::Albums => (&mut self.albums_liststate, self.albums.len()),
-            FocusArea::Playlists => (&mut self.playlists_liststate, self.playlists.len()),
-            FocusArea::Queue => (&mut self.songs_liststate, self.songs.len()),
-            FocusArea::SearchAlbums => {
-                (&mut self.search_albums_liststate, self.search_albums.len())
+        let (state, len) = if self.is_popup {
+            (&mut self.cus_playlists_liststate, self.cus_playlists.len())
+        } else {
+            match self.focus_area {
+                FocusArea::Albums => (&mut self.albums_liststate, self.albums.len()),
+                FocusArea::Playlists => (&mut self.playlists_liststate, self.playlists.len()),
+                FocusArea::Queue => (&mut self.songs_liststate, self.queue.len()),
+                FocusArea::SearchAlbums => {
+                    (&mut self.search_albums_liststate, self.search_albums.len())
+                }
+                FocusArea::SearchSongs => {
+                    (&mut self.search_songs_liststate, self.search_songs.len())
+                }
             }
-            FocusArea::SearchSongs => (&mut self.search_songs_liststate, self.search_songs.len()),
         };
-
         if len == 0 {
             return;
         }
@@ -107,16 +121,21 @@ impl App {
 
     // TOGGLE PREVIOUS ITEM IN LISTSTATE
     pub fn previous(&mut self) {
-        let (state, len) = match self.focus_area {
-            FocusArea::Albums => (&mut self.albums_liststate, self.albums.len()),
-            FocusArea::Playlists => (&mut self.playlists_liststate, self.playlists.len()),
-            FocusArea::Queue => (&mut self.songs_liststate, self.songs.len()),
-            FocusArea::SearchAlbums => {
-                (&mut self.search_albums_liststate, self.search_albums.len())
+        let (state, len) = if self.is_popup {
+            (&mut self.cus_playlists_liststate, self.cus_playlists.len())
+        } else {
+            match self.focus_area {
+                FocusArea::Albums => (&mut self.albums_liststate, self.albums.len()),
+                FocusArea::Playlists => (&mut self.playlists_liststate, self.playlists.len()),
+                FocusArea::Queue => (&mut self.songs_liststate, self.queue.len()),
+                FocusArea::SearchAlbums => {
+                    (&mut self.search_albums_liststate, self.search_albums.len())
+                }
+                FocusArea::SearchSongs => {
+                    (&mut self.search_songs_liststate, self.search_songs.len())
+                }
             }
-            FocusArea::SearchSongs => (&mut self.search_songs_liststate, self.search_songs.len()),
         };
-
         if len == 0 {
             return;
         }
