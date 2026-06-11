@@ -13,6 +13,7 @@ pub struct PlayList {
 #[derive(Default, Debug, Clone)]
 pub struct Song {
     pub title: String,
+    pub set_video_id: String,
     pub video_id: String,
     pub duration: String,
     pub is_liked: bool,
@@ -57,6 +58,7 @@ pub enum FocusArea {
     Queue,
     SearchAlbums,
     SearchSongs,
+    Songs,
 }
 
 #[derive(PartialEq, Copy, Clone)]

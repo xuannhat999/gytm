@@ -69,10 +69,11 @@ pub fn parse_songs(data: Value) -> YResult<Vec<Song>> {
                 title: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
                     .and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
                 
+                set_video_id: renderer.pointer("/overlay/musicItemThumbnailOverlayRenderer/content/musicPlayButtonRenderer/playNavigationEndpoint/watchEndpoint/playlistSetVideoId")
+                    .and_then(|v| v.as_str()).unwrap_or("").to_string(),
                 video_id: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId")
                     .or_else(|| renderer.pointer("/playlistItemData/videoId"))
                     .and_then(|v| v.as_str()).unwrap_or("").to_string(),
-
                 duration: renderer.pointer("/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text").and_then(|v| v.as_str()).unwrap_or("").to_string(),
                 is_liked: false,
             };
@@ -185,6 +186,10 @@ pub fn parse_search_songs(data: Value) -> YResult<Vec<Song>> {
                         if !video_id.is_empty() {
                             songs.push(Song {
                                 video_id,
+                                set_video_id: renderer["overlay"]["musicItemThumbnailOverlayRenderer"]["content"]["musicPlayButtonRenderer"]["playNavigationEndpoint"]["watchEndpoint"]["playlistSetVideoId"]
+                                    .as_str()
+                                    .unwrap_or("")
+                                    .to_string(),
                                 title,
                                 duration,
                                 is_liked,
@@ -242,6 +247,10 @@ pub fn parse_related_songs(data: Value) -> YResult<Vec<Song>> {
                 if let (Some(vid), Some(t)) = (video_id, title) {
                     songs.push(Song {
                         video_id: vid.to_string(),
+                        set_video_id: video.pointer("/navigationEndpoint/watchEndpoint/playlistSetVideoId")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string(),
                         title: t.to_string(),
                         duration,
                         is_liked: false,

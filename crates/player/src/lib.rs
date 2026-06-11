@@ -311,7 +311,7 @@ impl Player {
         Ok(())
     }
 
-    pub async fn load_playlist(&mut self, songs: &[Song]) -> YResult<()> {
+    pub async fn load_playlist(&mut self, songs: &[Song], play_pos: usize) -> YResult<()> {
         if songs.is_empty() {
             return Err(YError::PlaylistEmpty);
         }
@@ -331,6 +331,11 @@ impl Player {
             let cmd = serde_json::json!({"command": ["loadlist", playlist_path, "replace"]});
             let load_cmd = serde_json::to_string(&cmd)?;
             self.send_mpv_command(&load_cmd).await?;
+            let pos_cmd = serde_json::json!({
+                "command": ["set_property", "playlist-pos", play_pos]
+            });
+            self.send_mpv_command(&serde_json::to_string(&pos_cmd)?)
+                .await?;
             if self.play_mode == PlayMode::ShuffleMode {
                 if let Err(e) = self.shuffle().await {
                     log_to_file(&e);

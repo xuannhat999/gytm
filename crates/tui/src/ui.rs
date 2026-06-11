@@ -40,9 +40,14 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
                 .split(main_layout[1]);
+            let list_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(hor_layout[0]);
 
-            render_list(frame, app, hor_layout[0], FocusArea::Albums, theme);
-            render_list(frame, app, hor_layout[1], FocusArea::Playlists, theme);
+            render_list(frame, app, list_layout[0], FocusArea::Albums, theme);
+            render_list(frame, app, list_layout[1], FocusArea::Playlists, theme);
+            render_songs(frame, app, hor_layout[1], theme);
         }
         AppPage::Search => {
             let search_layout = Layout::default()
@@ -113,7 +118,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
                 let is_playing = app
                     .playing_playlist_id
                     .as_ref()
-                    .map_or_else(|| false, |playing| playing.as_str() == item.browse_id);
+                    .map_or_else(|| false, |playing| playing.as_str() == item.playlist_id);
                 let content = if is_playing {
                     format!(" {} - {}", item.title, item.artist)
                 } else {
@@ -149,7 +154,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
                 Span::styled("Enter ", theme.key_style()),
                 Span::styled("| Unsave: ", theme.text_style()),
                 Span::styled("x ", theme.key_style()),
-                Span::styled(" ]", theme.text_style()),
+                Span::styled("]", theme.text_style()),
             ]);
 
             block = block.title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
@@ -166,6 +171,62 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
 
         frame.render_stateful_widget(list_widget, area, list);
     }
+}
+
+fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
+    let is_focused = FocusArea::Songs == app.focus_area && !app.is_popup;
+    let border_style = if is_focused {
+        theme.active_border_style()
+    } else {
+        theme.inactive_border_style()
+    };
+    let items: Vec<ListItem> = app
+        .songs
+        .iter()
+        .enumerate()
+        .map(|(i, song)| {
+            let content = format!(" {:>3}. {}", i + 1, song.title);
+            ListItem::new(content)
+        })
+        .collect();
+    let keymap = Line::from(vec![
+        Span::styled("[ Remove from Playlist: ", theme.text_style()),
+        Span::styled("x ", theme.key_style()),
+        Span::styled("]", theme.text_style()),
+    ]);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .title(format!("[4]- Songs ({})", app.songs.len()))
+        .title_bottom(keymap.centered())
+        .border_style(border_style);
+
+    let inner_area = block.inner(area);
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Min(10),
+        ])
+        .split(inner_area);
+    let list_title = if let Some(viewing_list) = &app.viewing_list {
+        Line::from(format!(" {} - {}", viewing_list.title, viewing_list.artist))
+    } else {
+        Line::default()
+    };
+    let line = Block::default().borders(Borders::TOP);
+    let highlight_style = if is_focused {
+        theme.selected_item()
+    } else {
+        Style::default()
+    };
+    let list_widget = List::new(items).highlight_style(highlight_style);
+
+    frame.render_widget(block, area);
+    frame.render_widget(list_title, layout[0]);
+    frame.render_widget(line, layout[1]);
+    frame.render_stateful_widget(list_widget, layout[2], &mut app.songs_liststate);
 }
 
 // RENDER QUEUE
@@ -233,7 +294,7 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
         )
         .highlight_style(highlight_style);
 
-    frame.render_stateful_widget(list_widget, area, &mut app.songs_liststate);
+    frame.render_stateful_widget(list_widget, area, &mut app.queue_liststate);
 }
 
 fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, theme: &Theme) {
@@ -453,7 +514,7 @@ fn render_save_song_to_playlist_popup(frame: &mut Frame, app: &mut App, area: Re
         .border_style(theme.active_border_style())
         .title_bottom(keymap.centered());
 
-    let center_area = area.centered(Constraint::Percentage(30), Constraint::Percentage(30));
+    let center_area = area.centered(Constraint::Percentage(40), Constraint::Percentage(50));
     let inner_area = block.inner(center_area);
 
     let layout = Layout::default()
@@ -474,7 +535,7 @@ fn render_save_song_to_playlist_popup(frame: &mut Frame, app: &mut App, area: Re
     };
 
     let helper = Line::from(vec![
-        Span::raw(" Select playlist to save "),
+        Span::raw(" Saving "),
         Span::styled(title, theme.key_style()),
         Span::raw(" to:"),
     ]);

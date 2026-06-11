@@ -15,13 +15,16 @@ pub struct App {
 
     pub albums_liststate: ListState,
     pub playlists_liststate: ListState,
-    pub songs_liststate: ListState,
+    pub queue_liststate: ListState,
 
     pub time_pos: Option<f64>,
     pub playing_song: Option<Song>,
     pub mpv_list: Vec<String>,
 
     pub playing_playlist_id: Option<String>,
+    pub songs: Vec<Song>,
+    pub songs_liststate: ListState,
+    pub viewing_list: Option<PlayList>,
 
     // PAGE SEARCH
     pub search_albums: Vec<PlayList>,
@@ -31,10 +34,12 @@ pub struct App {
 
     pub search_query: String,
     pub is_insert: bool,
+
     //POPUP
     pub cus_playlists: Vec<usize>,
     pub cus_playlists_liststate: ListState,
     pub selected_save_song: Option<Song>,
+
     // OTHER
     pub is_popup: bool,
     pub noti: Notifications,
@@ -51,16 +56,18 @@ impl Default for App {
 
             albums_liststate: ListState::default(),
             playlists_liststate: ListState::default(),
-            songs_liststate: ListState::default(),
+            queue_liststate: ListState::default(),
 
             focus_area: FocusArea::Albums,
 
             time_pos: None,
             playing_song: None,
-
+            songs: Vec::new(),
+            songs_liststate: ListState::default(),
             mpv_list: Vec::new(),
 
             playing_playlist_id: None,
+            viewing_list: None,
 
             //PAGE SEARCH
             search_albums: Vec::new(),
@@ -85,26 +92,10 @@ impl Default for App {
 
 impl App {
     // TOGGLE NEXT ITEM IN LISTSTATE
-    pub fn next(&mut self) {
-        let (state, len) = if self.is_popup {
-            (&mut self.cus_playlists_liststate, self.cus_playlists.len())
-        } else {
-            match self.focus_area {
-                FocusArea::Albums => (&mut self.albums_liststate, self.albums.len()),
-                FocusArea::Playlists => (&mut self.playlists_liststate, self.playlists.len()),
-                FocusArea::Queue => (&mut self.songs_liststate, self.queue.len()),
-                FocusArea::SearchAlbums => {
-                    (&mut self.search_albums_liststate, self.search_albums.len())
-                }
-                FocusArea::SearchSongs => {
-                    (&mut self.search_songs_liststate, self.search_songs.len())
-                }
-            }
-        };
+    pub fn next(state: &mut ListState, len: usize) {
         if len == 0 {
             return;
         }
-
         let i = match state.selected() {
             Some(i) => {
                 if i >= len - 1 {
@@ -115,27 +106,11 @@ impl App {
             }
             None => 0,
         };
-
         state.select(Some(i));
     }
 
     // TOGGLE PREVIOUS ITEM IN LISTSTATE
-    pub fn previous(&mut self) {
-        let (state, len) = if self.is_popup {
-            (&mut self.cus_playlists_liststate, self.cus_playlists.len())
-        } else {
-            match self.focus_area {
-                FocusArea::Albums => (&mut self.albums_liststate, self.albums.len()),
-                FocusArea::Playlists => (&mut self.playlists_liststate, self.playlists.len()),
-                FocusArea::Queue => (&mut self.songs_liststate, self.queue.len()),
-                FocusArea::SearchAlbums => {
-                    (&mut self.search_albums_liststate, self.search_albums.len())
-                }
-                FocusArea::SearchSongs => {
-                    (&mut self.search_songs_liststate, self.search_songs.len())
-                }
-            }
-        };
+    pub fn previous(state: &mut ListState, len: usize) {
         if len == 0 {
             return;
         }
