@@ -142,7 +142,9 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
                 Span::styled("| Down: ", theme.text_style()),
                 Span::styled("/j ", theme.key_style()),
                 Span::styled("| Play: ", theme.text_style()),
-                Span::styled("<Enter>", theme.key_style()),
+                Span::styled("<Enter> ", theme.key_style()),
+                Span::styled("| Unsave: ", theme.text_style()),
+                Span::styled("x ", theme.key_style()),
                 Span::styled(" ]", theme.text_style()),
             ]);
 
@@ -353,10 +355,8 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
     };
 
     let bottom_nav = Line::from(vec![
-        Span::styled("[ Save to Lib: ", theme.text_style()),
-        Span::styled("a ", theme.key_style()),
-        Span::styled("| Remove from Lib: ", theme.text_style()),
-        Span::styled("d ", theme.key_style()),
+        Span::styled("[ Save/Unsave: ", theme.text_style()),
+        Span::styled("x ", theme.key_style()),
         Span::styled(" ]", theme.text_style()),
     ]);
 

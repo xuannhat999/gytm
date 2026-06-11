@@ -120,7 +120,7 @@ pub async fn handle_key_events(
                 }
                 _ => {}
             },
-            KeyCode::Char('d') => match app.focus_area {
+            KeyCode::Char('x') => match app.focus_area {
                 FocusArea::Albums => {
                     if let Some(i) = app.albums_liststate.selected() {
                         let playlist_id = app.albums.get(i).map(|a| a.playlist_id.clone());
@@ -131,7 +131,7 @@ pub async fn handle_key_events(
                                 app.albums.remove(i);
                                 app.notify(
                                     data::NotifyType::Success,
-                                    String::from("Removed album from Library"),
+                                    String::from("Unsaved album from Library"),
                                 );
                                 if let Some(pos) =
                                     app.search_albums.iter().position(|a| id == a.playlist_id)
@@ -161,7 +161,7 @@ pub async fn handle_key_events(
                                     app.playlists.remove(i);
                                     app.notify(
                                         data::NotifyType::Success,
-                                        String::from("Removed playlist from Library"),
+                                        String::from("Unsaved playlist from Library"),
                                     );
                                 }
                                 Err(e) => log_to_file(&e),
@@ -222,7 +222,7 @@ pub async fn handle_key_events(
                     KeyCode::Char('s') => {
                         app.is_insert = true;
                     }
-                    KeyCode::Char('a') => {
+                    KeyCode::Char('x') => {
                         if app.focus_area == FocusArea::SearchAlbums {
                             if let Some(i) = app.search_albums_liststate.selected() {
                                 if let Some(selected) = app.search_albums.get_mut(i) {
@@ -240,6 +240,25 @@ pub async fn handle_key_events(
                                                 String::from("Saved album to Library"),
                                             );
                                         }
+                                    } else {
+                                        if let Err(e) =
+                                            client.remove_saved_list(&selected.playlist_id).await
+                                        {
+                                            log_to_file(&e);
+                                        } else {
+                                            selected.is_saved = false;
+                                            if let Some(pos) = app
+                                                .albums
+                                                .iter()
+                                                .position(|a| a.playlist_id == selected.playlist_id)
+                                            {
+                                                app.albums.remove(pos);
+                                                app.notify(
+                                                    data::NotifyType::Success,
+                                                    String::from("Unsaved album from Library"),
+                                                );
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -255,34 +274,6 @@ pub async fn handle_key_events(
                                             data::NotifyType::Success,
                                             String::from("Added song to Queue"),
                                         );
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    KeyCode::Char('d') => {
-                        if app.focus_area == FocusArea::SearchAlbums {
-                            if let Some(i) = app.search_albums_liststate.selected() {
-                                if let Some(selected) = app.search_albums.get_mut(i) {
-                                    if selected.is_saved {
-                                        if let Err(e) =
-                                            client.remove_saved_list(&selected.playlist_id).await
-                                        {
-                                            log_to_file(&e);
-                                        } else {
-                                            selected.is_saved = false;
-                                            if let Some(pos) = app
-                                                .albums
-                                                .iter()
-                                                .position(|a| a.playlist_id == selected.playlist_id)
-                                            {
-                                                app.albums.remove(pos);
-                                                app.notify(
-                                                    data::NotifyType::Success,
-                                                    String::from("Removed Album from Library"),
-                                                );
-                                            }
-                                        }
                                     }
                                 }
                             }

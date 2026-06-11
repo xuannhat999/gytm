@@ -77,11 +77,12 @@ paru -S gytm-git
 - <kbd>s</kbd>: Toggle search input ( in Search Tab )
 - <kbd>Esc</kbd>: Exit insert mode ( in search input )
 - <kbd>Enter</kbd>: Submit and search ( in search input )
+- <kbd>x</kbd>:
+  -  In album search results: Save/Unsave album
+  -  In Library: Unsave album/playlist
 - <kbd>a</kbd>:
-  -  In Song search result: Add song to Queue
-  -  In Album search result: Save Album to Library
+  -  In song search results: Add song to Queue
 - <kbd>d</kbd>: 
-  -  In albums search result or Library: Remove saved album from Library
   -  In Queue: Remove song from Queue
 - <kbd>c</kbd>: Clear Queue
 # ⚠️ Troubleshooting (App freezes on startup)
