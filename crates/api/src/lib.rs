@@ -250,7 +250,7 @@ impl YClient {
     }
 
     // SAVE ALBUM TO LIBRARY
-    pub async fn save_album_to_lib(&self, playlist_id: &str) -> YResult<Value> {
+    pub async fn save_album(&self, playlist_id: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/like/like?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -287,7 +287,7 @@ impl YClient {
     }
 
     // REMOVE SAVED ALBUM IN LIBRARY
-    pub async fn remove_saved_list(&self, playlist_id: &str, is_cus: bool) -> YResult<Value> {
+    pub async fn unsave_album(&self, playlist_id: &str, is_cus: bool) -> YResult<Value> {
         let url = if is_cus {
             format!(
                 "{}/youtubei/v1/playlist/delete?key={}&alt=json",

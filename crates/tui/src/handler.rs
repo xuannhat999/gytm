@@ -177,7 +177,7 @@ pub async fn handle_key_events(
                         if let Some(i) = app.albums_liststate.selected() {
                             let playlist_id = app.albums.get(i).map(|a| a.playlist_id.clone());
                             if let Some(id) = playlist_id {
-                                if let Err(e) = client.remove_saved_list(&id, false).await {
+                                if let Err(e) = client.unsave_album(&id, false).await {
                                     log_to_file(&e);
                                 } else {
                                     app.albums.remove(i);
@@ -204,7 +204,7 @@ pub async fn handle_key_events(
                                     );
                                 } else {
                                     let id = &playlist.playlist_id;
-                                    match client.remove_saved_list(id, playlist.is_custom).await {
+                                    match client.unsave_album(id, playlist.is_custom).await {
                                         Ok(_) => {
                                             app.playlists.remove(i);
                                             app.notify(
@@ -325,9 +325,8 @@ pub async fn handle_key_events(
                                 if let Some(i) = app.search_albums_liststate.selected() {
                                     if let Some(selected) = app.search_albums.get_mut(i) {
                                         if !selected.is_saved {
-                                            if let Err(e) = client
-                                                .save_album_to_lib(&selected.playlist_id)
-                                                .await
+                                            if let Err(e) =
+                                                client.save_album(&selected.playlist_id).await
                                             {
                                                 log_to_file(&e);
                                             } else {
@@ -341,7 +340,7 @@ pub async fn handle_key_events(
                                             }
                                         } else {
                                             if let Err(e) = client
-                                                .remove_saved_list(&selected.playlist_id, false)
+                                                .unsave_album(&selected.playlist_id, false)
                                                 .await
                                             {
                                                 log_to_file(&e);
