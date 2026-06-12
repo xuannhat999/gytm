@@ -88,6 +88,7 @@ paru -S gytm-git
 - <kbd>Tab</kbd>: Switch tab
 - <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>: Toggle focus area
 - (<kbd>arrow up</kbd>/<kbd>k</kbd>) / (<kbd>arrow down</kbd>/<kbd>j</kbd>): Navigate up/down list items
+- <kbd>l</kbd>: View Songs from album/playlist ( In Library )
 - <kbd>Enter</kbd>: Play Album/Playlist/Song
 - <kbd>Space</kbd>: Pause/Resume
 - <kbd>m</kbd>: Toggle playmode (Default/Shuffle)
