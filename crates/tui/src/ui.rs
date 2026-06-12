@@ -192,6 +192,8 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let keymap = Line::from(vec![
         Span::styled("[ Remove from Playlist: ", theme.text_style()),
         Span::styled("x ", theme.key_style()),
+        Span::styled("| Add to Queue: ", theme.text_style()),
+        Span::styled("a ", theme.key_style()),
         Span::styled("]", theme.text_style()),
     ]);
     let block = Block::default()

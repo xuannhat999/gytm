@@ -1,7 +1,7 @@
 use crate::app::App;
 use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
-use data::{AppPage, FocusArea, MpvEvent, PlayMode, PlayerStatus};
+use data::{AppPage, FocusArea, MpvEvent, PlayList, PlayMode, PlayerStatus, Song};
 use error::{YError, log_to_file};
 use player::Player;
 use state::AppState;
@@ -127,29 +127,16 @@ pub async fn handle_key_events(
                     FocusArea::Albums | FocusArea::Playlists => {
                         let is_album = app.focus_area == FocusArea::Albums;
                         let selection = if is_album {
-                            app.albums_liststate.selected().map(|i| &app.albums[i])
+                            app.albums_liststate
+                                .selected()
+                                .map(|i| app.albums[i].clone())
                         } else {
                             app.playlists_liststate
                                 .selected()
-                                .map(|i| &app.playlists[i])
+                                .map(|i| app.playlists[i].clone())
                         };
                         if let Some(list) = selection {
-                            let browse_id = &list.browse_id;
-                            let playlist_id = &list.playlist_id;
-                            if let Ok(songs) = client.get_songs(browse_id).await {
-                                if !songs.is_empty() {
-                                    app.queue = songs;
-                                    app.queue_liststate.select(Some(0));
-                                    app.focus_area = FocusArea::Queue;
-                                    app.playing_playlist_id = Some(playlist_id.clone());
-                                    app.playing_song = None;
-                                    if let Err(e) = player.load_playlist(&app.queue, 0).await {
-                                        log_to_file(&e);
-                                    }
-                                }
-                            } else {
-                                log_to_file("Fetching songs Error");
-                            }
+                            play_list(app, client, player, list).await;
                         }
                     }
                     FocusArea::Songs => {
@@ -190,7 +177,7 @@ pub async fn handle_key_events(
                         if let Some(i) = app.albums_liststate.selected() {
                             let playlist_id = app.albums.get(i).map(|a| a.playlist_id.clone());
                             if let Some(id) = playlist_id {
-                                if let Err(e) = client.remove_saved_list(&id).await {
+                                if let Err(e) = client.remove_saved_list(&id, false).await {
                                     log_to_file(&e);
                                 } else {
                                     app.albums.remove(i);
@@ -217,12 +204,7 @@ pub async fn handle_key_events(
                                     );
                                 } else {
                                     let id = &playlist.playlist_id;
-                                    let result = if playlist.is_custom {
-                                        client.remove_saved_cus_list(id).await
-                                    } else {
-                                        client.remove_saved_list(id).await
-                                    };
-                                    match result {
+                                    match client.remove_saved_list(id, playlist.is_custom).await {
                                         Ok(_) => {
                                             app.playlists.remove(i);
                                             app.notify(
@@ -273,8 +255,20 @@ pub async fn handle_key_events(
                             }
                         }
                     }
+
                     _ => {}
                 },
+                KeyCode::Char('a') => {
+                    if app.focus_area == FocusArea::Songs {
+                        if let Some(song) =
+                            app.songs_liststate.selected().map(|i| app.songs[i].clone())
+                        {
+                            append_song_to_queue(app, player, song).await;
+                        }
+                    } else if app.focus_area == FocusArea::Playlists {
+                    }
+                }
+
                 _ => {}
             },
             AppPage::Search => {
@@ -347,7 +341,7 @@ pub async fn handle_key_events(
                                             }
                                         } else {
                                             if let Err(e) = client
-                                                .remove_saved_list(&selected.playlist_id)
+                                                .remove_saved_list(&selected.playlist_id, false)
                                                 .await
                                             {
                                                 log_to_file(&e);
@@ -379,19 +373,12 @@ pub async fn handle_key_events(
                             _ => {}
                         },
                         KeyCode::Char('a') => {
-                            if let Some(i) = app.search_songs_liststate.selected() {
-                                if let Some(song) = app.search_songs.get(i) {
-                                    if let Err(e) = player.append_to_queue(&song.video_id).await {
-                                        log_to_file(&e);
-                                    } else {
-                                        let new_song = song.clone();
-                                        app.queue.push(new_song);
-                                        app.notify(
-                                            data::NotifyType::Success,
-                                            String::from("Added song to Queue"),
-                                        );
-                                    }
-                                }
+                            if let Some(song) = app
+                                .search_songs_liststate
+                                .selected()
+                                .map(|i| app.search_songs[i].clone())
+                            {
+                                append_song_to_queue(app, player, song).await;
                             }
                         }
                         KeyCode::Enter => {
@@ -399,24 +386,9 @@ pub async fn handle_key_events(
                                 let selected = app
                                     .search_albums_liststate
                                     .selected()
-                                    .map(|i| &app.search_albums[i]);
+                                    .map(|i| app.search_albums[i].clone());
                                 if let Some(album) = selected {
-                                    let browse_id = &album.browse_id;
-                                    let playlist_id = &album.playlist_id;
-                                    if let Ok(songs) = client.get_songs(browse_id).await {
-                                        if !songs.is_empty() {
-                                            app.queue = songs;
-                                            app.queue_liststate.select(Some(0));
-                                            app.focus_area = FocusArea::Queue;
-                                            app.playing_playlist_id = Some(playlist_id.clone());
-                                            app.playing_song = None;
-                                            if let Err(e) =
-                                                player.load_playlist(&app.queue, 0).await
-                                            {
-                                                log_to_file(&e);
-                                            }
-                                        }
-                                    }
+                                    play_list(app, client, player, album).await;
                                 }
                             } else if app.focus_area == FocusArea::SearchSongs {
                                 let selected = app
@@ -694,5 +666,35 @@ async fn handle_popup_event(
             }
         }
         _ => {}
+    }
+}
+async fn append_song_to_queue(app: &mut App, player: &mut Player, song: Song) {
+    if let Err(e) = player.append_to_queue(&song.video_id).await {
+        log_to_file(&e);
+    } else {
+        let new_song = song.clone();
+        app.queue.push(new_song);
+        app.notify(
+            data::NotifyType::Success,
+            String::from("Added song to Queue"),
+        );
+    }
+}
+async fn play_list(app: &mut App, client: Arc<YClient>, player: &mut Player, list: PlayList) {
+    let browse_id = &list.browse_id;
+    let playlist_id = &list.playlist_id;
+    if let Ok(songs) = client.get_songs(browse_id).await {
+        if !songs.is_empty() {
+            app.queue = songs;
+            app.queue_liststate.select(Some(0));
+            app.focus_area = FocusArea::Queue;
+            app.playing_playlist_id = Some(playlist_id.clone());
+            app.playing_song = None;
+            if let Err(e) = player.load_playlist(&app.queue, 0).await {
+                log_to_file(&e);
+            }
+        }
+    } else {
+        log_to_file("Fetching songs Error");
     }
 }

@@ -287,22 +287,41 @@ impl YClient {
     }
 
     // REMOVE SAVED ALBUM IN LIBRARY
-    pub async fn remove_saved_list(&self, playlist_id: &str) -> YResult<Value> {
-        let url = format!(
-            "{}/youtubei/v1/like/removelike?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
-            },
-            "target": {
+    pub async fn remove_saved_list(&self, playlist_id: &str, is_cus: bool) -> YResult<Value> {
+        let url = if is_cus {
+            format!(
+                "{}/youtubei/v1/playlist/delete?key={}&alt=json",
+                YTM_DOMAIN, self.innertube_api_key
+            )
+        } else {
+            format!(
+                "{}/youtubei/v1/like/removelike?key={}&alt=json",
+                YTM_DOMAIN, self.innertube_api_key
+            )
+        };
+        let body = if is_cus {
+            json!({
+                "context": {
+                    "client": {
+                        "clientName": "WEB_REMIX",
+                        "clientVersion": self.client_version,
+                    }
+                },
                 "playlistId": playlist_id
-            },
-        });
+            })
+        } else {
+            json!({
+                "context": {
+                    "client": {
+                        "clientName": "WEB_REMIX",
+                        "clientVersion": self.client_version,
+                    }
+                },
+                "target": {
+                    "playlistId": playlist_id
+                },
+            })
+        };
 
         let response = self
             .http
@@ -320,38 +339,6 @@ impl YClient {
         }
     }
 
-    pub async fn remove_saved_cus_list(&self, playlist_id: &str) -> YResult<Value> {
-        let url = format!(
-            "{}/youtubei/v1/playlist/delete?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
-            },
-            "playlistId": playlist_id
-        });
-
-        let response = self
-            .http
-            .post(&url)
-            .headers(self.get_api_headers()?)
-            .json(&body)
-            .send()
-            .await?;
-
-        let text = response.text().await?;
-
-        if text.trim().is_empty() {
-            Ok(json!({}))
-        } else {
-            let json_val: Value = serde_json::from_str(&text)?;
-            Ok(json_val)
-        }
-    }
     pub async fn save_to_playlist(&self, video_id: &str, playlist_id: &str) -> YResult<()> {
         let url = format!(
             "{}/youtubei/v1/browse/edit_playlist?key={}&alt=json",
