@@ -250,7 +250,7 @@ impl YClient {
     }
 
     // SAVE ALBUM TO LIBRARY
-    pub async fn add_to_lib(&self, playlist_id: &str) -> YResult<Value> {
+    pub async fn save_album_to_lib(&self, playlist_id: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/like/like?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -287,22 +287,41 @@ impl YClient {
     }
 
     // REMOVE SAVED ALBUM IN LIBRARY
-    pub async fn remove_saved_list(&self, playlist_id: &str) -> YResult<Value> {
-        let url = format!(
-            "{}/youtubei/v1/like/removelike?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
-            },
-            "target": {
+    pub async fn remove_saved_list(&self, playlist_id: &str, is_cus: bool) -> YResult<Value> {
+        let url = if is_cus {
+            format!(
+                "{}/youtubei/v1/playlist/delete?key={}&alt=json",
+                YTM_DOMAIN, self.innertube_api_key
+            )
+        } else {
+            format!(
+                "{}/youtubei/v1/like/removelike?key={}&alt=json",
+                YTM_DOMAIN, self.innertube_api_key
+            )
+        };
+        let body = if is_cus {
+            json!({
+                "context": {
+                    "client": {
+                        "clientName": "WEB_REMIX",
+                        "clientVersion": self.client_version,
+                    }
+                },
                 "playlistId": playlist_id
-            },
-        });
+            })
+        } else {
+            json!({
+                "context": {
+                    "client": {
+                        "clientName": "WEB_REMIX",
+                        "clientVersion": self.client_version,
+                    }
+                },
+                "target": {
+                    "playlistId": playlist_id
+                },
+            })
+        };
 
         let response = self
             .http
@@ -320,9 +339,9 @@ impl YClient {
         }
     }
 
-    pub async fn remove_saved_cus_list(&self, playlist_id: &str) -> YResult<Value> {
+    pub async fn save_to_playlist(&self, video_id: &str, playlist_id: &str) -> YResult<()> {
         let url = format!(
-            "{}/youtubei/v1/playlist/delete?key={}&alt=json",
+            "{}/youtubei/v1/browse/edit_playlist?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
         let body = json!({
@@ -332,6 +351,13 @@ impl YClient {
                     "clientVersion": self.client_version,
                 }
             },
+            "actions": [
+                {
+                    "action": "ACTION_ADD_VIDEO",
+                    "addedVideoId": video_id,
+                    "dedupeOption": "DEDUPE_OPTION_CHECK"
+                }
+            ],
             "playlistId": playlist_id
         });
 
@@ -343,20 +369,111 @@ impl YClient {
             .send()
             .await?;
 
-        let text = response.text().await?;
+        let status = response.status();
+        let bytes = response.bytes().await?;
 
-        if text.trim().is_empty() {
-            Ok(json!({}))
+        let val: Value = serde_json::from_slice(&bytes)?;
+
+        match val["status"].as_str() {
+            Some("STATUS_SUCCEEDED") => Ok(()),
+            _ if status.is_success() => Err(YError::AlreadyInPlaylist),
+            _ => Err(YError::BadStatus(String::from(
+                "Save/Unsave song to playlist",
+            ))),
+        }
+    }
+    pub async fn unsave_to_playlist(
+        &self,
+        video_id: &str,
+        playlist_id: &str,
+        set_video_id: &str,
+    ) -> YResult<()> {
+        let url = format!(
+            "{}/youtubei/v1/browse/edit_playlist?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
+        let body = json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": self.client_version,
+                }
+            },
+            "actions": [
+                {
+                    "action": "ACTION_REMOVE_VIDEO",
+                    "removeVideoId": video_id,
+                    "setVideoId": set_video_id,
+                }
+            ],
+            "playlistId": playlist_id
+        });
+
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers()?)
+            .json(&body)
+            .send()
+            .await?;
+
+        let status = response.status();
+        let bytes = response.bytes().await?;
+
+        let val: Value = serde_json::from_slice(&bytes)?;
+
+        match val["status"].as_str() {
+            Some("STATUS_SUCCEEDED") => Ok(()),
+            _ if status.is_success() => Err(YError::AlreadyInPlaylist),
+            _ => Err(YError::BadStatus(String::from(
+                "Save/Unsave song to playlist",
+            ))),
+        }
+    }
+    pub async fn like_or_unlike_song(&self, video_id: &str, is_like: bool) -> YResult<()> {
+        let url = if is_like {
+            format!(
+                "{}/youtubei/v1/like/like?key={}&alt=json",
+                YTM_DOMAIN, self.innertube_api_key
+            )
         } else {
-            let json_val: Value = serde_json::from_str(&text)?;
-            Ok(json_val)
+            format!(
+                "{}/youtubei/v1/like/removelike?key={}&alt=json",
+                YTM_DOMAIN, self.innertube_api_key
+            )
+        };
+        let body = json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB_REMIX",
+                    "clientVersion": self.client_version,
+                }
+            },
+            "target": {
+                "videoId": video_id
+            }
+        });
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers()?)
+            .json(&body)
+            .send()
+            .await?;
+
+        let status = response.status();
+        if status.is_success() {
+            Ok(())
+        } else {
+            Err(YError::BadStatus(String::from("Like/Unlike Song")))
         }
     }
 
     // FETCH ALBUMS/PLAYLIST IN LIBRARY
-    pub async fn get_lists(&self) -> YResult<(Vec<PlayList>, Vec<PlayList>)> {
+    pub async fn get_lists(&self) -> YResult<(Vec<PlayList>, Vec<PlayList>, Vec<usize>)> {
         let mut all_albums: Vec<PlayList> = Vec::new();
         let mut all_playlists: Vec<PlayList> = Vec::new();
+        let mut all_cus_playlists: Vec<usize> = Vec::new();
         let raw_data = match self.get_raw_lists().await {
             Ok(raw_lists) => raw_lists,
             Err(e) => {
@@ -383,7 +500,15 @@ impl YClient {
             all_playlists.append(&mut next_playlists);
             token = next_token;
         }
-        Ok((all_albums, all_playlists))
+        for (idx, playlist) in all_playlists.iter_mut().enumerate() {
+            if playlist.playlist_id == "LM" {
+                playlist.is_custom = true;
+            }
+            if playlist.is_custom {
+                all_cus_playlists.push(idx);
+            }
+        }
+        Ok((all_albums, all_playlists, all_cus_playlists))
     }
 
     // FETCH SONGS FROM ALBUM/PLAYLIST

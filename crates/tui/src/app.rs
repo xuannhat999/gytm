@@ -10,18 +10,21 @@ pub struct App {
     // PAGE LIBRARY
     pub albums: Vec<PlayList>,
     pub playlists: Vec<PlayList>,
-    pub songs: Vec<Song>,
+    pub queue: Vec<Song>,
     pub focus_area: FocusArea,
 
     pub albums_liststate: ListState,
     pub playlists_liststate: ListState,
-    pub songs_liststate: ListState,
+    pub queue_liststate: ListState,
 
     pub time_pos: Option<f64>,
     pub playing_song: Option<Song>,
     pub mpv_list: Vec<String>,
 
     pub playing_playlist_id: Option<String>,
+    pub songs: Vec<Song>,
+    pub songs_liststate: ListState,
+    pub viewing_list: Option<PlayList>,
 
     // PAGE SEARCH
     pub search_albums: Vec<PlayList>,
@@ -32,7 +35,13 @@ pub struct App {
     pub search_query: String,
     pub is_insert: bool,
 
+    //POPUP
+    pub cus_playlists: Vec<usize>,
+    pub cus_playlists_liststate: ListState,
+    pub selected_save_song: Option<Song>,
+
     // OTHER
+    pub is_popup: bool,
     pub noti: Notifications,
     pub page: AppPage,
     pub is_exit: bool,
@@ -43,20 +52,22 @@ impl Default for App {
             // PAGE LIBRARY
             albums: Vec::new(),
             playlists: Vec::new(),
-            songs: Vec::new(),
+            queue: Vec::new(),
 
             albums_liststate: ListState::default(),
             playlists_liststate: ListState::default(),
-            songs_liststate: ListState::default(),
+            queue_liststate: ListState::default(),
 
             focus_area: FocusArea::Albums,
 
             time_pos: None,
             playing_song: None,
-
+            songs: Vec::new(),
+            songs_liststate: ListState::default(),
             mpv_list: Vec::new(),
 
             playing_playlist_id: None,
+            viewing_list: None,
 
             //PAGE SEARCH
             search_albums: Vec::new(),
@@ -66,7 +77,12 @@ impl Default for App {
             search_query: String::new(),
             is_insert: false,
 
+            //POPUP
+            selected_save_song: None,
+            cus_playlists: Vec::new(),
+            cus_playlists_liststate: ListState::default(),
             //OTHER
+            is_popup: false,
             noti: Notifications::new(),
             is_exit: false,
             page: AppPage::Library,
@@ -76,21 +92,10 @@ impl Default for App {
 
 impl App {
     // TOGGLE NEXT ITEM IN LISTSTATE
-    pub fn next(&mut self) {
-        let (state, len) = match self.focus_area {
-            FocusArea::Albums => (&mut self.albums_liststate, self.albums.len()),
-            FocusArea::Playlists => (&mut self.playlists_liststate, self.playlists.len()),
-            FocusArea::Queue => (&mut self.songs_liststate, self.songs.len()),
-            FocusArea::SearchAlbums => {
-                (&mut self.search_albums_liststate, self.search_albums.len())
-            }
-            FocusArea::SearchSongs => (&mut self.search_songs_liststate, self.search_songs.len()),
-        };
-
+    pub fn next(state: &mut ListState, len: usize) {
         if len == 0 {
             return;
         }
-
         let i = match state.selected() {
             Some(i) => {
                 if i >= len - 1 {
@@ -101,22 +106,11 @@ impl App {
             }
             None => 0,
         };
-
         state.select(Some(i));
     }
 
     // TOGGLE PREVIOUS ITEM IN LISTSTATE
-    pub fn previous(&mut self) {
-        let (state, len) = match self.focus_area {
-            FocusArea::Albums => (&mut self.albums_liststate, self.albums.len()),
-            FocusArea::Playlists => (&mut self.playlists_liststate, self.playlists.len()),
-            FocusArea::Queue => (&mut self.songs_liststate, self.songs.len()),
-            FocusArea::SearchAlbums => {
-                (&mut self.search_albums_liststate, self.search_albums.len())
-            }
-            FocusArea::SearchSongs => (&mut self.search_songs_liststate, self.search_songs.len()),
-        };
-
+    pub fn previous(state: &mut ListState, len: usize) {
         if len == 0 {
             return;
         }

@@ -37,13 +37,13 @@ async fn main() -> YResult<()> {
         }
     };
     println!(" Fetching data from Youtube Music...");
-    let (albums, playlists) = client.get_lists().await?;
+    let (albums, playlists, cus_playlists) = client.get_lists().await?;
 
     let mut app = App::default();
     let mut player = Player::new(&state.player_state);
     app.albums = albums;
     app.playlists = playlists;
-
+    app.cus_playlists = cus_playlists;
     let (tx, mut rx) = mpsc::channel::<MpvEvent>(32);
 
     if let Err(e) = player.start_mpv_and_observe(tx) {
@@ -66,7 +66,7 @@ async fn main() -> YResult<()> {
     let mut last_tick = std::time::Instant::now();
     loop {
         let had_notification = app.noti.has_notification();
-        let elapsed = last_tick.elapsed();
+        let elapsed = std::cmp::min(last_tick.elapsed(), Duration::from_millis(100));
         last_tick = std::time::Instant::now();
         app.noti.tick(elapsed);
         while let Ok(event) = rx.try_recv() {
