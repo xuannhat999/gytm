@@ -156,7 +156,13 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
                 Span::styled("x ", theme.key_style()),
                 Span::styled("]", theme.text_style()),
             ]);
-
+            block = block.title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
+        } else {
+            let bottom_nav = Line::from(vec![
+                Span::styled("[ View Songs: ", theme.text_style()),
+                Span::styled("l ", theme.key_style()),
+                Span::styled("]", theme.text_style()),
+            ]);
             block = block.title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
         }
         let highlight_style = if is_focused {
