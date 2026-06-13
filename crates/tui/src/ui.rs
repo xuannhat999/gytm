@@ -231,7 +231,9 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     } else {
         Line::default()
     };
-    let line = Block::default().borders(Borders::TOP);
+    let line = Block::default()
+        .borders(Borders::TOP)
+        .border_style(border_style);
     let highlight_style = if is_focused {
         theme.selected_item()
     } else {
@@ -241,7 +243,9 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
 
     frame.render_widget(block, area);
     frame.render_widget(list_title, layout[0]);
-    frame.render_widget(line, layout[1]);
+    if app.viewing_list.is_some() {
+        frame.render_widget(line, layout[1]);
+    }
     frame.render_stateful_widget(list_widget, layout[2], &mut app.songs_liststate);
 }
 

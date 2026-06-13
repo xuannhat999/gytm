@@ -72,7 +72,9 @@ pub async fn handle_key_events(
                     if let Err(e) = player.clear_queue().await {
                         log_to_file(&e);
                     } else {
+                        player.status = PlayerStatus::Idle;
                         app.playing_song = None;
+                        app.time_pos = None;
                         app.queue = Vec::new();
                         app.playing_playlist_id = None;
                         app.notify(data::NotifyType::Success, String::from("Cleared Queue"));
@@ -384,12 +386,14 @@ pub async fn handle_key_events(
                             _ => {}
                         },
                         KeyCode::Char('a') => {
-                            if let Some(song) = app
-                                .search_songs_liststate
-                                .selected()
-                                .map(|i| app.search_songs[i].clone())
-                            {
-                                append_song_to_queue(app, player, song).await;
+                            if app.focus_area == FocusArea::SearchSongs {
+                                if let Some(song) = app
+                                    .search_songs_liststate
+                                    .selected()
+                                    .map(|i| app.search_songs[i].clone())
+                                {
+                                    append_song_to_queue(app, player, song).await;
+                                }
                             }
                         }
                         KeyCode::Enter => {
@@ -463,32 +467,18 @@ async fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Pla
         KeyCode::Char('d') => {
             if let Some(i) = app.queue_liststate.selected() {
                 if player.play_mode == PlayMode::DefaultMode {
-                    if let Err(e) = player.remove_from_queue(i).await {
-                        log_to_file(&e);
-                    } else {
-                        app.queue.remove(i);
-                        app.notify(
-                            data::NotifyType::Success,
-                            String::from("Removed song from Queue"),
-                        );
-                    }
+                    remove_song_from_queue(app, player, i, i).await;
                 } else {
                     let video_id = &app.queue[i].video_id;
                     if let Some(idx_mpv) = app.get_mpv_idx(video_id) {
-                        if let Err(e) = player.remove_from_queue(idx_mpv).await {
-                            log_to_file(&e);
-                        } else {
-                            app.queue.remove(i);
-                            app.notify(
-                                data::NotifyType::Success,
-                                String::from("Removed song from Queue"),
-                            );
-                        }
+                        remove_song_from_queue(app, player, i, idx_mpv).await;
                     }
                 }
                 if app.queue.is_empty() {
                     player.status = PlayerStatus::Idle;
                     app.playing_song = None;
+                    app.playing_playlist_id = None;
+                    app.time_pos = None;
                 }
             }
         }
@@ -760,6 +750,7 @@ async fn handle_popup_event(
         PopupState::None => {}
     }
 }
+
 async fn append_song_to_queue(app: &mut App, player: &mut Player, song: Song) {
     if let Err(e) = player.append_to_queue(&song.video_id).await {
         log_to_file(&e);
@@ -769,6 +760,18 @@ async fn append_song_to_queue(app: &mut App, player: &mut Player, song: Song) {
         app.notify(
             data::NotifyType::Success,
             String::from("Added song to Queue"),
+        );
+    }
+}
+
+async fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_idx: usize) {
+    if let Err(e) = player.remove_from_queue(mpv_idx).await {
+        log_to_file(&e);
+    } else {
+        app.queue.remove(idx);
+        app.notify(
+            data::NotifyType::Success,
+            String::from("Removed song from Queue"),
         );
     }
 }
