@@ -167,7 +167,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
             let bottom_nav = Line::from(vec![
                 Span::styled("[ View Songs: ", theme.text_style()),
                 Span::styled("l ", theme.key_style()),
-                Span::styled("| Create: ", theme.text_style()),
+                Span::styled("| Create playlist: ", theme.text_style()),
                 Span::styled("a ", theme.key_style()),
                 Span::styled("]", theme.text_style()),
             ]);

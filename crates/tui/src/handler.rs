@@ -136,7 +136,7 @@ pub async fn handle_key_events(
                                 .map(|i| app.playlists[i].clone())
                         };
                         if let Some(list) = selection {
-                            play_list(app, client, player, list).await;
+                            fetch_and_play_list(app, client, player, list).await;
                         }
                     }
                     FocusArea::Songs => {
@@ -162,6 +162,7 @@ pub async fn handle_key_events(
                                         Ok(_) => {
                                             app.queue = app.songs.clone();
                                             app.focus_area = FocusArea::Queue;
+                                            app.queue_liststate.select(Some(i));
                                         }
                                     }
                                 }
@@ -398,7 +399,7 @@ pub async fn handle_key_events(
                                     .selected()
                                     .map(|i| app.search_albums[i].clone());
                                 if let Some(album) = selected {
-                                    play_list(app, client, player, album).await;
+                                    fetch_and_play_list(app, client, player, album).await;
                                 }
                             } else if app.focus_area == FocusArea::SearchSongs {
                                 let selected = app
@@ -628,11 +629,12 @@ async fn handle_popup_event(
                                             if let Some(playing_playlist) = &app.playing_playlist_id
                                             {
                                                 if playing_playlist == playlist_id {
-                                                    app.queue.push(song.clone());
                                                     if let Err(e) =
                                                         player.append_to_queue(&song.video_id).await
                                                     {
                                                         log_to_file(&e);
+                                                    } else {
+                                                        app.queue.push(song.clone());
                                                     }
                                                 }
                                             }
@@ -651,11 +653,12 @@ async fn handle_popup_event(
                                     Ok(_) => {
                                         if let Some(playing_playlist) = &app.playing_playlist_id {
                                             if playing_playlist == playlist_id {
-                                                app.queue.push(song.clone());
                                                 if let Err(e) =
                                                     player.append_to_queue(&song.video_id).await
                                                 {
                                                     log_to_file(&e);
+                                                } else {
+                                                    app.queue.push(song.clone());
                                                 }
                                             }
                                         }
@@ -769,7 +772,12 @@ async fn append_song_to_queue(app: &mut App, player: &mut Player, song: Song) {
         );
     }
 }
-async fn play_list(app: &mut App, client: Arc<YClient>, player: &mut Player, list: PlayList) {
+async fn fetch_and_play_list(
+    app: &mut App,
+    client: Arc<YClient>,
+    player: &mut Player,
+    list: PlayList,
+) {
     let browse_id = &list.browse_id;
     let playlist_id = &list.playlist_id;
     if let Ok(songs) = client.get_songs(browse_id).await {
