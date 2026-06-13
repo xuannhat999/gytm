@@ -793,6 +793,8 @@ async fn fetch_and_play_list(
             if let Err(e) = player.load_playlist(&app.queue, 0).await {
                 log_to_file(&e);
             }
+        } else {
+            app.notify(data::NotifyType::Error, String::from("Playlist is empty"));
         }
     } else {
         log_to_file("Fetching songs Error");
