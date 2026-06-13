@@ -628,6 +628,11 @@ async fn handle_popup_event(
                                                     }
                                                 }
                                             }
+                                            if let Some(viewing_list) = &app.viewing_list
+                                                && viewing_list.playlist_id.eq(playlist_id)
+                                            {
+                                                app.songs.push(song.clone());
+                                            }
                                             app.notify(
                                                 data::NotifyType::Success,
                                                 String::from("Liked song"),
@@ -651,6 +656,11 @@ async fn handle_popup_event(
                                                     app.queue.push(song.clone());
                                                 }
                                             }
+                                        }
+                                        if let Some(viewing_list) = &app.viewing_list
+                                            && viewing_list.playlist_id.eq(playlist_id)
+                                        {
+                                            app.songs.push(song.clone());
                                         }
                                         app.notify(
                                             data::NotifyType::Success,
