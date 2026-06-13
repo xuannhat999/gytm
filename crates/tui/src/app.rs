@@ -1,10 +1,30 @@
 use std::time::Duration;
 
 use crate::theme::{error_style, success_style};
-use data::{AppPage, FocusArea, NotifyType, PlayList, Song};
+use data::{AppPage, FocusArea, NotifyType, PlayList, PlayListPrivacy, Song};
 use error::log_to_file;
 use ratatui::widgets::ListState;
 use ratatui_notifications::{Anchor, AutoDismiss, Level, Notification, Notifications};
+
+pub enum PopupState {
+    None,
+    SaveSong {
+        selected_save_song: Song,
+    },
+    CreatePlaylist {
+        title: String,
+        description: String,
+        privacy: PlayListPrivacy,
+        focused_field: CreatePlaylistFocus,
+    },
+}
+
+#[derive(PartialEq)]
+pub enum CreatePlaylistFocus {
+    Title,
+    Description,
+    Privacy,
+}
 
 pub struct App {
     // PAGE LIBRARY
@@ -38,10 +58,9 @@ pub struct App {
     //POPUP
     pub cus_playlists: Vec<usize>,
     pub cus_playlists_liststate: ListState,
-    pub selected_save_song: Option<Song>,
+    pub popup_state: PopupState,
 
     // OTHER
-    pub is_popup: bool,
     pub noti: Notifications,
     pub page: AppPage,
     pub is_exit: bool,
@@ -78,11 +97,10 @@ impl Default for App {
             is_insert: false,
 
             //POPUP
-            selected_save_song: None,
             cus_playlists: Vec::new(),
             cus_playlists_liststate: ListState::default(),
+            popup_state: PopupState::None,
             //OTHER
-            is_popup: false,
             noti: Notifications::new(),
             is_exit: false,
             page: AppPage::Library,
@@ -134,6 +152,18 @@ impl App {
             }
         }
         None
+    }
+    pub fn refresh_cus_playlist(&mut self) {
+        let mut new_cus: Vec<usize> = Vec::new();
+        for (i, playlist) in self.playlists.iter().enumerate() {
+            if playlist.is_custom {
+                new_cus.push(i);
+            }
+        }
+        self.cus_playlists = new_cus;
+    }
+    pub fn is_popup_active(&self) -> bool {
+        !matches!(self.popup_state, PopupState::None)
     }
     pub fn notify(&mut self, noti_type: NotifyType, msg: String) {
         let style = match noti_type {

@@ -1,4 +1,4 @@
-use data::{PlayList, Song};
+use data::{PlayList, PlayListPrivacy, Song};
 use error::{YError, YResult, log_to_file};
 use reqwest::{
     Client, Url,
@@ -6,10 +6,16 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
 };
 use rookie::{any_browser, common::enums::Cookie, load};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
-pub mod parser;
 
+use crate::request::{
+    AcionsContent, BrowseIdRequest, CreatePlaylistRequest, GetContinuationRequest,
+    GetRelatedSongsRequest, PlaylistIdRequest, RequestClient, RequestContext, SaveAlbumRequest,
+    SaveUnsaveListRequest, SearchRequest, TargetContent, TargetRequest, VideoIdRequest,
+};
+pub mod parser;
+pub mod request;
 pub struct YClient {
     pub http: Client,
     pub sapisid: String,
@@ -75,23 +81,24 @@ impl YClient {
         headers.insert("Authorization", auth_val?);
         Ok(headers)
     }
-
+    fn get_context(&self) -> RequestContext<'_> {
+        RequestContext {
+            client: RequestClient {
+                client_name: "WEB_REMIX",
+                client_version: &self.client_version,
+            },
+        }
+    }
     pub async fn get_raw_lists(&self) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
 
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
-            },
-            "browseId": "FEmusic_library_landing",
-        });
-
+        let body = BrowseIdRequest {
+            context: self.get_context(),
+            browse_id: "FEmusic_library_landing",
+        };
         let response = self
             .http
             .post(&url)
@@ -104,22 +111,16 @@ impl YClient {
         Ok(response)
     }
 
-    pub async fn get_continuation_data(&self, token: &str) -> YResult<Value> {
+    pub async fn get_continuation_raw(&self, token: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
 
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
-            },
-            "continuation": token,
-        });
-
+        let body = GetContinuationRequest {
+            context: self.get_context(),
+            continuation: token,
+        };
         let response = self
             .http
             .post(&url)
@@ -132,20 +133,15 @@ impl YClient {
 
         Ok(response)
     }
-    pub async fn get_raw_songs(&self, id: &str) -> YResult<Value> {
+    pub async fn get_songs_raw(&self, browse_id: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
-            },
-            "browseId": id.to_string(),
-        });
+        let body = BrowseIdRequest {
+            context: self.get_context(),
+            browse_id,
+        };
         let response = self
             .http
             .post(&url)
@@ -169,16 +165,11 @@ impl YClient {
             YTM_DOMAIN, self.innertube_api_key
         );
 
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
-            },
-            "query": query,
-            "params": params,
-        });
+        let body = SearchRequest {
+            context: self.get_context(),
+            query,
+            params,
+        };
         let response = self
             .http
             .post(&url)
@@ -192,20 +183,15 @@ impl YClient {
         Ok(response)
     }
 
-    pub async fn get_raw_params(&self, video_id: &str) -> YResult<Value> {
+    pub async fn get_params_raw(&self, video_id: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/next?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
-            },
-            "videoId": video_id
-        });
+        let body = VideoIdRequest {
+            context: self.get_context(),
+            video_id,
+        };
         let response = self
             .http
             .post(&url)
@@ -218,24 +204,61 @@ impl YClient {
         Ok(response)
     }
 
-    pub async fn get_raw_related_songs(&self, playlist_id: &str, params: &str) -> YResult<Value> {
+    pub async fn create_playlist_raw(
+        &self,
+        title: &str,
+        desc: &str,
+        privacy: PlayListPrivacy,
+    ) -> YResult<Value> {
+        let url = format!(
+            "{}/youtubei/v1/playlist/create?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
+        let body = CreatePlaylistRequest {
+            context: self.get_context(),
+            title,
+            params: "KAA%3D",
+            description: if desc.is_empty() { None } else { Some(desc) },
+            privacy_status: if privacy == PlayListPrivacy::Private {
+                None
+            } else {
+                Some(privacy)
+            },
+        };
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers()?)
+            .json(&body)
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+        Ok(response)
+    }
+
+    pub async fn create_playlist(
+        &self,
+        title: &str,
+        desc: &str,
+        privacy: PlayListPrivacy,
+    ) -> YResult<PlayList> {
+        let res = self.create_playlist_raw(title, desc, privacy).await?;
+        let playlist = parser::parse_created_playlist(res)?;
+        Ok(playlist)
+    }
+
+    pub async fn get_related_songs_raw(&self, playlist_id: &str, params: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/next?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
-
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
-            },
-            "playlistId": playlist_id,
-            "params": params,
-            "tunerSettingValue": "AUTOMIX_SETTING_NORMAL"
-        });
-
+        let body = GetRelatedSongsRequest {
+            context: self.get_context(),
+            playlist_id,
+            params,
+            tuner_setting_value: "AUTOMIX_SETTING_NORMAL",
+        };
         let response = self
             .http
             .post(&url)
@@ -250,23 +273,19 @@ impl YClient {
     }
 
     // SAVE ALBUM TO LIBRARY
-    pub async fn save_album(&self, playlist_id: &str) -> YResult<Value> {
+    pub async fn save_album_raw(&self, playlist_id: &str) -> YResult<Value> {
         let url = format!(
             "{}/youtubei/v1/like/like?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
+        let body = SaveAlbumRequest {
+            context: self.get_context(),
+            target: TargetContent {
+                playlist_id: Some(playlist_id),
+                video_id: None,
             },
-            "target": {
-                "playlistId": playlist_id
-            },
-            "status": "LIKE"
-        });
+            status: "LIKE",
+        };
 
         let response = self
             .http
@@ -274,53 +293,46 @@ impl YClient {
             .headers(self.get_api_headers()?)
             .json(&body)
             .send()
+            .await?
+            .json::<Value>()
             .await?;
+        Ok(response)
+    }
 
-        let text = response.text().await?;
+    pub async fn unsave_cus_playlist_raw(&self, playlist_id: &str) -> YResult<Value> {
+        let url = format!(
+            "{}/youtubei/v1/playlist/delete?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
 
-        if text.trim().is_empty() {
-            Ok(json!({}))
-        } else {
-            let json_val: Value = serde_json::from_str(&text)?;
-            Ok(json_val)
-        }
+        let body = PlaylistIdRequest {
+            context: self.get_context(),
+            playlist_id,
+        };
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers()?)
+            .json(&body)
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+        Ok(response)
     }
 
     // REMOVE SAVED ALBUM IN LIBRARY
-    pub async fn unsave_album(&self, playlist_id: &str, is_cus: bool) -> YResult<Value> {
-        let url = if is_cus {
-            format!(
-                "{}/youtubei/v1/playlist/delete?key={}&alt=json",
-                YTM_DOMAIN, self.innertube_api_key
-            )
-        } else {
-            format!(
-                "{}/youtubei/v1/like/removelike?key={}&alt=json",
-                YTM_DOMAIN, self.innertube_api_key
-            )
-        };
-        let body = if is_cus {
-            json!({
-                "context": {
-                    "client": {
-                        "clientName": "WEB_REMIX",
-                        "clientVersion": self.client_version,
-                    }
-                },
-                "playlistId": playlist_id
-            })
-        } else {
-            json!({
-                "context": {
-                    "client": {
-                        "clientName": "WEB_REMIX",
-                        "clientVersion": self.client_version,
-                    }
-                },
-                "target": {
-                    "playlistId": playlist_id
-                },
-            })
+    pub async fn unsave_album_raw(&self, playlist_id: &str) -> YResult<Value> {
+        let url = format!(
+            "{}/youtubei/v1/like/removelike?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
+        let body = TargetRequest {
+            context: self.get_context(),
+            target: TargetContent {
+                playlist_id: Some(playlist_id),
+                video_id: None,
+            },
         };
 
         let response = self
@@ -329,14 +341,10 @@ impl YClient {
             .headers(self.get_api_headers()?)
             .json(&body)
             .send()
+            .await?
+            .json::<Value>()
             .await?;
-        let text = response.text().await?;
-        if text.trim().is_empty() {
-            Ok(json!({}))
-        } else {
-            let json_val: Value = serde_json::from_str(&text)?;
-            Ok(json_val)
-        }
+        Ok(response)
     }
 
     pub async fn save_to_playlist(&self, video_id: &str, playlist_id: &str) -> YResult<()> {
@@ -344,23 +352,19 @@ impl YClient {
             "{}/youtubei/v1/browse/edit_playlist?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
-            },
-            "actions": [
-                {
-                    "action": "ACTION_ADD_VIDEO",
-                    "addedVideoId": video_id,
-                    "dedupeOption": "DEDUPE_OPTION_CHECK"
-                }
-            ],
-            "playlistId": playlist_id
-        });
+        let actions = vec![AcionsContent {
+            action: "ACTION_ADD_VIDEO",
+            added_video_id: Some(video_id),
+            dedupe_option: Some("DEDUPE_OPTION_CHECK"),
+            removed_video_id: None,
+            set_video_id: None,
+        }];
 
+        let body = SaveUnsaveListRequest {
+            context: self.get_context(),
+            actions,
+            playlist_id,
+        };
         let response = self
             .http
             .post(&url)
@@ -382,6 +386,8 @@ impl YClient {
             ))),
         }
     }
+
+    // REMOVE SONG FROM PLAYLIST
     pub async fn unsave_to_playlist(
         &self,
         video_id: &str,
@@ -392,23 +398,19 @@ impl YClient {
             "{}/youtubei/v1/browse/edit_playlist?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
-            },
-            "actions": [
-                {
-                    "action": "ACTION_REMOVE_VIDEO",
-                    "removeVideoId": video_id,
-                    "setVideoId": set_video_id,
-                }
-            ],
-            "playlistId": playlist_id
-        });
+        let actions = vec![AcionsContent {
+            action: "ACTION_REMOVE_VIDEO",
+            added_video_id: None,
+            dedupe_option: None,
+            removed_video_id: Some(video_id),
+            set_video_id: Some(set_video_id),
+        }];
 
+        let body = SaveUnsaveListRequest {
+            context: self.get_context(),
+            actions,
+            playlist_id,
+        };
         let response = self
             .http
             .post(&url)
@@ -442,17 +444,14 @@ impl YClient {
                 YTM_DOMAIN, self.innertube_api_key
             )
         };
-        let body = json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB_REMIX",
-                    "clientVersion": self.client_version,
-                }
+
+        let body = TargetRequest {
+            context: self.get_context(),
+            target: TargetContent {
+                video_id: Some(video_id),
+                playlist_id: None,
             },
-            "target": {
-                "videoId": video_id
-            }
-        });
+        };
         let response = self
             .http
             .post(&url)
@@ -493,7 +492,7 @@ impl YClient {
         all_playlists.append(&mut playlists);
 
         while let Some(current_token) = token {
-            let next_raw_data = self.get_continuation_data(&current_token).await?;
+            let next_raw_data = self.get_continuation_raw(&current_token).await?;
             let (mut next_albums, mut next_playlists, next_token) =
                 parser::parse_lists(next_raw_data)?;
             all_albums.append(&mut next_albums);
@@ -513,7 +512,7 @@ impl YClient {
 
     // FETCH SONGS FROM ALBUM/PLAYLIST
     pub async fn get_songs(&self, browse_id: &str) -> YResult<Vec<Song>> {
-        let raw_songs = match self.get_raw_songs(browse_id).await {
+        let raw_songs = match self.get_songs_raw(browse_id).await {
             Ok(raw_songs) => raw_songs,
             Err(e) => {
                 log_to_file(&e);
@@ -570,7 +569,7 @@ impl YClient {
 
     // FETCH PARAMS
     pub async fn get_params(&self, video_id: &str) -> YResult<String> {
-        let raw_data = match self.get_raw_params(video_id).await {
+        let raw_data = match self.get_params_raw(video_id).await {
             Ok(raw) => raw,
             Err(e) => {
                 log_to_file(&e);
@@ -590,7 +589,7 @@ impl YClient {
     // FETCH RELATED SONGS
     pub async fn get_related_songs(&self, video_id: &str, params: &str) -> YResult<Vec<Song>> {
         let playlist_id = format!("RDAMVM{}", video_id);
-        let raw_data = match self.get_raw_related_songs(&playlist_id, params).await {
+        let raw_data = match self.get_related_songs_raw(&playlist_id, params).await {
             Ok(raw) => raw,
             Err(e) => {
                 log_to_file(&e);
