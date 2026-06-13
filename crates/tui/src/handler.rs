@@ -785,13 +785,14 @@ async fn fetch_and_play_list(
     let playlist_id = &list.playlist_id;
     if let Ok(songs) = client.get_songs(browse_id).await {
         if !songs.is_empty() {
-            app.queue = songs;
-            app.queue_liststate.select(Some(0));
-            app.focus_area = FocusArea::Queue;
-            app.playing_playlist_id = Some(playlist_id.clone());
-            app.playing_song = None;
-            if let Err(e) = player.load_playlist(&app.queue, 0).await {
+            if let Err(e) = player.load_playlist(&songs, 0).await {
                 log_to_file(&e);
+            } else {
+                app.queue = songs;
+                app.queue_liststate.select(Some(0));
+                app.focus_area = FocusArea::Queue;
+                app.playing_playlist_id = Some(playlist_id.clone());
+                app.playing_song = None;
             }
         } else {
             app.notify(data::NotifyType::Error, String::from("Playlist is empty"));
