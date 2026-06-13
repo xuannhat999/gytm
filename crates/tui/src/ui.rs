@@ -1,6 +1,6 @@
-use crate::app::App;
+use crate::app::{App, CreatePlaylistFocus, PopupState};
 use crate::theme::Theme;
-use data::{AppPage, FocusArea, PlayMode, PlayerStatus};
+use data::{AppPage, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus};
 use player::Player;
 use ratatui::{
     self, Frame,
@@ -63,8 +63,14 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
             render_search_songs(frame, app, result_layout[1], theme);
         }
     }
-    if app.is_popup {
-        render_save_song_to_playlist_popup(frame, app, frame.area(), theme);
+    match &app.popup_state {
+        PopupState::None => {}
+        PopupState::SaveSong { .. } => {
+            render_save_song_to_playlist_popup(frame, app, frame.area(), theme);
+        }
+        PopupState::CreatePlaylist { .. } => {
+            render_create_playlist_popup(frame, app, frame.area(), theme);
+        }
     }
 }
 
@@ -161,6 +167,8 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
             let bottom_nav = Line::from(vec![
                 Span::styled("[ View Songs: ", theme.text_style()),
                 Span::styled("l ", theme.key_style()),
+                Span::styled("| Create: ", theme.text_style()),
+                Span::styled("a ", theme.key_style()),
                 Span::styled("]", theme.text_style()),
             ]);
             block = block.title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
@@ -180,7 +188,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
 }
 
 fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
-    let is_focused = FocusArea::Songs == app.focus_area && !app.is_popup;
+    let is_focused = FocusArea::Songs == app.focus_area && !app.is_popup_active();
     let border_style = if is_focused {
         theme.active_border_style()
     } else {
@@ -240,7 +248,7 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
 // RENDER QUEUE
 fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let is_focused = FocusArea::Queue == app.focus_area
-        && !app.is_popup
+        && !app.is_popup_active()
         && ((!app.is_insert && app.page == AppPage::Search) || app.page == AppPage::Library);
     let border_style = if is_focused {
         theme.active_border_style()
@@ -421,7 +429,8 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
         })
         .collect();
 
-    let is_focused = FocusArea::SearchAlbums == app.focus_area && !app.is_insert && !app.is_popup;
+    let is_focused =
+        FocusArea::SearchAlbums == app.focus_area && !app.is_insert && !app.is_popup_active();
     let border_style = if is_focused {
         theme.active_border_style()
     } else {
@@ -471,7 +480,8 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         Span::styled(" ]", theme.text_style()),
     ]);
 
-    let is_focused = FocusArea::SearchSongs == app.focus_area && !app.is_insert && !app.is_popup;
+    let is_focused =
+        FocusArea::SearchSongs == app.focus_area && !app.is_insert && !app.is_popup_active();
     let border_style = if is_focused {
         theme.active_border_style()
     } else {
@@ -495,6 +505,10 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
     frame.render_stateful_widget(list_widget, area, &mut app.search_songs_liststate);
 }
 fn render_save_song_to_playlist_popup(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
+    let PopupState::SaveSong { selected_save_song } = &app.popup_state else {
+        return;
+    };
+
     let items: Vec<ListItem> = app
         .cus_playlists
         .iter()
@@ -519,7 +533,6 @@ fn render_save_song_to_playlist_popup(frame: &mut Frame, app: &mut App, area: Re
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(theme.active_border_style())
         .title_bottom(keymap.centered());
 
     let center_area = area.centered(Constraint::Percentage(40), Constraint::Percentage(50));
@@ -536,15 +549,9 @@ fn render_save_song_to_playlist_popup(frame: &mut Frame, app: &mut App, area: Re
 
     let list_widget = List::new(items).highlight_style(theme.selected_item());
 
-    let title = if let Some(song) = app.selected_save_song.clone() {
-        song.title
-    } else {
-        String::new()
-    };
-
     let helper = Line::from(vec![
         Span::raw(" Saving "),
-        Span::styled(title, theme.key_style()),
+        Span::styled(&selected_save_song.title, theme.key_style()),
         Span::raw(" to:"),
     ]);
     let line = Block::default().borders(Borders::TOP);
@@ -554,6 +561,160 @@ fn render_save_song_to_playlist_popup(frame: &mut Frame, app: &mut App, area: Re
     frame.render_widget(line, layout[1]);
     frame.render_stateful_widget(list_widget, layout[2], &mut app.cus_playlists_liststate);
 }
+
+fn render_create_playlist_popup(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
+    let PopupState::CreatePlaylist {
+        title,
+        description,
+        privacy,
+        focused_field,
+    } = &app.popup_state
+    else {
+        return;
+    };
+
+    let keymap = Line::from(vec![
+        Span::styled("[ Tab: ", theme.text_style()),
+        Span::styled("Next ", theme.key_style()),
+        Span::styled("| Enter: ", theme.text_style()),
+        Span::styled("Create ", theme.key_style()),
+        Span::styled("| Esc: ", theme.text_style()),
+        Span::styled("Cancel ", theme.key_style()),
+        Span::styled("]", theme.text_style()),
+    ]);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .title(" Create Playlist ")
+        .title_bottom(keymap.centered());
+
+    let center_area = area.centered(Constraint::Percentage(40), Constraint::Length(15));
+    let inner_area = block.inner(center_area);
+
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(4),
+            Constraint::Length(4),
+        ])
+        .split(inner_area);
+
+    frame.render_widget(Clear, center_area);
+    frame.render_widget(block, center_area);
+
+    render_input_field(
+        frame,
+        layout[0],
+        theme,
+        " Title:",
+        title,
+        matches!(focused_field, CreatePlaylistFocus::Title),
+    );
+    render_input_field(
+        frame,
+        layout[1],
+        theme,
+        " Desc:",
+        description,
+        matches!(focused_field, CreatePlaylistFocus::Description),
+    );
+    render_privacy_selector(
+        frame,
+        layout[2],
+        theme,
+        privacy,
+        matches!(focused_field, CreatePlaylistFocus::Privacy),
+    );
+}
+
+fn render_input_field(
+    frame: &mut Frame,
+    area: Rect,
+    theme: &Theme,
+    label: &str,
+    text: &str,
+    is_focused: bool,
+) {
+    let border_style = if is_focused {
+        theme.active_border_style()
+    } else {
+        theme.inactive_border_style()
+    };
+
+    let display = if is_focused {
+        format!("{}_", text)
+    } else {
+        text.to_string()
+    };
+
+    let input = Paragraph::new(display)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .title(label)
+                .border_style(border_style),
+        )
+        .style(Style::default().fg(theme.base));
+
+    frame.render_widget(input, area);
+}
+
+fn render_privacy_selector(
+    frame: &mut Frame,
+    area: Rect,
+    theme: &Theme,
+    privacy: &PlayListPrivacy,
+    is_focused: bool,
+) {
+    let border_style = if is_focused {
+        theme.active_border_style()
+    } else {
+        theme.inactive_border_style()
+    };
+
+    let items = ["Private", "Public", "Unlisted"];
+    let choices = [
+        PlayListPrivacy::Private,
+        PlayListPrivacy::Public,
+        PlayListPrivacy::Unlisted,
+    ];
+
+    let spans: Vec<Span> = items
+        .iter()
+        .zip(choices.iter())
+        .map(|(label, value)| {
+            let selected = privacy == value;
+            let prefix = if selected { " ● " } else { " ○ " };
+            let text = format!("{}{}", prefix, label);
+            if selected {
+                Span::styled(text, theme.key_style())
+            } else {
+                Span::styled(text, theme.text_style())
+            }
+        })
+        .collect();
+    let keymap = Line::from(vec![
+        Span::styled("[ Select previous: ", theme.text_style()),
+        Span::styled("h/ ", theme.key_style()),
+        Span::styled("| Select next: ", theme.text_style()),
+        Span::styled("l/ ", theme.key_style()),
+        Span::styled("]", theme.text_style()),
+    ]);
+    let p = Paragraph::new(Line::from(spans)).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .title(" Privacy:")
+            .title_bottom(keymap.centered())
+            .border_style(border_style),
+    );
+
+    frame.render_widget(p, area);
+}
+
 fn format_time(secs: f64) -> String {
     let s = secs as u64;
     format!("{}:{:02}", s / 60, s % 60)

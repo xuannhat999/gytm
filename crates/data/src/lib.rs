@@ -71,3 +71,10 @@ pub enum NotifyType {
     Success,
     Error,
 }
+
+#[derive(Serialize, PartialEq, Copy, Clone)]
+pub enum PlayListPrivacy {
+    Private,
+    Public,
+    Unlisted,
+}

@@ -88,6 +88,7 @@ dependencies = [
  "error",
  "reqwest",
  "rookie",
+ "serde",
  "serde_json",
  "sha1_smol",
 ]

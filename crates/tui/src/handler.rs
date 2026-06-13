@@ -1,7 +1,7 @@
-use crate::app::App;
+use crate::app::{App, CreatePlaylistFocus, PopupState};
 use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
-use data::{AppPage, FocusArea, MpvEvent, PlayList, PlayMode, PlayerStatus, Song};
+use data::{AppPage, FocusArea, MpvEvent, PlayList, PlayListPrivacy, PlayMode, PlayerStatus, Song};
 use error::{YError, log_to_file};
 use player::Player;
 use state::AppState;
@@ -42,9 +42,6 @@ pub async fn handle_key_events(
     player: &mut Player,
     state: &mut AppState,
 ) {
-    if key_event.code == KeyCode::Tab {
-        handle_page_event(app);
-    }
     if app.focus_area == FocusArea::Albums
         || app.focus_area == FocusArea::Playlists
         || app.focus_area == FocusArea::Queue
@@ -54,9 +51,12 @@ pub async fn handle_key_events(
     {
         handle_lists_event(key_event, app);
     }
-    if app.is_popup {
+    if !matches!(app.popup_state, PopupState::None) {
         handle_popup_event(key_event, app, client, player).await;
     } else {
+        if key_event.code == KeyCode::Tab {
+            handle_page_event(app);
+        }
         if !app.is_insert || app.page == AppPage::Library {
             match key_event.code {
                 KeyCode::Char('q') => {
@@ -177,7 +177,7 @@ pub async fn handle_key_events(
                         if let Some(i) = app.albums_liststate.selected() {
                             let playlist_id = app.albums.get(i).map(|a| a.playlist_id.clone());
                             if let Some(id) = playlist_id {
-                                if let Err(e) = client.unsave_album(&id, false).await {
+                                if let Err(e) = client.unsave_album_raw(&id).await {
                                     log_to_file(&e);
                                 } else {
                                     app.albums.remove(i);
@@ -197,14 +197,19 @@ pub async fn handle_key_events(
                     FocusArea::Playlists => {
                         if let Some(i) = app.playlists_liststate.selected() {
                             if let Some(playlist) = app.playlists.get(i) {
-                                if i == app.playlists.len() - 1 || playlist.playlist_id == "LM" {
+                                if playlist.playlist_id == "LM" || playlist.playlist_id == "SE" {
                                     app.notify(
                                         data::NotifyType::Error,
                                         String::from("Can not remove this playlist"),
                                     );
                                 } else {
                                     let id = &playlist.playlist_id;
-                                    match client.unsave_album(id, playlist.is_custom).await {
+                                    let res = if playlist.is_custom {
+                                        client.unsave_cus_playlist_raw(id).await
+                                    } else {
+                                        client.unsave_album_raw(id).await
+                                    };
+                                    match res {
                                         Ok(_) => {
                                             app.playlists.remove(i);
                                             app.notify(
@@ -266,6 +271,12 @@ pub async fn handle_key_events(
                             append_song_to_queue(app, player, song).await;
                         }
                     } else if app.focus_area == FocusArea::Playlists {
+                        app.popup_state = PopupState::CreatePlaylist {
+                            title: String::new(),
+                            description: String::new(),
+                            privacy: PlayListPrivacy::Private,
+                            focused_field: CreatePlaylistFocus::Title,
+                        };
                     }
                 }
 
@@ -326,7 +337,7 @@ pub async fn handle_key_events(
                                     if let Some(selected) = app.search_albums.get_mut(i) {
                                         if !selected.is_saved {
                                             if let Err(e) =
-                                                client.save_album(&selected.playlist_id).await
+                                                client.save_album_raw(&selected.playlist_id).await
                                             {
                                                 log_to_file(&e);
                                             } else {
@@ -339,9 +350,8 @@ pub async fn handle_key_events(
                                                 );
                                             }
                                         } else {
-                                            if let Err(e) = client
-                                                .unsave_album(&selected.playlist_id, false)
-                                                .await
+                                            if let Err(e) =
+                                                client.unsave_album_raw(&selected.playlist_id).await
                                             {
                                                 log_to_file(&e);
                                             } else {
@@ -363,8 +373,9 @@ pub async fn handle_key_events(
                             FocusArea::SearchSongs => {
                                 if let Some(i) = app.search_songs_liststate.selected() {
                                     if let Some(song) = app.search_songs.get(i) {
-                                        app.is_popup = true;
-                                        app.selected_save_song = Some(song.clone());
+                                        app.popup_state = PopupState::SaveSong {
+                                            selected_save_song: song.clone(),
+                                        };
                                         app.cus_playlists_liststate.select(Some(0));
                                     }
                                 }
@@ -425,7 +436,10 @@ pub async fn handle_key_events(
 }
 
 fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
-    let (state, len) = if app.is_popup {
+    if matches!(app.popup_state, PopupState::CreatePlaylist { .. }) {
+        return;
+    }
+    let (state, len) = if matches!(app.popup_state, PopupState::SaveSong { .. }) {
         (&mut app.cus_playlists_liststate, app.cus_playlists.len())
     } else {
         match app.focus_area {
@@ -584,13 +598,13 @@ async fn handle_popup_event(
     client: Arc<YClient>,
     player: &mut Player,
 ) {
-    match key_event.code {
-        KeyCode::Esc => {
-            app.is_popup = false;
-            app.selected_save_song = None;
-        }
-        KeyCode::Enter => {
-            if let Some(song) = app.selected_save_song.as_mut() {
+    match &mut app.popup_state {
+        PopupState::SaveSong { selected_save_song } => match key_event.code {
+            KeyCode::Esc => {
+                app.popup_state = PopupState::None;
+            }
+            KeyCode::Enter => {
+                let song = selected_save_song;
                 if let Some(i) = app.cus_playlists_liststate.selected() {
                     if let Some(idx) = app.cus_playlists.get(i) {
                         if let Some(playlist) = app.playlists.get(*idx) {
@@ -663,8 +677,84 @@ async fn handle_popup_event(
                     }
                 }
             }
-        }
-        _ => {}
+            _ => {}
+        },
+        PopupState::CreatePlaylist {
+            title,
+            description,
+            privacy,
+            focused_field,
+        } => match key_event.code {
+            KeyCode::Esc => {
+                app.popup_state = PopupState::None;
+            }
+            KeyCode::Enter => {
+                if title.is_empty() {
+                    app.notify(
+                        data::NotifyType::Error,
+                        String::from("Title must not be empty"),
+                    );
+                } else {
+                    let result = client.create_playlist(title, description, *privacy).await;
+                    match result {
+                        Ok(playlist) => {
+                            app.playlists.push(playlist);
+                            app.cus_playlists.push(app.playlists.len() - 1);
+                            app.popup_state = PopupState::None;
+                            app.notify(data::NotifyType::Success, "Created playlist".to_string());
+                        }
+                        Err(e) => {
+                            log_to_file(&e);
+                            app.notify(
+                                data::NotifyType::Error,
+                                "Failed to create playlist".to_string(),
+                            );
+                        }
+                    }
+                }
+            }
+            KeyCode::Tab => {
+                *focused_field = match focused_field {
+                    CreatePlaylistFocus::Title => CreatePlaylistFocus::Description,
+                    CreatePlaylistFocus::Description => CreatePlaylistFocus::Privacy,
+                    CreatePlaylistFocus::Privacy => CreatePlaylistFocus::Title,
+                };
+            }
+            KeyCode::Left | KeyCode::Char('h')
+                if *focused_field == CreatePlaylistFocus::Privacy =>
+            {
+                *privacy = match *privacy {
+                    PlayListPrivacy::Public => PlayListPrivacy::Private,
+                    PlayListPrivacy::Unlisted => PlayListPrivacy::Public,
+                    PlayListPrivacy::Private => PlayListPrivacy::Unlisted,
+                };
+            }
+            KeyCode::Right | KeyCode::Char('l')
+                if *focused_field == CreatePlaylistFocus::Privacy =>
+            {
+                *privacy = match *privacy {
+                    PlayListPrivacy::Public => PlayListPrivacy::Unlisted,
+                    PlayListPrivacy::Unlisted => PlayListPrivacy::Private,
+                    PlayListPrivacy::Private => PlayListPrivacy::Public,
+                };
+            }
+            KeyCode::Char(c) if *focused_field != CreatePlaylistFocus::Privacy => {
+                if *focused_field == CreatePlaylistFocus::Title {
+                    title.push(c);
+                } else {
+                    description.push(c);
+                }
+            }
+            KeyCode::Backspace if *focused_field != CreatePlaylistFocus::Privacy => {
+                if *focused_field == CreatePlaylistFocus::Title {
+                    title.pop();
+                } else {
+                    description.pop();
+                }
+            }
+            _ => {}
+        },
+        PopupState::None => {}
     }
 }
 async fn append_song_to_queue(app: &mut App, player: &mut Player, song: Song) {

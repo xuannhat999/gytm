@@ -86,6 +86,44 @@ pub fn parse_songs(data: Value) -> YResult<Vec<Song>> {
     Ok(songs)
 }
 
+pub fn parse_created_playlist(data: Value) -> YResult<PlayList> {
+    let playlist_id = data["playlistId"]
+        .as_str()
+        .ok_or(YError::InvalidCookie)?
+        .to_string();
+
+    let renderer = data["actions"][1]
+        .get("handlePlaylistCreationCommand")
+        .and_then(|h| h.get("createdPlaylist"))
+        .and_then(|c| c.get("musicTwoRowItemRenderer"))
+        .ok_or(YError::InvalidCookie)?;
+
+    let title = renderer["title"]["runs"][0]["text"]
+        .as_str()
+        .unwrap_or("Unknown")
+        .to_string();
+
+    let artist = renderer["subtitle"]["runs"][0]["text"]
+        .as_str()
+        .unwrap_or("Unknown")
+        .to_string();
+
+    let browse_id = renderer
+        .pointer("/navigationEndpoint/browseEndpoint/browseId")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    Ok(PlayList {
+        title,
+        artist,
+        browse_id,
+        playlist_id,
+        is_saved: true,
+        is_custom: true,
+    })
+}
+
 pub fn parse_search_albums(data: Value) -> YResult<Vec<PlayList>> {
     let mut albums: Vec<PlayList> = Vec::new();
     let contents = data
