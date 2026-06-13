@@ -214,6 +214,7 @@ pub async fn handle_key_events(
                                     };
                                     match res {
                                         Ok(_) => {
+                                            app.refresh_cus_playlist();
                                             app.playlists.remove(i);
                                             app.notify(
                                                 data::NotifyType::Success,

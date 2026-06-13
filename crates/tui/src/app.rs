@@ -153,6 +153,15 @@ impl App {
         }
         None
     }
+    pub fn refresh_cus_playlist(&mut self) {
+        let mut new_cus: Vec<usize> = Vec::new();
+        for (i, playlist) in self.playlists.iter().enumerate() {
+            if playlist.is_custom {
+                new_cus.push(i);
+            }
+        }
+        self.cus_playlists = new_cus;
+    }
     pub fn is_popup_active(&self) -> bool {
         !matches!(self.popup_state, PopupState::None)
     }
