@@ -275,7 +275,9 @@ pub async fn handle_key_events(
                         if let Some(song) =
                             app.songs_liststate.selected().map(|i| app.songs[i].clone())
                         {
-                            append_song_to_queue(app, player, &song).await;
+                            if let Err(e) = append_song_to_queue(app, player, &song).await {
+                                log_to_file(&e);
+                            }
                         }
                     } else if app.focus_area == FocusArea::Playlists {
                         app.popup_state = PopupState::CreatePlaylist {
@@ -396,7 +398,9 @@ pub async fn handle_key_events(
                                     .selected()
                                     .map(|i| app.search_songs[i].clone())
                                 {
-                                    append_song_to_queue(app, player, &song).await;
+                                    if let Err(e) = append_song_to_queue(app, player, &song).await {
+                                        log_to_file(&e);
+                                    }
                                 }
                             }
                         }
@@ -784,18 +788,19 @@ async fn handle_popup_event(
     }
 }
 
-async fn append_song_to_queue(app: &mut App, player: &mut Player, song: &Song) {
+async fn append_song_to_queue(app: &mut App, player: &mut Player, song: &Song) -> YResult<()> {
     let url = get_url_from_vid_id(&song.video_id);
-    if let Err(e) = player.send_mpv_command(MpvCommand::AppendSong(url)) {
-        log_to_file(&e);
-    } else {
-        let new_song = song.clone();
-        app.queue.push(new_song);
-        app.notify(
-            data::NotifyType::Success,
-            String::from("Added song to Queue"),
-        );
+    player.send_mpv_command(MpvCommand::AppendSong(url))?;
+    let new_song = song.clone();
+    app.queue.push(new_song);
+    app.notify(
+        data::NotifyType::Success,
+        String::from("Added song to Queue"),
+    );
+    if app.play_mode == PlayMode::ShuffleMode && app.queue.len() == 3 {
+        player.send_mpv_command(MpvCommand::Shuffle)?;
     }
+    Ok(())
 }
 
 async fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_idx: usize) {
