@@ -105,7 +105,6 @@ impl App {
             cus_playlists: Vec::new(),
             cus_playlists_liststate: ListState::default(),
             popup_state: PopupState::None,
-
             //OTHER
             noti: Notifications::new(),
             is_exit: false,
