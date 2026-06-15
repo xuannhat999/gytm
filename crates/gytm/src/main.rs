@@ -4,7 +4,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use data::MpvEvent;
+use data::{MpvCommand, MpvEvent};
 use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
@@ -39,8 +39,8 @@ async fn main() -> YResult<()> {
     println!(" Fetching data from Youtube Music...");
     let (albums, playlists, cus_playlists) = client.get_lists().await?;
 
-    let mut app = App::default();
-    let mut player = Player::new(&state.player_state);
+    let mut app = App::new(&state.player_state);
+    let mut player = Player::default();
     app.albums = albums;
     app.playlists = playlists;
     app.cus_playlists = cus_playlists;
@@ -51,6 +51,7 @@ async fn main() -> YResult<()> {
         println!("Error starting MPV: {}", e);
         std::process::exit(1);
     }
+    player.send_mpv_command(MpvCommand::SetVol(app.volume))?;
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
@@ -70,7 +71,7 @@ async fn main() -> YResult<()> {
         last_tick = std::time::Instant::now();
         app.noti.tick(elapsed);
         while let Ok(event) = rx.try_recv() {
-            handler::handle_mpv_event(&mut app, &mut player, &mut state, event);
+            handler::handle_mpv_event(&mut app, &mut state, event);
             render = true;
         }
         if event::poll(Duration::from_millis(50))? {
@@ -100,7 +101,7 @@ async fn main() -> YResult<()> {
         }
         if render {
             terminal.draw(|f| {
-                ui::render(&mut app, f, &player, &theme);
+                ui::render(&mut app, f, &theme);
                 app.noti.render(f, f.area());
             })?;
             render = false;
