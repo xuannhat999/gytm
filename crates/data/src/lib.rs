@@ -10,7 +10,7 @@ pub struct PlayList {
     pub is_saved: bool,
     pub is_custom: bool,
 }
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct Song {
     pub title: String,
     pub set_video_id: String,
@@ -34,6 +34,25 @@ pub enum MpvEvent {
     TimePos(f64),
 }
 
+#[derive(PartialEq)]
+pub enum MpvCommand {
+    Shuffle,
+    Unshuffle,
+    SeekForward,
+    SeekBackward,
+    PlayNext,
+    PlayPrev,
+    TogglePause,
+    IncreaseVol,
+    DecreaseVol,
+    SetVol(u8),
+    PlayPos(usize),
+    AppendSong(String),
+    LoadList(String),
+    RemovePos(usize),
+    Stop,
+    Clear,
+}
 #[derive(Default, PartialEq)]
 pub enum PlayerStatus {
     #[default]
@@ -61,6 +80,13 @@ pub enum FocusArea {
     Songs,
 }
 
+#[derive(PartialEq)]
+pub enum CreatePlaylistFocus {
+    Title,
+    Description,
+    Privacy,
+}
+
 #[derive(PartialEq, Copy, Clone)]
 pub enum AppPage {
     Library = 0,
@@ -77,4 +103,19 @@ pub enum PlayListPrivacy {
     Private,
     Public,
     Unlisted,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PlayerState {
+    pub volume: u8,
+    pub play_mode: PlayMode,
+}
+
+impl Default for PlayerState {
+    fn default() -> Self {
+        PlayerState {
+            volume: 100,
+            play_mode: PlayMode::DefaultMode,
+        }
+    }
 }

@@ -1,4 +1,4 @@
-use data::MpvEvent;
+use data::{MpvCommand, MpvEvent};
 use reqwest::header::InvalidHeaderValue;
 use std::{
     fmt::{Debug, Display},
@@ -50,7 +50,7 @@ pub enum YError {
     EventSenderError(#[from] tokio::sync::mpsc::error::SendError<MpvEvent>),
 
     #[error("Command Sender Error: {0}")]
-    CmdSenderError(#[from] tokio::sync::mpsc::error::SendError<String>),
+    CmdSenderError(#[from] tokio::sync::mpsc::error::SendError<MpvCommand>),
 
     #[error("Song alredy saved in playlist")]
     AlreadyInPlaylist,

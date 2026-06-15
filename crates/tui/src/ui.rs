@@ -1,7 +1,7 @@
-use crate::app::{App, CreatePlaylistFocus, PopupState};
+use crate::app::{App, PopupState};
+use crate::helper;
 use crate::theme::Theme;
-use data::{AppPage, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus};
-use player::Player;
+use data::{AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus};
 use ratatui::{
     self, Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -10,7 +10,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs},
 };
 
-pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) {
+pub fn render(app: &mut App, frame: &mut Frame, theme: &Theme) {
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -32,7 +32,7 @@ pub fn render(app: &mut App, frame: &mut Frame, player: &Player, theme: &Theme) 
         vec![("Quit", "q"), ("Next tab", "Tab")],
     );
     render_queue(frame, app, main_layout[2], theme);
-    render_player(frame, app, main_layout[3], player, theme);
+    render_player(frame, app, main_layout[3], theme);
     match app.page {
         AppPage::Library => {
             // HORIZONTAL LAYOUT (ALBUMS | PLAYLISTS)
@@ -317,18 +317,18 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     frame.render_stateful_widget(list_widget, area, &mut app.queue_liststate);
 }
 
-fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, theme: &Theme) {
-    let song_info = match player.status {
+fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
+    let song_info = match app.status {
         PlayerStatus::Idle => vec![Line::from("   No song is playing ".to_string())],
         PlayerStatus::Loading => vec![Line::from("   Loading...".to_string())],
         _ => {
-            let icon = if player.status == PlayerStatus::Playing {
+            let icon = if app.status == PlayerStatus::Playing {
                 ""
             } else {
                 ""
             };
             if let (Some(song), Some(time_pos)) = (&app.playing_song, app.time_pos) {
-                let time_pos_text = format_time(time_pos);
+                let time_pos_text = helper::format_time(time_pos);
                 vec![
                     Line::from(format!(" {}  {} ", icon, song.title)),
                     Line::from(format!("    {} / {}", time_pos_text, song.duration)),
@@ -338,13 +338,13 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, player: &Player, them
             }
         }
     };
-    let mode_text = match player.play_mode {
+    let mode_text = match app.play_mode {
         PlayMode::DefaultMode => "Play mode:   Default ",
         PlayMode::ShuffleMode => "Play mode:   Shuffle ",
     };
     let right_content = vec![
         Line::from(mode_text),
-        Line::from(format!("  {}% ", player.volume)),
+        Line::from(format!("  {}% ", app.volume)),
     ];
     let key_map = Line::from(vec![
         Span::styled("[ ⏸ / : ", theme.text_style()),
@@ -717,9 +717,4 @@ fn render_privacy_selector(
     );
 
     frame.render_widget(p, area);
-}
-
-fn format_time(secs: f64) -> String {
-    let s = secs as u64;
-    format!("{}:{:02}", s / 60, s % 60)
 }

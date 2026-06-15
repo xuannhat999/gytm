@@ -19,7 +19,7 @@ Stream Youtube Music from your terminal !
 - Search for Albums & Songs
 - Add / Remove Songs in Queue
 - When select to play a song in search result, it will automatically load list of related songs into Queue
-- Add / Remove Songs in personal playlist
+- Create / Edit personal playlists
 
 ## Supported OS
 
@@ -86,7 +86,7 @@ paru -S gytm-git
 
 - <kbd>q</kbd>: Quit app
 - <kbd>Tab</kbd>: Switch tab
-- <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>: Toggle focus area
+- <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd>: Toggle focus area
 - (<kbd>arrow up</kbd>/<kbd>k</kbd>) / (<kbd>arrow down</kbd>/<kbd>j</kbd>): Navigate up/down list items
 - <kbd>l</kbd>: View Songs from album/playlist ( In Library )
 - <kbd>Enter</kbd>: Play Album/Playlist/Song

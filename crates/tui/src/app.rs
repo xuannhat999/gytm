@@ -1,7 +1,10 @@
 use std::time::Duration;
 
 use crate::theme::{error_style, success_style};
-use data::{AppPage, FocusArea, NotifyType, PlayList, PlayListPrivacy, Song};
+use data::{
+    AppPage, CreatePlaylistFocus, FocusArea, NotifyType, PlayList, PlayListPrivacy, PlayMode,
+    PlayerState, PlayerStatus, Song,
+};
 use error::log_to_file;
 use ratatui::widgets::ListState;
 use ratatui_notifications::{Anchor, AutoDismiss, Level, Notification, Notifications};
@@ -17,13 +20,6 @@ pub enum PopupState {
         privacy: PlayListPrivacy,
         focused_field: CreatePlaylistFocus,
     },
-}
-
-#[derive(PartialEq)]
-pub enum CreatePlaylistFocus {
-    Title,
-    Description,
-    Privacy,
 }
 
 pub struct App {
@@ -61,12 +57,16 @@ pub struct App {
     pub popup_state: PopupState,
 
     // OTHER
+    pub status: PlayerStatus,
+    pub volume: u8,
+    pub play_mode: PlayMode,
+
     pub noti: Notifications,
     pub page: AppPage,
     pub is_exit: bool,
 }
-impl Default for App {
-    fn default() -> Self {
+impl App {
+    pub fn new(player_state: &PlayerState) -> Self {
         Self {
             // PAGE LIBRARY
             albums: Vec::new(),
@@ -96,6 +96,11 @@ impl Default for App {
             search_query: String::new(),
             is_insert: false,
 
+            // PLAYER
+            status: PlayerStatus::Idle,
+            volume: player_state.volume,
+            play_mode: player_state.play_mode.clone(),
+
             //POPUP
             cus_playlists: Vec::new(),
             cus_playlists_liststate: ListState::default(),
@@ -110,7 +115,7 @@ impl Default for App {
 
 impl App {
     // TOGGLE NEXT ITEM IN LISTSTATE
-    pub fn next(state: &mut ListState, len: usize) {
+    pub fn next_item(state: &mut ListState, len: usize) {
         if len == 0 {
             return;
         }
@@ -128,7 +133,7 @@ impl App {
     }
 
     // TOGGLE PREVIOUS ITEM IN LISTSTATE
-    pub fn previous(state: &mut ListState, len: usize) {
+    pub fn previous_item(state: &mut ListState, len: usize) {
         if len == 0 {
             return;
         }

@@ -1,6 +1,5 @@
-use data::{MpvEvent, MpvResponse, PlayMode, PlayerStatus, Song};
+use data::{MpvCommand, MpvEvent, MpvResponse, Song};
 use error::{YError, YResult, log_to_file};
-use state::PlayerState;
 use std::{
     fs,
     io::Write,
@@ -13,13 +12,11 @@ use tokio::{
     sync::mpsc,
 };
 
+#[derive(Default)]
 pub struct Player {
-    pub current_process: Option<Child>,
-    pub status: PlayerStatus,
-    pub volume: u8,
-    pub play_mode: PlayMode,
-    pub playlist_file: Option<NamedTempFile>,
-    mpv_conn: Option<mpsc::UnboundedSender<String>>,
+    current_process: Option<Child>,
+    playlist_file: Option<NamedTempFile>,
+    mpv_conn: Option<mpsc::UnboundedSender<MpvCommand>>,
 }
 
 impl Drop for Player {
@@ -29,17 +26,6 @@ impl Drop for Player {
 }
 
 impl Player {
-    pub fn new(player_state: &PlayerState) -> Self {
-        Self {
-            current_process: None,
-            status: PlayerStatus::Idle,
-            volume: player_state.volume,
-            play_mode: player_state.play_mode.clone(),
-            playlist_file: None,
-            mpv_conn: None,
-        }
-    }
-
     // KILL CURRENT MPV PROCESS
     fn kill_current_process(&mut self) {
         if let Some(mut child) = self.current_process.take() {
@@ -51,48 +37,6 @@ impl Player {
         let _ = fs::remove_file(String::from("/tmp/gytm-mpv-socket"));
     }
 
-    // PLAY PREVIOUS SONG IN ALBUM/PLAYLIST
-    pub async fn next(&mut self) -> YResult<()> {
-        self.status = PlayerStatus::Loading;
-        self.send_mpv_command(r#"{"command": ["playlist-next"]}"#)
-            .await?;
-        Ok(())
-    }
-
-    // PLAY NEXT SONG IN ALBUM/PLAYLIST
-    pub async fn prev(&mut self) -> YResult<()> {
-        self.status = PlayerStatus::Loading;
-        self.send_mpv_command(r#"{"command": ["playlist-prev"]}"#)
-            .await?;
-        Ok(())
-    }
-
-    // PAUSE PLAYING SONG
-    pub async fn toggle_pause(&mut self) -> YResult<()> {
-        match self.status {
-            PlayerStatus::Playing => {
-                self.status = PlayerStatus::Paused;
-            }
-            PlayerStatus::Paused => {
-                self.status = PlayerStatus::Playing;
-            }
-            _ => {}
-        };
-        self.send_mpv_command(r#"{"command": ["cycle", "pause"]}"#)
-            .await?;
-        Ok(())
-    }
-    pub async fn forward(&mut self) -> YResult<()> {
-        self.send_mpv_command(r#"{"command": ["seek", 5, "relative"]}"#)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn backward(&mut self) -> YResult<()> {
-        self.send_mpv_command(r#"{"command": ["seek", -5, "relative"]}"#)
-            .await?;
-        Ok(())
-    }
     // START MPV SOCKET
     pub fn start_mpv_and_observe(
         &mut self,
@@ -103,7 +47,6 @@ impl Player {
             .arg("--idle")
             .arg(format!("--input-ipc-server={}", socket_path))
             .arg("--video=no")
-            .arg(format!("--volume={}", self.volume))
             .arg("--loop-playlist=inf")
             .arg("--cache=yes")
             .arg("--cache-secs=5")
@@ -116,7 +59,7 @@ impl Player {
             .map_err(|_| YError::MpvSpawnError)?;
 
         self.current_process = Some(child);
-        let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+        let (tx, mut rx) = mpsc::unbounded_channel::<MpvCommand>();
         self.mpv_conn = Some(tx);
 
         tokio::spawn(async move {
@@ -179,10 +122,13 @@ impl Player {
                         // RECEIVE CMD AND SEND TO SOCKET
                         cmd = rx.recv() => {
                             match cmd {
-                                Some(cmd) => {
-                                    if let Err(e) = writer.write_all(cmd.as_bytes()).await {
-                                        log_to_file(format!("Failed to send command to mpv: {e}"));
-                                        break;
+                                Some(mpv_cmd) => {
+                                    let cmd = match_mpv_command(mpv_cmd);
+                                    if !cmd.is_empty() {
+                                        if let Err(e) = writer.write_all(cmd.as_bytes()).await {
+                                            log_to_file(format!("Failed to send command to mpv: {e}"));
+                                            break;
+                                        }
                                     }
                                 }
                                 None => { break; }
@@ -212,7 +158,7 @@ impl Player {
                                                         let mpv_ids: Vec<String> = items
                                                             .iter()
                                                             .filter_map(|i| {
-                                                                i["filename"].as_str().map(get_vid_id_from_url)
+                                                                i["filename"].as_str().map(|s|s.to_string())
                                                             })
                                                             .collect();
                                                         if let Err(e) =
@@ -225,9 +171,8 @@ impl Player {
                                                             .find(|i| i["playing"].as_bool() == Some(true))
                                                         {
                                                             if let Some(url) = item["filename"].as_str() {
-                                                                let video_id = get_vid_id_from_url(url);
                                                                 if let Err(e) = tx_event
-                                                                    .send(MpvEvent::StartPlaying(video_id))
+                                                                    .send(MpvEvent::StartPlaying(url.to_string()))
                                                                     .await
                                                                 {
                                                                     log_to_file(format!("Failed to send StartPlaying: {e}"));
@@ -269,53 +214,14 @@ impl Player {
         Ok(())
     }
 
-    pub async fn increase_volume(&mut self) -> YResult<()> {
-        self.volume = self.volume.saturating_add(5).min(130);
-        self.send_mpv_command(r#"{"command": ["add", "volume", 5]}"#)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn decrease_volume(&mut self) -> YResult<()> {
-        self.volume = self.volume.saturating_sub(5);
-        self.send_mpv_command(r#"{"command": ["add", "volume", -5]}"#)
-            .await?;
-        Ok(())
-    }
-    async fn send_mpv_command(&self, command: &str) -> YResult<()> {
+    pub fn send_mpv_command(&self, command: MpvCommand) -> YResult<()> {
         if let Some(ref tx) = self.mpv_conn {
-            let full_cmd = format!("{}\n", command);
-            tx.send(full_cmd)?;
-        }
-        Ok(())
-    }
-    pub async fn toggle_playmode(&mut self) -> YResult<()> {
-        match self.play_mode {
-            PlayMode::DefaultMode => {
-                self.play_mode = PlayMode::ShuffleMode;
-                self.send_mpv_command(r#"{"command": ["playlist-shuffle"]}"#)
-                    .await?;
-            }
-            PlayMode::ShuffleMode => {
-                self.play_mode = PlayMode::DefaultMode;
-                self.send_mpv_command(r#"{"command": ["playlist-unshuffle"]}"#)
-                    .await?;
-            }
+            tx.send(command)?;
         }
         Ok(())
     }
 
-    pub async fn shuffle(&self) -> YResult<()> {
-        self.send_mpv_command(r#"{"command": ["playlist-shuffle"]}"#)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn load_playlist(&mut self, songs: &[Song], play_pos: usize) -> YResult<()> {
-        if songs.is_empty() {
-            return Err(YError::PlaylistEmpty);
-        }
-        self.status = PlayerStatus::Loading;
+    pub fn write_tmp_list(&mut self, songs: &[Song]) -> YResult<String> {
         if self.playlist_file.is_none() {
             self.playlist_file = Some(NamedTempFile::new()?);
         }
@@ -327,57 +233,48 @@ impl Player {
                 writeln!(file, "https://www.youtube.com/watch?v={}", song.video_id)?;
             }
             file.sync_all()?;
-            let playlist_path = tempfile.path().to_string_lossy().to_string();
-            let cmd = serde_json::json!({"command": ["loadlist", playlist_path, "replace"]});
-            let load_cmd = serde_json::to_string(&cmd)?;
-            self.send_mpv_command(&load_cmd).await?;
-            let pos_cmd = serde_json::json!({
-                "command": ["set_property", "playlist-pos", play_pos]
-            });
-            self.send_mpv_command(&serde_json::to_string(&pos_cmd)?)
-                .await?;
-            if self.play_mode == PlayMode::ShuffleMode {
-                if let Err(e) = self.shuffle().await {
-                    log_to_file(&e);
-                }
-            }
+            let file_path = tempfile.path().to_string_lossy().to_string();
+            Ok(file_path)
+        } else {
+            Err(YError::InvalidFilePath)
         }
-        Ok(())
-    }
-
-    pub async fn remove_from_queue(&mut self, idx: usize) -> YResult<()> {
-        let command = format!(r#"{{"command": ["playlist-remove", {}]}}"#, idx);
-        self.send_mpv_command(&command).await?;
-        Ok(())
-    }
-
-    pub async fn append_to_queue(&mut self, video_id: &str) -> YResult<()> {
-        let url = format!("https://www.youtube.com/watch?v={}", video_id);
-        let json = serde_json::json!({"command": ["loadfile", url, "append"]});
-        let command = serde_json::to_string(&json)?;
-        self.send_mpv_command(&command).await?;
-        Ok(())
-    }
-
-    pub async fn play_at_idx(&mut self, index: &usize) -> YResult<()> {
-        self.status = PlayerStatus::Loading;
-        let command = format!(
-            r#"{{"command": ["set_property", "playlist-pos", {}]}}"#,
-            index
-        );
-        self.send_mpv_command(&command).await?;
-        Ok(())
-    }
-
-    pub async fn clear_queue(&mut self) -> YResult<()> {
-        self.status = PlayerStatus::Idle;
-        self.send_mpv_command(r#"{"command": ["stop"]}"#).await?;
-        self.send_mpv_command(r#"{"command": ["playlist-clear"]}"#)
-            .await?;
-        Ok(())
     }
 }
-
-fn get_vid_id_from_url(url: &str) -> String {
-    url.split("v=").last().unwrap_or(url).to_string()
+fn match_mpv_command(mpv_cmd: MpvCommand) -> String {
+    let cmd_str = match mpv_cmd {
+        MpvCommand::Shuffle => r#"{"command": ["playlist-shuffle"]}"#,
+        MpvCommand::Unshuffle => r#"{"command": ["playlist-unshuffle"]}"#,
+        MpvCommand::PlayPrev => r#"{"command": ["playlist-prev"]}"#,
+        MpvCommand::PlayNext => r#"{"command": ["playlist-next"]}"#,
+        MpvCommand::SeekBackward => r#"{"command": ["seek", -5, "relative"]}"#,
+        MpvCommand::SeekForward => r#"{"command": ["seek", 5, "relative"]}"#,
+        MpvCommand::DecreaseVol => r#"{"command": ["add", "volume", -5]}"#,
+        MpvCommand::IncreaseVol => r#"{"command": ["add", "volume", 5]}"#,
+        MpvCommand::TogglePause => r#"{"command": ["cycle", "pause"]}"#,
+        MpvCommand::SetVol(volume) => {
+            return format!(r#"{{"command": ["set_property", "volume", {}]}}"#, volume) + "\n";
+        }
+        MpvCommand::PlayPos(pos) => {
+            return format!(
+                r#"{{"command": ["set_property", "playlist-pos", {}]}}"#,
+                pos
+            ) + "\n";
+        }
+        MpvCommand::LoadList(path) => {
+            return format!(r#"{{"command": ["loadlist", "{}", "replace"]}}"#, path) + "\n";
+        }
+        MpvCommand::AppendSong(url) => {
+            return format!(r#"{{"command": ["loadfile", "{}", "append-play"]}}"#, url) + "\n";
+        }
+        MpvCommand::RemovePos(idx) => {
+            return format!(r#"{{"command": ["playlist-remove", {}]}}"#, idx) + "\n";
+        }
+        MpvCommand::Stop => r#"{"command": ["stop"]}"#,
+        MpvCommand::Clear => r#"{"command": ["playlist-clear"]}"#,
+    };
+    if cmd_str.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", cmd_str)
+    }
 }

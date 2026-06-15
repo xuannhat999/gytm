@@ -9,4 +9,3 @@ error = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["sync", "net", "io-util"] }
 tempfile = { workspace = true }
-state = { workspace = true }
