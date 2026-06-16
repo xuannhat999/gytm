@@ -236,7 +236,7 @@ impl Player {
             let file_path = tempfile.path().to_string_lossy().to_string();
             Ok(file_path)
         } else {
-            Err(YError::InvalidFilePath)
+            Err(YError::InvalidPath("/tmp/TempFile".to_string()))
         }
     }
 }
@@ -252,22 +252,22 @@ fn match_mpv_command(mpv_cmd: MpvCommand) -> String {
         MpvCommand::IncreaseVol => r#"{"command": ["add", "volume", 5]}"#,
         MpvCommand::TogglePause => r#"{"command": ["cycle", "pause"]}"#,
         MpvCommand::SetVol(volume) => {
-            return format!(r#"{{"command": ["set_property", "volume", {}]}}"#, volume) + "\n";
+            return format!(r#"{{"command": ["set_property", "volume", {}]}}"#, volume);
         }
         MpvCommand::PlayPos(pos) => {
             return format!(
                 r#"{{"command": ["set_property", "playlist-pos", {}]}}"#,
                 pos
-            ) + "\n";
+            );
         }
         MpvCommand::LoadList(path) => {
-            return format!(r#"{{"command": ["loadlist", "{}", "replace"]}}"#, path) + "\n";
+            return format!(r#"{{"command": ["loadlist", "{}", "replace"]}}"#, path);
         }
         MpvCommand::AppendSong(url) => {
-            return format!(r#"{{"command": ["loadfile", "{}", "append-play"]}}"#, url) + "\n";
+            return format!(r#"{{"command": ["loadfile", "{}", "append-play"]}}"#, url);
         }
         MpvCommand::RemovePos(idx) => {
-            return format!(r#"{{"command": ["playlist-remove", {}]}}"#, idx) + "\n";
+            return format!(r#"{{"command": ["playlist-remove", {}]}}"#, idx);
         }
         MpvCommand::Stop => r#"{"command": ["stop"]}"#,
         MpvCommand::Clear => r#"{"command": ["playlist-clear"]}"#,

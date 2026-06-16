@@ -11,7 +11,7 @@ pub fn parse_lists(data: Value) -> YResult<(Vec<PlayList>, Vec<PlayList>, Option
     let grid_renderer = data
         .pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/gridRenderer")
         .or_else(|| data.pointer("/continuationContents/gridContinuation"))
-        .ok_or(YError::InvalidCookie)?; 
+        .ok_or(YError::InvalidResponse("Browse Library".to_string()))?; 
 
     if let Some(items) = grid_renderer.get("items").and_then(|v| v.as_array()) {
         for item in items {
@@ -61,7 +61,7 @@ pub fn parse_songs(data: Value) -> YResult<Vec<Song>> {
     let track_list = data.pointer("/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicShelfRenderer/contents")
         .or_else(|| data.pointer("/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicPlaylistShelfRenderer/contents"))
         .and_then(|v| v.as_array())
-        .ok_or(YError::InvalidCookie)?; 
+        .ok_or(YError::InvalidResponse("Browse songs".to_string()))?; 
 
     for item in track_list {
         if let Some(renderer) = item.get("musicResponsiveListItemRenderer") {
@@ -89,14 +89,14 @@ pub fn parse_songs(data: Value) -> YResult<Vec<Song>> {
 pub fn parse_created_playlist(data: Value) -> YResult<PlayList> {
     let playlist_id = data["playlistId"]
         .as_str()
-        .ok_or(YError::InvalidCookie)?
+        .ok_or(YError::InvalidResponse("Create playlist".to_string()))?
         .to_string();
 
     let renderer = data["actions"][1]
         .get("handlePlaylistCreationCommand")
         .and_then(|h| h.get("createdPlaylist"))
         .and_then(|c| c.get("musicTwoRowItemRenderer"))
-        .ok_or(YError::InvalidCookie)?;
+        .ok_or(YError::InvalidResponse("Create playlist".to_string()))?;
 
     let title = renderer["title"]["runs"][0]["text"]
         .as_str()
@@ -129,7 +129,7 @@ pub fn parse_search_albums(data: Value) -> YResult<Vec<PlayList>> {
     let contents = data
         .pointer("/contents/tabbedSearchResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicShelfRenderer/contents")
         .and_then(|v| v.as_array())
-        .ok_or(YError::InvalidCookie)?;
+        .ok_or(YError::InvalidResponse("Search albums".to_string()))?;
 
     for item in contents {
         if let Some(renderer) = item.get("musicResponsiveListItemRenderer") {
@@ -246,56 +246,32 @@ pub fn parse_params(data: Value) -> YResult<String> {
         .pointer("/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents/1/automixPreviewVideoRenderer/content/automixPlaylistVideoRenderer/navigationEndpoint/watchPlaylistEndpoint/params")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string()); 
-    params.ok_or(YError::InvalidCookie) 
+    params.ok_or(YError::InvalidResponse("Get Pamams".to_string())) 
 }
-
 pub fn parse_related_songs(data: Value) -> YResult<Vec<Song>> {
     let mut songs = Vec::new();
-    if let Some(contents) = data
-        .get("contents")
-        .and_then(|c| c.get("singleColumnMusicWatchNextResultsRenderer"))
-        .and_then(|s| s.get("tabbedRenderer"))
-        .and_then(|t| t.get("watchNextTabbedResultsRenderer"))
-        .and_then(|w| w.get("tabs"))
-        .and_then(|tabs| tabs.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|tab| tab.get("tabRenderer"))
-        .and_then(|tr| tr.get("content"))
-        .and_then(|c| c.get("musicQueueRenderer"))
-        .and_then(|mq| mq.get("content"))
-        .and_then(|c| c.get("playlistPanelRenderer"))
-        .and_then(|pp| pp.get("contents"))
-        .and_then(|c| c.as_array())
-    {
+    let contents = data.pointer("/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents").and_then(|c|c.as_array()).ok_or(YError::InvalidResponse("Get related songs".to_string()))?;
         for item in contents {
             if let Some(video) = item.get("playlistPanelVideoRenderer") {
                 let video_id = video.get("videoId").and_then(|v| v.as_str());
-                let title = video
-                    .get("title")
-                    .and_then(|t| t.get("runs"))
-                    .and_then(|r| r.as_array())
-                    .and_then(|arr| arr.first())
-                    .and_then(|run| run.get("text"))
-                    .and_then(|t| t.as_str());
+                let title = video.pointer("/title/runs/0/text").and_then(|v|v.as_str());
                 let duration = video
                     .pointer("/lengthText/runs/0/text")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                if let (Some(vid), Some(t)) = (video_id, title) {
+                    .and_then(|v| v.as_str());
+
+                if let (Some(vid), Some(t),Some(duration)) = (video_id, title,duration) {
                     songs.push(Song {
                         video_id: vid.to_string(),
-                        set_video_id: video.pointer("/navigationEndpoint/watchEndpoint/playlistSetVideoId")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string(),
+                        set_video_id: "".to_string(),
                         title: t.to_string(),
-                        duration,
+                        duration: duration.to_string(),
                         is_liked: false,
                     });
                 }
-            }
+
         }
     }
     Ok(songs)
 }
+
+

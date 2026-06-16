@@ -10,14 +10,11 @@ use time::{OffsetDateTime, format_description};
 
 #[derive(Debug, Error)]
 pub enum YError {
-    #[error("Config Dir Error")]
-    ConfigDirError,
+    #[error("Invalid File Path: {0}")]
+    InvalidPath(String),
 
-    #[error("State File Error")]
-    StateFileError,
-
-    #[error("Invalid File Path")]
-    InvalidFilePath,
+    #[error("Invalid Response from: {0}")]
+    InvalidResponse(String),
 
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
