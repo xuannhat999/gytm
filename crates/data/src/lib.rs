@@ -16,7 +16,6 @@ pub struct Song {
     pub set_video_id: String,
     pub video_id: String,
     pub duration: String,
-    pub is_liked: bool,
 }
 
 #[derive(Deserialize, Debug)]
