@@ -644,7 +644,8 @@ pub fn load_cookies_firefox_based() -> YResult<Vec<Cookie>> {
         "BraveSoftware/Brave-Origin",
     ];
     let target_filename = vec!["cookies.sqlite", "Cookies"];
-    let config_dir = dirs::config_dir().ok_or_else(|| YError::ConfigDirError)?;
+    let config_dir =
+        dirs::config_dir().ok_or_else(|| YError::InvalidPath("~/.config/".to_string()))?;
     let mut target_db_path: Option<PathBuf> = None;
     'outer: for browser in browser_dirs {
         let base_path = config_dir.join(browser);
@@ -668,7 +669,7 @@ pub fn load_cookies_firefox_based() -> YResult<Vec<Cookie>> {
     }
 
     let cookies_path = target_db_path
-        .ok_or_else(|| YError::InvalidFilePath)?
+        .ok_or_else(|| YError::InvalidPath("~/.config/browser_dirs/../Cookie".to_string()))?
         .to_string_lossy()
         .into_owned();
 

@@ -18,13 +18,15 @@ impl AppState {
         Ok(config)
     }
     pub fn save(&self) -> YResult<()> {
-        let conf_file = Self::get_path()?;
-        let f = fs::File::create(conf_file)?;
+        let state_file = Self::get_path()?;
+        let f = fs::File::create(state_file)?;
         serde_json::to_writer_pretty(f, self)?;
         Ok(())
     }
     pub fn create(file: &Path) -> YResult<AppState> {
-        let dir = file.parent().ok_or(YError::StateFileError)?;
+        let dir = file
+            .parent()
+            .ok_or(YError::InvalidPath("~/.local/state/".to_string()))?;
         fs::create_dir_all(dir)?;
 
         let default_config = AppState {
@@ -39,7 +41,7 @@ impl AppState {
 
     pub fn get_path() -> YResult<std::path::PathBuf> {
         Ok(dirs::state_dir()
-            .ok_or(YError::StateFileError)?
+            .ok_or(YError::InvalidPath("~/.local/state/".to_string()))?
             .join("gytm/state.json"))
     }
 }
