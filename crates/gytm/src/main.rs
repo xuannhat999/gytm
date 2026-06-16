@@ -107,6 +107,7 @@ async fn main() -> YResult<()> {
             render = false;
         }
     }
+    player.shutdown().await;
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;

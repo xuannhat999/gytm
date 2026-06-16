@@ -51,6 +51,7 @@ pub enum MpvCommand {
     RemovePos(usize),
     Stop,
     Clear,
+    Quit,
 }
 #[derive(Default, PartialEq)]
 pub enum PlayerStatus {

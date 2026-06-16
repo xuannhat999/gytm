@@ -4,12 +4,14 @@ use std::{
     fs,
     io::Write,
     process::{Child, Command, Stdio},
+    time::{Duration, Instant},
 };
 use tempfile::NamedTempFile;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::UnixStream,
     sync::mpsc,
+    time,
 };
 
 #[derive(Default)]
@@ -26,15 +28,38 @@ impl Drop for Player {
 }
 
 impl Player {
-    // KILL CURRENT MPV PROCESS
+    // KILL CURRENT MPV PROCESS — fallback for Drop, no IPC
     fn kill_current_process(&mut self) {
         if let Some(mut child) = self.current_process.take() {
             let _ = child.kill();
             let _ = child.wait();
         }
         self.playlist_file = None;
+        let _ = fs::remove_file("/tmp/gytm-mpv-socket");
+    }
+    pub async fn shutdown(&mut self) {
+        if let Err(e) = self.send_mpv_command(MpvCommand::Quit) {
+            log_to_file(&e);
+        }
         self.mpv_conn = None;
-        let _ = fs::remove_file(String::from("/tmp/gytm-mpv-socket"));
+        if let Some(mut child) = self.current_process.take() {
+            let start = Instant::now();
+            let timeout = Duration::from_secs(1);
+            loop {
+                match child.try_wait() {
+                    Ok(Some(_)) => break,
+                    Ok(None) if start.elapsed() >= timeout => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        break;
+                    }
+                    Ok(None) => time::sleep(Duration::from_millis(50)).await,
+                    Err(_) => break,
+                }
+            }
+        }
+        self.playlist_file = None;
+        let _ = fs::remove_file("/tmp/gytm-mpv-socket");
     }
 
     // START MPV SOCKET
@@ -271,6 +296,7 @@ fn match_mpv_command(mpv_cmd: MpvCommand) -> String {
         }
         MpvCommand::Stop => r#"{"command": ["stop"]}"#,
         MpvCommand::Clear => r#"{"command": ["playlist-clear"]}"#,
+        MpvCommand::Quit => r#"{"command": ["quit"]}"#,
     };
     if cmd_str.is_empty() {
         String::new()

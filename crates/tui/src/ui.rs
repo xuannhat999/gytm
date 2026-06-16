@@ -172,7 +172,7 @@ fn render_list(frame: &mut Frame, app: &mut App, area: Rect, area_type: FocusAre
             block = block.title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
         } else {
             let bottom_nav = Line::from(vec![
-                Span::styled("[ View Songs: ", theme.text_style()),
+                Span::styled("[ View content: ", theme.text_style()),
                 Span::styled("l ", theme.key_style()),
                 Span::styled("| Create playlist: ", theme.text_style()),
                 Span::styled("a ", theme.key_style()),
@@ -222,10 +222,7 @@ fn render_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .title(format!(
-            "[4]- View Songs/Edit playlist ({})",
-            app.songs.len()
-        ))
+        .title(format!("[4]-󰠶 Content ({})", app.songs.len()))
         .title_bottom(keymap.centered())
         .border_style(border_style);
 
@@ -456,8 +453,8 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
     let bottom_nav = Line::from(vec![
         Span::styled("[ Save/Unsave: ", theme.text_style()),
         Span::styled("x ", theme.key_style()),
-        Span::styled("| Play: ", theme.text_style()),
-        Span::styled("Enter ", theme.key_style()),
+        Span::styled("| View content: ", theme.text_style()),
+        Span::styled("l ", theme.key_style()),
         Span::styled(" ]", theme.text_style()),
     ]);
 
