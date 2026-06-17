@@ -4,11 +4,18 @@ Stream Youtube Music from your terminal !
 
 # Demo
 
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/f4fad48d-8a48-4bcd-95f7-0c066c8e3e93" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/19c07cbd-1a6f-42bc-a175-0271d27a992d" />
 <br></br>
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/398677ae-d35f-406c-adf2-50dca21952d6" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/d27a339a-2c63-4ff5-84fc-38b745b531c9" />
+<br></br>
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/1c63a8c0-51a0-4446-a1ab-1b5e9a6a8289" />
 
-<https://github.com/user-attachments/assets/b9e58baa-c24d-47c4-826a-e26c765b0905>
+
+
+
+https://github.com/user-attachments/assets/d181735e-08c5-4098-944a-d615b74b6e73
+
+
 
 <br><br>
 
@@ -20,7 +27,7 @@ Stream Youtube Music from your terminal !
 - Add / Remove Songs in Queue
 - When select to play a song in search result, it will automatically load list of related songs into Queue
 - Create / Edit personal playlists
-
+- Keep playing in background alfter quit app ( Minimize )
 ## Supported OS
 
 - **Linux** (Tested on Arch Linux)
@@ -84,7 +91,8 @@ paru -S gytm-git
 
 # Keymap
 
-- <kbd>q</kbd>: Quit app
+- <kbd>Q</kbd>: Quit app
+- <kbd>q</kbd>: Minimize app and keep mpv playing
 - <kbd>Tab</kbd>: Switch tab
 - <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd>: Toggle focus area
 - (<kbd>arrow up</kbd>/<kbd>k</kbd>) / (<kbd>arrow down</kbd>/<kbd>j</kbd>): Navigate up/down list items
@@ -101,9 +109,9 @@ paru -S gytm-git
 - <kbd>x</kbd>:
   - [1]Albums Search results: Save/Unsave album
   - [1]Albums/[2]Playlists in Library: Unsave album/playlist
-  - [4]Songs in Library: Remove song from playlist
+  - [4]Content: Save song to playlist, Unsave with <kbd>X</kbd>
 - <kbd>a</kbd>:
-  - [2]Songs Search results  / [4]Songs in Library: Add song to Queue
+  - [2]Songs Search results  / [4]Content: Add song to Queue
   - [2]Playlist in Library: Create new playlist
 - <kbd>d</kbd>:
   - [3]Queue: Remove song from Queue
