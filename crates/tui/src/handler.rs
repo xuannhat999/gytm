@@ -11,7 +11,6 @@ use data::{
 use error::{YError, YResult, log_to_file};
 use player::Player;
 use state::AppState;
-use std::sync::Arc;
 
 pub fn handle_mpv_event(app: &mut App, state: &mut AppState, event: MpvEvent) {
     match event {
@@ -47,7 +46,7 @@ pub fn handle_mpv_event(app: &mut App, state: &mut AppState, event: MpvEvent) {
 pub async fn handle_key_events(
     key_event: KeyEvent,
     app: &mut App,
-    client: Arc<YClient>,
+    client: &YClient,
     player: &mut Player,
     state: &mut AppState,
 ) {
@@ -97,7 +96,7 @@ pub async fn handle_key_events(
                     handle_queue_event(key_event, app, player).await;
                 }
                 FocusArea::Songs => {
-                    handle_songs_event(key_event, app, &client, player).await;
+                    handle_songs_event(key_event, app, client, player).await;
                 }
                 _ => {}
             }
@@ -573,7 +572,7 @@ async fn handle_player_event(
 async fn handle_songs_event(
     key_event: KeyEvent,
     app: &mut App,
-    client: &Arc<YClient>,
+    client: &YClient,
     player: &mut Player,
 ) {
     match key_event.code {
@@ -663,7 +662,7 @@ async fn handle_songs_event(
 async fn handle_popup_event(
     key_event: KeyEvent,
     app: &mut App,
-    client: Arc<YClient>,
+    client: &YClient,
     player: &mut Player,
 ) {
     match &mut app.popup_state {

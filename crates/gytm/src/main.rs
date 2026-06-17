@@ -75,14 +75,8 @@ async fn main() -> YResult<()> {
         if event::poll(Duration::from_millis(50))? {
             match event::read()? {
                 Event::Key(key) => {
-                    handler::handle_key_events(
-                        key,
-                        &mut app,
-                        Arc::clone(&client),
-                        &mut player,
-                        &mut state,
-                    )
-                    .await;
+                    handler::handle_key_events(key, &mut app, &client, &mut player, &mut state)
+                        .await;
                     render = true;
                 }
                 Event::Resize(_, _) => {
