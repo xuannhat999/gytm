@@ -6,7 +6,8 @@ use api::YClient;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::{
     AppPage, CreatePlaylistFocus, FocusArea, MpvCommand, MpvEvent, PlayListPrivacy, PlayMode,
-    PlayerStatus, Song,
+    PlayerStatus::{self},
+    Song,
 };
 use error::{YError, YResult, log_to_file};
 use player::Player;
@@ -41,6 +42,15 @@ pub fn handle_mpv_event(app: &mut App, state: &mut AppState, event: MpvEvent) {
         MpvEvent::TimePos(pos) => {
             app.time_pos = Some(pos);
         }
+        MpvEvent::PauseChange(is_pause) => {
+            if app.playing_song.is_some() {
+                if is_pause {
+                    app.status = PlayerStatus::Paused
+                } else {
+                    app.status = PlayerStatus::Playing
+                }
+            }
+        }
     }
 }
 pub async fn handle_key_events(
@@ -65,7 +75,7 @@ pub async fn handle_key_events(
         if key_event.code == KeyCode::Tab {
             handle_page_event(app);
         }
-        if !app.is_insert || app.page == AppPage::Library {
+        if !app.is_insert {
             match key_event.code {
                 KeyCode::Char('q') => {
                     let _ = app.save_queue_file();
@@ -490,7 +500,7 @@ fn handle_page_event(app: &mut App) {
             }
         }
         AppPage::Search => {
-            // app.is_insert = false;
+            app.is_insert = false;
             app.page = AppPage::Library;
             if app.focus_area != FocusArea::Queue {
                 app.focus_area = FocusArea::Albums;
@@ -508,8 +518,6 @@ async fn handle_player_event(
         KeyCode::Char(' ') if app.playing_song.is_some() => {
             if let Err(e) = player.send_mpv_command(MpvCommand::TogglePause) {
                 log_to_file(&e);
-            } else {
-                app.status = PlayerStatus::Paused;
             }
         }
         KeyCode::Char('m') => {

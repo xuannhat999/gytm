@@ -230,7 +230,7 @@ pub fn parse_params(data: Value) -> YResult<String> {
         .pointer("/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents/1/automixPreviewVideoRenderer/content/automixPlaylistVideoRenderer/navigationEndpoint/watchPlaylistEndpoint/params")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string()); 
-    params.ok_or(YError::InvalidResponse("Get Pamams".to_string())) 
+    params.ok_or(YError::InvalidResponse("Get Params".to_string())) 
 }
 pub fn parse_related_songs(data: Value) -> YResult<Vec<Song>> {
     let mut songs = Vec::new();

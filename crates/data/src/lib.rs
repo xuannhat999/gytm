@@ -22,7 +22,6 @@ pub struct Song {
 pub struct MpvResponse {
     pub event: Option<String>,
     pub name: Option<String>,
-    #[serde(default)]
     pub data: Option<Value>,
 }
 
@@ -31,6 +30,7 @@ pub enum MpvEvent {
     StartPlaying(String),
     VolumeChange(u8),
     TimePos(f64),
+    PauseChange(bool),
 }
 
 #[derive(PartialEq)]

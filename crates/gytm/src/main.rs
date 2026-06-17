@@ -4,7 +4,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use data::{MpvCommand, MpvEvent, file_path::MPV_PLAYLIST};
+use data::{MpvCommand, MpvEvent, PlayerStatus, file_path::MPV_PLAYLIST};
 use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
@@ -89,6 +89,7 @@ async fn main() -> YResult<()> {
             let _ = fs::remove_file(MPV_PLAYLIST);
             break;
         }
+
         if app.noti.has_notification() || had_notification {
             render = true;
         }

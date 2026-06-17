@@ -100,7 +100,16 @@ impl Player {
                         ));
                         return;
                     }
-
+                    if writer
+                        .write_all(b"{\"command\": [\"observe_property\", 3, \"pause\"]}\n")
+                        .await
+                        .is_err()
+                    {
+                        log_to_file(YError::MpvSocketError(
+                            "Failed to send observe pause command".to_string(),
+                        ));
+                        return;
+                    }
                     let reader = BufReader::new(raw_reader);
                     let mut lines = reader.lines();
 
@@ -188,6 +197,16 @@ impl Player {
                                                             }
                                                         }
                                                     }
+                                                    Some("pause") => {
+                                                        if let Some(is_paused) = msg.data.and_then(|d| d.as_bool()) {
+                                                            if let Err(e) = tx_event
+                                                                .send(MpvEvent::PauseChange(is_paused))
+                                                                .await
+                                                            {
+                                                                log_to_file(format!("Failed to send PauseChange: {e}"));
+                                                            }
+                                                        }
+                                                    }
                                                     _ => {}
                                                 }
                                             }
@@ -235,7 +254,6 @@ impl Player {
         for song in songs {
             writeln!(file, "https://www.youtube.com/watch?v={}", song.video_id)?;
         }
-        file.sync_all()?;
         Ok(())
     }
 }
@@ -243,8 +261,19 @@ fn match_mpv_command(mpv_cmd: MpvCommand) -> String {
     let cmd_str = match mpv_cmd {
         MpvCommand::Shuffle => r#"{"command": ["playlist-shuffle"]}"#,
         MpvCommand::Unshuffle => r#"{"command": ["playlist-unshuffle"]}"#,
-        MpvCommand::PlayPrev => r#"{"command": ["playlist-prev"]}"#,
-        MpvCommand::PlayNext => r#"{"command": ["playlist-next"]}"#,
+        MpvCommand::PlayNext => {
+            return r#"{"command": ["playlist-next", "force"]}"#.to_string()
+                + "\n"
+                + r#"{"command": ["set_property", "pause", false]}"#
+                + "\n";
+        }
+
+        MpvCommand::PlayPrev => {
+            return r#"{"command": ["playlist-prev", "force"]}"#.to_string()
+                + "\n"
+                + r#"{"command": ["set_property", "pause", false]}"#
+                + "\n";
+        }
         MpvCommand::SeekBackward => r#"{"command": ["seek", -5, "relative"]}"#,
         MpvCommand::SeekForward => r#"{"command": ["seek", 5, "relative"]}"#,
         MpvCommand::DecreaseVol => r#"{"command": ["add", "volume", -5]}"#,

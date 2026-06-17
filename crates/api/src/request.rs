@@ -94,14 +94,14 @@ pub struct SaveAlbumRequest<'a, T: Serialize> {
 #[derive(Serialize)]
 pub struct SaveUnsaveListRequest<'a> {
     pub context: RequestContext<'a>,
-    pub actions: Vec<AcionsContent<'a>>,
+    pub actions: Vec<ActionsContent<'a>>,
     #[serde(rename = "playlistId")]
     pub playlist_id: &'a str,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AcionsContent<'a> {
+pub struct ActionsContent<'a> {
     pub action: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub added_video_id: Option<&'a str>,

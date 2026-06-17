@@ -10,7 +10,7 @@ use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
 
 use crate::request::{
-    AcionsContent, BrowseIdRequest, CreatePlaylistRequest, GetContinuationRequest,
+    ActionsContent, BrowseIdRequest, CreatePlaylistRequest, GetContinuationRequest,
     GetRelatedSongsRequest, PlaylistIdRequest, RequestClient, RequestContext, SaveAlbumRequest,
     SaveUnsaveListRequest, SearchRequest, TargetContent, TargetRequest, VideoIdRequest,
 };
@@ -352,7 +352,7 @@ impl YClient {
             "{}/youtubei/v1/browse/edit_playlist?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
-        let actions = vec![AcionsContent {
+        let actions = vec![ActionsContent {
             action: "ACTION_ADD_VIDEO",
             added_video_id: Some(video_id),
             dedupe_option: Some("DEDUPE_OPTION_CHECK"),
@@ -398,7 +398,7 @@ impl YClient {
             "{}/youtubei/v1/browse/edit_playlist?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
-        let actions = vec![AcionsContent {
+        let actions = vec![ActionsContent {
             action: "ACTION_REMOVE_VIDEO",
             added_video_id: None,
             dedupe_option: None,
