@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
+pub mod file_path;
 #[derive(Debug, Clone)]
 pub struct PlayList {
     pub title: String,
@@ -10,20 +10,18 @@ pub struct PlayList {
     pub is_saved: bool,
     pub is_custom: bool,
 }
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Song {
     pub title: String,
     pub set_video_id: String,
     pub video_id: String,
     pub duration: String,
-    pub is_liked: bool,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct MpvResponse {
     pub event: Option<String>,
     pub name: Option<String>,
-    #[serde(default)]
     pub data: Option<Value>,
 }
 
@@ -32,6 +30,7 @@ pub enum MpvEvent {
     StartPlaying(String),
     VolumeChange(u8),
     TimePos(f64),
+    PauseChange(bool),
 }
 
 #[derive(PartialEq)]
@@ -48,10 +47,11 @@ pub enum MpvCommand {
     SetVol(u8),
     PlayPos(usize),
     AppendSong(String),
-    LoadList(String),
+    LoadList,
     RemovePos(usize),
     Stop,
     Clear,
+    Quit,
 }
 #[derive(Default, PartialEq)]
 pub enum PlayerStatus {

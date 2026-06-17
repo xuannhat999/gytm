@@ -4,16 +4,17 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use data::{MpvCommand, MpvEvent};
+use data::{MpvCommand, MpvEvent, file_path::MPV_PLAYLIST};
 use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use state::AppState;
-use std::{io, sync::Arc, time::Duration};
+use std::{fs, io, sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 use tui::{
     app::App,
     handler,
+    helper::remove_queue_file,
     theme::Theme,
     ui::{self},
 };
@@ -27,6 +28,7 @@ async fn main() -> YResult<()> {
             std::process::exit(1);
         }
     };
+    let mut app = App::new(&state.player_state);
     println!("󱘖 Connecting to YouTube Music...");
     let client = match YClient::new().await {
         Ok(c) => Arc::new(c),
@@ -37,19 +39,15 @@ async fn main() -> YResult<()> {
         }
     };
     println!(" Fetching data from Youtube Music...");
-    let (albums, playlists, cus_playlists) = client.get_lists().await?;
-
-    let mut app = App::new(&state.player_state);
+    app.fetch_data(&client).await?;
     let mut player = Player::default();
-    app.albums = albums;
-    app.playlists = playlists;
-    app.cus_playlists = cus_playlists;
-    let (tx, mut rx) = mpsc::channel::<MpvEvent>(32);
-
-    if let Err(e) = player.start_mpv_and_observe(tx) {
-        log_to_file(&e);
-        println!("Error starting MPV: {}", e);
-        std::process::exit(1);
+    let (tx_event, mut rx) = mpsc::channel::<MpvEvent>(32);
+    if player.reconnect(tx_event.clone()).await.is_err() {
+        remove_queue_file();
+        player.spawn_mpv()?;
+        player.connect_observe_mpv(tx_event).await?;
+    } else {
+        let _ = app.load_queue_file();
     }
     player.send_mpv_command(MpvCommand::SetVol(app.volume))?;
     enable_raw_mode()?;
@@ -77,14 +75,8 @@ async fn main() -> YResult<()> {
         if event::poll(Duration::from_millis(50))? {
             match event::read()? {
                 Event::Key(key) => {
-                    handler::handle_key_events(
-                        key,
-                        &mut app,
-                        Arc::clone(&client),
-                        &mut player,
-                        &mut state,
-                    )
-                    .await;
+                    handler::handle_key_events(key, &mut app, &client, &mut player, &mut state)
+                        .await;
                     render = true;
                 }
                 Event::Resize(_, _) => {
@@ -94,8 +86,10 @@ async fn main() -> YResult<()> {
             }
         }
         if app.is_exit {
+            let _ = fs::remove_file(MPV_PLAYLIST);
             break;
         }
+
         if app.noti.has_notification() || had_notification {
             render = true;
         }

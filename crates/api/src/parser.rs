@@ -75,7 +75,6 @@ pub fn parse_songs(data: Value) -> YResult<Vec<Song>> {
                     .or_else(|| renderer.pointer("/playlistItemData/videoId"))
                     .and_then(|v| v.as_str()).unwrap_or("").to_string(),
                 duration: renderer.pointer("/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                is_liked: false,
             };
             if !song.video_id.is_empty() {
                 songs.push(song);
@@ -207,20 +206,6 @@ pub fn parse_search_songs(data: Value) -> YResult<Vec<Song>> {
                                 }
                             }
                         }
-
-                        let mut is_liked = false;
-                        if let Some(items) = renderer.pointer("/menu/menuRenderer/items").and_then(|v| v.as_array()) {
-                            for menu_item in items {
-                                if let Some(toggle) = menu_item.get("toggleMenuServiceItemRenderer") {
-                                    if let Some(status) = toggle.pointer("/defaultServiceEndpoint/likeEndpoint/status").and_then(|v| v.as_str()) {
-                                        if status == "INDIFFERENT" {
-                                            is_liked = true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
                         if !video_id.is_empty() {
                             songs.push(Song {
                                 video_id,
@@ -230,7 +215,6 @@ pub fn parse_search_songs(data: Value) -> YResult<Vec<Song>> {
                                     .to_string(),
                                 title,
                                 duration,
-                                is_liked,
                             });
                         }
                     }
@@ -246,7 +230,7 @@ pub fn parse_params(data: Value) -> YResult<String> {
         .pointer("/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents/1/automixPreviewVideoRenderer/content/automixPlaylistVideoRenderer/navigationEndpoint/watchPlaylistEndpoint/params")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string()); 
-    params.ok_or(YError::InvalidResponse("Get Pamams".to_string())) 
+    params.ok_or(YError::InvalidResponse("Get Params".to_string())) 
 }
 pub fn parse_related_songs(data: Value) -> YResult<Vec<Song>> {
     let mut songs = Vec::new();
@@ -265,7 +249,6 @@ pub fn parse_related_songs(data: Value) -> YResult<Vec<Song>> {
                         set_video_id: "".to_string(),
                         title: t.to_string(),
                         duration: duration.to_string(),
-                        is_liked: false,
                     });
                 }
 
