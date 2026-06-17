@@ -40,7 +40,7 @@ pub fn render(app: &mut App, frame: &mut Frame, theme: &Theme) {
         frame,
         top_layout[1],
         theme,
-        vec![("Quit", "q"), ("Next tab", "Tab")],
+        vec![("Quit", "Q"), ("Minimize", "q"), ("Next tab", "Tab")],
     );
     render_queue(frame, app, main_layout[3], theme);
     render_player(frame, app, main_layout[4], theme);

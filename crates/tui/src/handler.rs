@@ -69,6 +69,11 @@ pub async fn handle_key_events(
         if !app.is_insert || app.page == AppPage::Library {
             match key_event.code {
                 KeyCode::Char('q') => {
+                    let _ = app.save_queue_file();
+                    app.is_exit = true;
+                }
+                KeyCode::Char('Q') => {
+                    App::shutdown(player).await;
                     app.is_exit = true;
                 }
                 KeyCode::Char('3') => {
@@ -867,8 +872,8 @@ async fn load_list(
     start_index: usize,
     playlist_id: Option<String>,
 ) -> YResult<()> {
-    let tmp_file = player.write_tmp_list(&songs)?;
-    player.send_mpv_command(MpvCommand::LoadList(tmp_file))?;
+    player.write_playlist(&songs)?;
+    player.send_mpv_command(MpvCommand::LoadList)?;
     if start_index > 0 {
         player.send_mpv_command(MpvCommand::PlayPos(start_index))?;
     }

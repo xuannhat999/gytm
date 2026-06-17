@@ -1,11 +1,16 @@
 use std::time::Duration;
 
-use crate::theme::{error_style, success_style};
+use crate::{
+    helper::{self, get_queue_file},
+    theme::{error_style, success_style},
+};
+use api::YClient;
 use data::{
     AppPage, CreatePlaylistFocus, FocusArea, NotifyType, PlayList, PlayListPrivacy, PlayMode,
     PlayerState, PlayerStatus, Song,
 };
-use error::log_to_file;
+use error::{YResult, log_to_file};
+use player::Player;
 use ratatui::widgets::ListState;
 use ratatui_notifications::{Anchor, AutoDismiss, Level, Notification, Notifications};
 
@@ -114,6 +119,13 @@ impl App {
 }
 
 impl App {
+    pub async fn fetch_data(&mut self, client: &YClient) -> YResult<()> {
+        let (albums, playlists, cus_playlists) = client.get_lists().await?;
+        self.albums = albums;
+        self.playlists = playlists;
+        self.cus_playlists = cus_playlists;
+        Ok(())
+    }
     // TOGGLE NEXT ITEM IN LISTSTATE
     pub fn next_item(state: &mut ListState, len: usize) {
         if len == 0 {
@@ -170,6 +182,25 @@ impl App {
     pub fn is_popup_active(&self) -> bool {
         !matches!(self.popup_state, PopupState::None)
     }
+    pub fn save_queue_file(&self) -> YResult<()> {
+        let path = helper::get_queue_file()?;
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        let content = serde_json::to_string_pretty(&self.queue)?;
+        std::fs::write(&path, content)?;
+        Ok(())
+    }
+
+    pub fn load_queue_file(&mut self) -> YResult<()> {
+        let path = get_queue_file()?;
+        if path.exists() {
+            let content = std::fs::read_to_string(path)?;
+            self.queue = serde_json::from_str(&content).unwrap_or_default();
+        }
+        Ok(())
+    }
+
     pub fn notify(&mut self, noti_type: NotifyType, msg: String) {
         let style = match noti_type {
             NotifyType::Error => error_style(),
@@ -196,5 +227,9 @@ impl App {
                 log_to_file(&e);
             }
         }
+    }
+    pub async fn shutdown(player: &mut Player) {
+        helper::remove_queue_file();
+        player.shutdown().await;
     }
 }
