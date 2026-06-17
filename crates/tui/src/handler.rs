@@ -78,7 +78,11 @@ pub async fn handle_key_events(
         if !app.is_insert {
             match key_event.code {
                 KeyCode::Char('q') => {
-                    let _ = app.save_queue_file();
+                    if app.queue.is_empty() {
+                        App::shutdown(player).await;
+                    } else {
+                        let _ = app.save_queue_file();
+                    }
                     app.is_exit = true;
                 }
                 KeyCode::Char('Q') => {
