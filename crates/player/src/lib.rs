@@ -277,22 +277,22 @@ fn match_mpv_command(mpv_cmd: MpvCommand) -> String {
         MpvCommand::IncreaseVol => r#"{"command": ["add", "volume", 5]}"#,
         MpvCommand::TogglePause => r#"{"command": ["cycle", "pause"]}"#,
         MpvCommand::SetVol(volume) => {
-            return format!(r#"{{"command": ["set_property", "volume", {}]}}"#, volume);
+            return format!(r#"{{"command": ["set_property", "volume", {}]}}"#, volume) + "\n";
         }
         MpvCommand::PlayPos(pos) => {
             return format!(
                 r#"{{"command": ["set_property", "playlist-pos", {}]}}"#,
                 pos
-            );
+            ) + "\n";
         }
         MpvCommand::LoadList(path) => {
-            return format!(r#"{{"command": ["loadlist", "{}", "replace"]}}"#, path);
+            return format!(r#"{{"command": ["loadlist", "{}", "replace"]}}"#, path) + "\n";
         }
         MpvCommand::AppendSong(url) => {
-            return format!(r#"{{"command": ["loadfile", "{}", "append-play"]}}"#, url);
+            return format!(r#"{{"command": ["loadfile", "{}", "append-play"]}}"#, url) + "\n";
         }
         MpvCommand::RemovePos(idx) => {
-            return format!(r#"{{"command": ["playlist-remove", {}]}}"#, idx);
+            return format!(r#"{{"command": ["playlist-remove", {}]}}"#, idx) + "\n";
         }
         MpvCommand::Stop => r#"{"command": ["stop"]}"#,
         MpvCommand::Clear => r#"{"command": ["playlist-clear"]}"#,

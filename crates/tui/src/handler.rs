@@ -587,8 +587,6 @@ async fn handle_songs_event(
                         .await
                         {
                             log_to_file(&e);
-                        } else {
-                            let _ = player.send_mpv_command(MpvCommand::PlayPos(i));
                         }
                     }
                 } else {
@@ -877,6 +875,7 @@ async fn load_list(
     if app.play_mode == PlayMode::ShuffleMode {
         player.send_mpv_command(MpvCommand::Shuffle)?;
     }
+
     app.queue = songs;
     app.queue_liststate.select(Some(start_index));
     app.focus_area = FocusArea::Queue;
