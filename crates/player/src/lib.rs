@@ -38,7 +38,7 @@ impl Player {
             .map_err(|_| YError::MpvSpawnError)?;
         Ok(())
     }
-    pub async fn shutdown(&mut self) {
+    pub fn shutdown(&mut self) {
         if let Err(e) = self.send_mpv_command(MpvCommand::Quit) {
             log_to_file(&e);
         }

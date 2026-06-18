@@ -50,7 +50,7 @@ pub fn handle_mpv_event(app: &mut App, state: &mut AppState, event: MpvEvent) {
         }
     }
 }
-pub async fn handle_key_events(
+pub fn handle_key_events(
     key_event: KeyEvent,
     app: &mut App,
     player: &mut Player,
@@ -66,7 +66,7 @@ pub async fn handle_key_events(
         handle_lists_event(key_event, app);
     }
     if !matches!(app.popup_state, PopupState::None) {
-        handle_popup_event(key_event, app).await;
+        handle_popup_event(key_event, app);
     } else {
         if key_event.code == KeyCode::Tab {
             handle_page_event(app);
@@ -75,14 +75,14 @@ pub async fn handle_key_events(
             match key_event.code {
                 KeyCode::Char('q') => {
                     if app.queue.is_empty() {
-                        App::shutdown(player).await;
+                        App::shutdown(player);
                     } else {
                         let _ = app.save_queue_file();
                     }
                     app.is_exit = true;
                 }
                 KeyCode::Char('Q') => {
-                    App::shutdown(player).await;
+                    App::shutdown(player);
                     app.is_exit = true;
                 }
                 KeyCode::Char('3') => {
@@ -103,14 +103,14 @@ pub async fn handle_key_events(
             }
             match app.focus_area {
                 FocusArea::Queue => {
-                    handle_queue_event(key_event, app, player).await;
+                    handle_queue_event(key_event, app, player);
                 }
                 FocusArea::Songs => {
-                    handle_songs_event(key_event, app, player).await;
+                    handle_songs_event(key_event, app, player);
                 }
                 _ => {}
             }
-            handle_player_event(key_event, app, player, state).await
+            handle_player_event(key_event, app, player, state);
         }
 
         match app.page {
@@ -286,7 +286,7 @@ pub async fn handle_key_events(
                                     .selected()
                                     .map(|i| app.search_songs[i].clone())
                                 {
-                                    if let Err(e) = append_song_to_queue(app, player, &song).await {
+                                    if let Err(e) = append_song_to_queue(app, player, &song) {
                                         log_to_file(&e);
                                     }
                                 }
@@ -364,16 +364,16 @@ fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
         _ => {}
     }
 }
-async fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
+fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
     match key_event.code {
         KeyCode::Char('d') => {
             if let Some(i) = app.queue_liststate.selected() {
                 if app.play_mode == PlayMode::DefaultMode {
-                    remove_song_from_queue(app, player, i, i).await;
+                    remove_song_from_queue(app, player, i, i);
                 } else {
                     let video_id = &app.queue[i].video_id;
                     if let Some(idx_mpv) = app.get_mpv_idx(video_id) {
-                        remove_song_from_queue(app, player, i, idx_mpv).await;
+                        remove_song_from_queue(app, player, i, idx_mpv);
                     }
                 }
                 if app.queue.is_empty() {
@@ -426,7 +426,7 @@ fn handle_page_event(app: &mut App) {
         }
     }
 }
-async fn handle_player_event(
+fn handle_player_event(
     key_event: KeyEvent,
     app: &mut App,
     player: &mut Player,
@@ -495,7 +495,7 @@ async fn handle_player_event(
         _ => {}
     }
 }
-async fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
+fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
     match key_event.code {
         KeyCode::Enter => {
             if let Some(list) = &app.viewing_list {
@@ -522,7 +522,7 @@ async fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Pla
         }
         KeyCode::Char('a') => {
             if let Some(song) = app.songs_liststate.selected().map(|i| app.songs[i].clone()) {
-                if let Err(e) = append_song_to_queue(app, player, &song).await {
+                if let Err(e) = append_song_to_queue(app, player, &song) {
                     log_to_file(&e);
                 }
             }
@@ -567,7 +567,7 @@ async fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Pla
         _ => {}
     }
 }
-async fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
+fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
     match &mut app.popup_state {
         PopupState::SaveSong { selected_save_song } => match key_event.code {
             KeyCode::Esc => {
@@ -667,7 +667,7 @@ async fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
     }
 }
 
-async fn append_song_to_queue(app: &mut App, player: &mut Player, song: &Song) -> YResult<()> {
+fn append_song_to_queue(app: &mut App, player: &mut Player, song: &Song) -> YResult<()> {
     let url = get_url_from_vid_id(&song.video_id);
     player.send_mpv_command(MpvCommand::AppendSong(url))?;
     let new_song = song.clone();
@@ -682,7 +682,7 @@ async fn append_song_to_queue(app: &mut App, player: &mut Player, song: &Song) -
     Ok(())
 }
 
-async fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_idx: usize) {
+fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_idx: usize) {
     if let Err(e) = player.send_mpv_command(MpvCommand::RemovePos(mpv_idx)) {
         log_to_file(&e);
     } else {

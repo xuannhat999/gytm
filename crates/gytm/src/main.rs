@@ -190,7 +190,7 @@ async fn main() -> YResult<()> {
         if event::poll(Duration::from_millis(50))? {
             match event::read()? {
                 Event::Key(key) => {
-                    handler::handle_key_events(key, &mut app, &mut player, &mut app_state).await;
+                    handler::handle_key_events(key, &mut app, &mut player, &mut app_state);
                     render = true;
                 }
                 Event::Resize(_, _) => {

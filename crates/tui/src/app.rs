@@ -230,8 +230,8 @@ impl App {
             }
         }
     }
-    pub async fn shutdown(player: &mut Player) {
+    pub fn shutdown(player: &mut Player) {
         helper::remove_queue_file();
-        player.shutdown().await;
+        player.shutdown();
     }
 }
