@@ -40,16 +40,17 @@ async fn main() -> YResult<()> {
     };
     println!(" Fetching data from Youtube Music...");
     app.fetch_data(&client).await?;
+    println!(" Setting up mpv...");
     let mut player = Player::default();
     let (tx_event, mut rx) = mpsc::channel::<MpvEvent>(32);
     if player.reconnect(tx_event.clone()).await.is_err() {
         remove_queue_file();
         player.spawn_mpv()?;
         player.connect_observe_mpv(tx_event).await?;
+        player.send_mpv_command(MpvCommand::SetVol(app.volume))?;
     } else {
         let _ = app.load_queue_file();
     }
-    player.send_mpv_command(MpvCommand::SetVol(app.volume))?;
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
