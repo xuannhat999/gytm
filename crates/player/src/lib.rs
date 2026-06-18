@@ -14,7 +14,7 @@ use tokio::{
 
 #[derive(Default)]
 pub struct Player {
-    mpv_conn: Option<mpsc::UnboundedSender<MpvCommand>>,
+    mpv_cmd_sender: Option<mpsc::UnboundedSender<MpvCommand>>,
 }
 impl Player {
     pub fn spawn_mpv(&mut self) -> YResult<()> {
@@ -38,20 +38,172 @@ impl Player {
             .map_err(|_| YError::MpvSpawnError)?;
         Ok(())
     }
-    pub async fn shutdown(&mut self) {
+    pub fn shutdown(&mut self) {
         if let Err(e) = self.send_mpv_command(MpvCommand::Quit) {
             log_to_file(&e);
         }
-        self.mpv_conn = None;
+        self.mpv_cmd_sender = None;
         let _ = fs::remove_file(data::file_path::MPV_SOCKET);
     }
 
     // START MPV SOCKET
-    pub async fn connect_observe_mpv(
+    pub async fn observe_mpv(
         &mut self,
+        stream: UnixStream,
         tx_event: tokio::sync::mpsc::Sender<MpvEvent>,
     ) -> YResult<()> {
-        // CONNECT TO MPV
+        let (tx, mut rx) = mpsc::unbounded_channel::<MpvCommand>();
+        self.mpv_cmd_sender = Some(tx);
+        tokio::spawn(async move {
+            let (raw_reader, mut writer) = tokio::io::split(stream);
+            // PLAYLIST CHANGE
+            if writer
+                .write_all(b"{\"command\": [\"observe_property\", 1, \"playlist\"]}\n")
+                .await
+                .is_err()
+            {
+                log_to_file(YError::MpvSocketError(
+                    "Failed to send observe playlist command".to_string(),
+                ));
+                return;
+            }
+            // VOLUME CHANGE
+            if writer
+                .write_all(b"{\"command\": [\"observe_property\", 2, \"volume\"]}\n")
+                .await
+                .is_err()
+            {
+                log_to_file(YError::MpvSocketError(
+                    "Failed to send observe volume command".to_string(),
+                ));
+                return;
+            }
+            if writer
+                .write_all(b"{\"command\": [\"observe_property\", 3, \"pause\"]}\n")
+                .await
+                .is_err()
+            {
+                log_to_file(YError::MpvSocketError(
+                    "Failed to send observe pause command".to_string(),
+                ));
+                return;
+            }
+            let reader = BufReader::new(raw_reader);
+            let mut lines = reader.lines();
+
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
+            tick.tick().await;
+            loop {
+                tokio::select! {
+                    // SEND TIME_POS CMD EVERY 1s
+                    _ = tick.tick() => {
+                        let cmd = r#"{"command": ["get_property", "time-pos"]}"#.to_string() + "\n";
+                        if let Err(e) = writer.write_all(cmd.as_bytes()).await {
+                            log_to_file(format!("Failed to send time-pos: {e}"));
+                            break;
+                        }
+                    }
+                    // RECEIVE CMD AND SEND TO SOCKET
+                    cmd = rx.recv() => {
+                        match cmd {
+                            Some(mpv_cmd) => {
+                                let cmd = match_mpv_command(mpv_cmd);
+                                if !cmd.is_empty() {
+                                    if let Err(e) = writer.write_all(cmd.as_bytes()).await {
+                                        log_to_file(format!("Failed to send command to mpv: {e}"));
+                                        break;
+                                    }
+                                }
+                            }
+                            None => { break; }
+                        }
+                    },
+                    // RECEIVE MPV RESPONSE AND SEND MPV EVENT
+                    line = lines.next_line() => {
+                        match line {
+                            Ok(Some(ref l)) => {
+                                if let Ok(reply) = serde_json::from_str::<serde_json::Value>(l) {
+                                    if reply.get("event").is_none() {
+                                        if let (Some("success"), Some(v)) = (
+                                            reply.get("error").and_then(|e| e.as_str()),
+                                            reply.get("data").and_then(|d| d.as_f64()),
+                                        ) {
+                                            let _ = tx_event.send(MpvEvent::TimePos(v)).await;
+                                        }
+                                    }
+                                }
+                                if let Ok(msg) = serde_json::from_str::<MpvResponse>(l) {
+                                    if msg.event.as_deref() == Some("property-change") {
+                                        match msg.name.as_deref() {
+                                            Some("playlist") => {
+                                                if let Some(items) =
+                                                    msg.data.and_then(|d| d.as_array().cloned())
+                                                {
+                                                    let mpv_ids: Vec<String> = items
+                                                        .iter()
+                                                        .filter_map(|i| {
+                                                            i["filename"].as_str().map(|s|s.to_string())
+                                                        })
+                                                        .collect();
+                                                    if let Err(e) =
+                                                        tx_event.send(MpvEvent::ListChange(mpv_ids)).await
+                                                    {
+                                                        log_to_file(format!("Failed to send ListChange: {e}"));
+                                                    }
+                                                    if let Some(item) = items
+                                                        .iter()
+                                                        .find(|i| i["playing"].as_bool() == Some(true))
+                                                    {
+                                                        if let Some(url) = item["filename"].as_str() {
+                                                            if let Err(e) = tx_event
+                                                                .send(MpvEvent::StartPlaying(url.to_string()))
+                                                                .await
+                                                            {
+                                                                log_to_file(format!("Failed to send StartPlaying: {e}"));
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            Some("volume") => {
+                                                if let Some(volume) = msg.data.and_then(|d| d.as_f64()) {
+                                                    if let Err(e) = tx_event
+                                                        .send(MpvEvent::VolumeChange(volume as u8))
+                                                        .await
+                                                    {
+                                                        log_to_file(format!("Failed to send VolumeChange: {e}"));
+                                                    }
+                                                }
+                                            }
+                                            Some("pause") => {
+                                                if let Some(is_paused) = msg.data.and_then(|d| d.as_bool()) {
+                                                    if let Err(e) = tx_event
+                                                        .send(MpvEvent::PauseChange(is_paused))
+                                                        .await
+                                                    {
+                                                        log_to_file(format!("Failed to send PauseChange: {e}"));
+                                                    }
+                                                }
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                            }
+                            Ok(None) => break,
+                            Err(e) => {
+                                log_to_file(format!("MPV socket read error: {e}"));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        Ok(())
+    }
+
+    pub async fn connect_mpv(&mut self) -> YResult<UnixStream> {
         let mut stream: Option<UnixStream> = None;
         let mut retries = 0;
         const MAX_RETRIES: u32 = 50;
@@ -67,182 +219,20 @@ impl Player {
                 }
             }
         }
-        if stream.is_none() {
-            return Err(YError::MpvSocketError(
-                "Timeout: Cannot connect to MPV IPC socket after 50 retries".to_string(),
-            ));
-        } else {
-            // CONNECT SUCESS -> OBSERVE
-            let (tx, mut rx) = mpsc::unbounded_channel::<MpvCommand>();
-            self.mpv_conn = Some(tx);
-            tokio::spawn(async move {
-                if let Some(s) = stream {
-                    let (raw_reader, mut writer) = tokio::io::split(s);
-                    // PLAYLIST CHANGE
-                    if writer
-                        .write_all(b"{\"command\": [\"observe_property\", 1, \"playlist\"]}\n")
-                        .await
-                        .is_err()
-                    {
-                        log_to_file(YError::MpvSocketError(
-                            "Failed to send observe playlist command".to_string(),
-                        ));
-                        return;
-                    }
-                    // VOLUME CHANGE
-                    if writer
-                        .write_all(b"{\"command\": [\"observe_property\", 2, \"volume\"]}\n")
-                        .await
-                        .is_err()
-                    {
-                        log_to_file(YError::MpvSocketError(
-                            "Failed to send observe volume command".to_string(),
-                        ));
-                        return;
-                    }
-                    if writer
-                        .write_all(b"{\"command\": [\"observe_property\", 3, \"pause\"]}\n")
-                        .await
-                        .is_err()
-                    {
-                        log_to_file(YError::MpvSocketError(
-                            "Failed to send observe pause command".to_string(),
-                        ));
-                        return;
-                    }
-                    let reader = BufReader::new(raw_reader);
-                    let mut lines = reader.lines();
-
-                    let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
-                    tick.tick().await;
-                    loop {
-                        tokio::select! {
-                            // SEND TIME_POS CMD EVERY 1s
-                            _ = tick.tick() => {
-                                let cmd = r#"{"command": ["get_property", "time-pos"]}"#.to_string() + "\n";
-                                if let Err(e) = writer.write_all(cmd.as_bytes()).await {
-                                    log_to_file(format!("Failed to send time-pos: {e}"));
-                                    break;
-                                }
-                            }
-                            // RECEIVE CMD AND SEND TO SOCKET
-                            cmd = rx.recv() => {
-                                match cmd {
-                                    Some(mpv_cmd) => {
-                                        let cmd = match_mpv_command(mpv_cmd);
-                                        if !cmd.is_empty() {
-                                            if let Err(e) = writer.write_all(cmd.as_bytes()).await {
-                                                log_to_file(format!("Failed to send command to mpv: {e}"));
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    None => { break; }
-                                }
-                            },
-                            // RECEIVE MPV RESPONSE AND SEND MPV EVENT
-                            line = lines.next_line() => {
-                                match line {
-                                    Ok(Some(ref l)) => {
-                                        if let Ok(reply) = serde_json::from_str::<serde_json::Value>(l) {
-                                            if reply.get("event").is_none() {
-                                                if let (Some("success"), Some(v)) = (
-                                                    reply.get("error").and_then(|e| e.as_str()),
-                                                    reply.get("data").and_then(|d| d.as_f64()),
-                                                ) {
-                                                    let _ = tx_event.send(MpvEvent::TimePos(v)).await;
-                                                }
-                                            }
-                                        }
-                                        if let Ok(msg) = serde_json::from_str::<MpvResponse>(l) {
-                                            if msg.event.as_deref() == Some("property-change") {
-                                                match msg.name.as_deref() {
-                                                    Some("playlist") => {
-                                                        if let Some(items) =
-                                                            msg.data.and_then(|d| d.as_array().cloned())
-                                                        {
-                                                            let mpv_ids: Vec<String> = items
-                                                                .iter()
-                                                                .filter_map(|i| {
-                                                                    i["filename"].as_str().map(|s|s.to_string())
-                                                                })
-                                                                .collect();
-                                                            if let Err(e) =
-                                                                tx_event.send(MpvEvent::ListChange(mpv_ids)).await
-                                                            {
-                                                                log_to_file(format!("Failed to send ListChange: {e}"));
-                                                            }
-                                                            if let Some(item) = items
-                                                                .iter()
-                                                                .find(|i| i["playing"].as_bool() == Some(true))
-                                                            {
-                                                                if let Some(url) = item["filename"].as_str() {
-                                                                    if let Err(e) = tx_event
-                                                                        .send(MpvEvent::StartPlaying(url.to_string()))
-                                                                        .await
-                                                                    {
-                                                                        log_to_file(format!("Failed to send StartPlaying: {e}"));
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                    Some("volume") => {
-                                                        if let Some(volume) = msg.data.and_then(|d| d.as_f64()) {
-                                                            if let Err(e) = tx_event
-                                                                .send(MpvEvent::VolumeChange(volume as u8))
-                                                                .await
-                                                            {
-                                                                log_to_file(format!("Failed to send VolumeChange: {e}"));
-                                                            }
-                                                        }
-                                                    }
-                                                    Some("pause") => {
-                                                        if let Some(is_paused) = msg.data.and_then(|d| d.as_bool()) {
-                                                            if let Err(e) = tx_event
-                                                                .send(MpvEvent::PauseChange(is_paused))
-                                                                .await
-                                                            {
-                                                                log_to_file(format!("Failed to send PauseChange: {e}"));
-                                                            }
-                                                        }
-                                                    }
-                                                    _ => {}
-                                                }
-                                            }
-                                        }
-                                    }
-                                    Ok(None) => break,
-                                    Err(e) => {
-                                        log_to_file(format!("MPV socket read error: {e}"));
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    log_to_file(YError::MpvSocketError(
-                        "Timeout: Cannot connect to MPV IPC socket".to_string(),
-                    ));
-                }
-            });
+        match stream {
+            Some(s) => Ok(s),
+            None => Err(YError::MpvSocketError("Connect to mpv failed".to_string())),
+        }
+    }
+    pub fn check_socket_exists() -> YResult<()> {
+        if !std::path::Path::new(data::file_path::MPV_SOCKET).exists() {
+            return Err(YError::MpvSocketError("MPV socket not found".to_string()));
         }
         Ok(())
     }
 
-    pub async fn reconnect(
-        &mut self,
-        tx_event: tokio::sync::mpsc::Sender<MpvEvent>,
-    ) -> YResult<()> {
-        if !std::path::Path::new(data::file_path::MPV_SOCKET).exists() {
-            return Err(YError::MpvSocketError("MPV socket not found".to_string()));
-        }
-        self.connect_observe_mpv(tx_event).await
-    }
-
     pub fn send_mpv_command(&self, command: MpvCommand) -> YResult<()> {
-        if let Some(ref tx) = self.mpv_conn {
+        if let Some(ref tx) = self.mpv_cmd_sender {
             tx.send(command)?;
         }
         Ok(())

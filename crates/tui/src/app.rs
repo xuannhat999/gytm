@@ -4,15 +4,16 @@ use crate::{
     helper::{self, get_queue_file},
     theme::{error_style, success_style},
 };
-use api::YClient;
+use api::protocol::{ApiCmd, ApiLoadingKind};
 use data::{
-    AppPage, CreatePlaylistFocus, FocusArea, NotifyType, PlayList, PlayListPrivacy, PlayMode,
-    PlayerState, PlayerStatus, Song,
+    AppPage, CreatePlaylistFocus, FocusArea, NotifyType, PlayListPrivacy, PlayMode, PlayerState,
+    PlayerStatus, Playlist, Song,
 };
 use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::widgets::ListState;
 use ratatui_notifications::{Anchor, AutoDismiss, Level, Notification, Notifications};
+use tokio::sync::mpsc;
 
 pub enum PopupState {
     None,
@@ -29,8 +30,8 @@ pub enum PopupState {
 
 pub struct App {
     // PAGE LIBRARY
-    pub albums: Vec<PlayList>,
-    pub playlists: Vec<PlayList>,
+    pub albums: Vec<Playlist>,
+    pub playlists: Vec<Playlist>,
     pub queue: Vec<Song>,
     pub focus_area: FocusArea,
 
@@ -45,10 +46,10 @@ pub struct App {
     pub playing_playlist_id: Option<String>,
     pub songs: Vec<Song>,
     pub songs_liststate: ListState,
-    pub viewing_list: Option<PlayList>,
+    pub viewing_list: Option<Playlist>,
 
     // PAGE SEARCH
-    pub search_albums: Vec<PlayList>,
+    pub search_albums: Vec<Playlist>,
     pub search_albums_liststate: ListState,
     pub search_songs: Vec<Song>,
     pub search_songs_liststate: ListState,
@@ -69,9 +70,13 @@ pub struct App {
     pub noti: Notifications,
     pub page: AppPage,
     pub is_exit: bool,
+
+    // API WORKER
+    pub api_cmd_tx: mpsc::UnboundedSender<ApiCmd>,
+    pub api_loading_kind: Option<ApiLoadingKind>,
 }
 impl App {
-    pub fn new(player_state: &PlayerState) -> Self {
+    pub fn new(player_state: &PlayerState, api_cmd_tx: mpsc::UnboundedSender<ApiCmd>) -> Self {
         Self {
             // PAGE LIBRARY
             albums: Vec::new(),
@@ -114,18 +119,15 @@ impl App {
             noti: Notifications::new(),
             is_exit: false,
             page: AppPage::Library,
+
+            // API WORKER
+            api_cmd_tx,
+            api_loading_kind: None,
         }
     }
 }
 
 impl App {
-    pub async fn fetch_data(&mut self, client: &YClient) -> YResult<()> {
-        let (albums, playlists, cus_playlists) = client.get_lists().await?;
-        self.albums = albums;
-        self.playlists = playlists;
-        self.cus_playlists = cus_playlists;
-        Ok(())
-    }
     // TOGGLE NEXT ITEM IN LISTSTATE
     pub fn next_item(state: &mut ListState, len: usize) {
         if len == 0 {
@@ -228,8 +230,8 @@ impl App {
             }
         }
     }
-    pub async fn shutdown(player: &mut Player) {
+    pub fn shutdown(player: &mut Player) {
         helper::remove_queue_file();
-        player.shutdown().await;
+        player.shutdown();
     }
 }

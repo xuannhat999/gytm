@@ -1,12 +1,12 @@
-use data::{PlayList, Song};
+use data::{Playlist, Song};
 use serde_json::Value;
 use error::{YError,YResult};
 
 
 // EXTRACT PLAYLISTS/ALBUMS FROM RESPONSED DATA (JSON TYPE)
-pub fn parse_lists(data: Value) -> YResult<(Vec<PlayList>, Vec<PlayList>, Option<String>)> {
-    let mut albums: Vec<PlayList> = Vec::new();
-    let mut playlists: Vec<PlayList> = Vec::new();
+pub fn parse_lists(data: Value) -> YResult<(Vec<Playlist>, Vec<Playlist>, Option<String>)> {
+    let mut albums: Vec<Playlist> = Vec::new();
+    let mut playlists: Vec<Playlist> = Vec::new();
 
     let grid_renderer = data
         .pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/gridRenderer")
@@ -28,7 +28,7 @@ pub fn parse_lists(data: Value) -> YResult<(Vec<PlayList>, Vec<PlayList>, Option
                             })
                         });
 
-                    let album = PlayList {
+                    let album = Playlist {
                         title: rerender.pointer("/title/runs/0/text").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
                         artist: rerender.pointer("/subtitle/runs/2/text").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
                         browse_id: rerender.pointer("/navigationEndpoint/browseEndpoint/browseId").and_then(|v| v.as_str()).unwrap_or("").to_string(),
@@ -85,7 +85,7 @@ pub fn parse_songs(data: Value) -> YResult<Vec<Song>> {
     Ok(songs)
 }
 
-pub fn parse_created_playlist(data: Value) -> YResult<PlayList> {
+pub fn parse_created_playlist(data: Value) -> YResult<Playlist> {
     let playlist_id = data["playlistId"]
         .as_str()
         .ok_or(YError::InvalidResponse("Create playlist".to_string()))?
@@ -113,7 +113,7 @@ pub fn parse_created_playlist(data: Value) -> YResult<PlayList> {
         .unwrap_or("")
         .to_string();
 
-    Ok(PlayList {
+    Ok(Playlist {
         title,
         artist,
         browse_id,
@@ -123,8 +123,8 @@ pub fn parse_created_playlist(data: Value) -> YResult<PlayList> {
     })
 }
 
-pub fn parse_search_albums(data: Value) -> YResult<Vec<PlayList>> {
-    let mut albums: Vec<PlayList> = Vec::new();
+pub fn parse_search_albums(data: Value) -> YResult<Vec<Playlist>> {
+    let mut albums: Vec<Playlist> = Vec::new();
     let contents = data
         .pointer("/contents/tabbedSearchResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicShelfRenderer/contents")
         .and_then(|v| v.as_array())
@@ -167,7 +167,7 @@ pub fn parse_search_albums(data: Value) -> YResult<Vec<PlayList>> {
                 }
             }
             if !browse_id.is_empty() {
-                albums.push(PlayList {
+                albums.push(Playlist {
                     title,
                     artist,
                     browse_id,
