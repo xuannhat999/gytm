@@ -4,10 +4,7 @@ use crate::{
     helper::{self, get_queue_file},
     theme::{error_style, success_style},
 };
-use api::{
-    YClient,
-    protocol::{ApiCmd, ApiLoadingKind},
-};
+use api::protocol::{ApiCmd, ApiLoadingKind};
 use data::{
     AppPage, CreatePlaylistFocus, FocusArea, NotifyType, PlayListPrivacy, PlayMode, PlayerState,
     PlayerStatus, Playlist, Song,
@@ -131,23 +128,6 @@ impl App {
 }
 
 impl App {
-    pub fn init_data(
-        &mut self,
-        albums: Vec<Playlist>,
-        playlists: Vec<Playlist>,
-        cus_playlists: Vec<usize>,
-    ) {
-        self.albums = albums;
-        self.playlists = playlists;
-        self.cus_playlists = cus_playlists;
-    }
-    pub async fn fetch_data(&mut self, client: &YClient) -> YResult<()> {
-        let (albums, playlists, cus_playlists) = client.get_lists().await?;
-        self.albums = albums;
-        self.playlists = playlists;
-        self.cus_playlists = cus_playlists;
-        Ok(())
-    }
     // TOGGLE NEXT ITEM IN LISTSTATE
     pub fn next_item(state: &mut ListState, len: usize) {
         if len == 0 {

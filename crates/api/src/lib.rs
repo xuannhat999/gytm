@@ -609,7 +609,8 @@ impl YClient {
     }
 
     // FETCH RELATED SONGS
-    pub async fn get_related_songs(&self, video_id: &str, params: &str) -> YResult<Vec<Song>> {
+    pub async fn get_related_songs(&self, song: Song, params: &str) -> YResult<Vec<Song>> {
+        let video_id = &song.video_id;
         let playlist_id = format!("RDAMVM{}", video_id);
         let raw_data = match self.get_related_songs_raw(&playlist_id, params).await {
             Ok(raw) => raw,
@@ -618,13 +619,14 @@ impl YClient {
                 Value::Null
             }
         };
-        let songs = match parser::parse_related_songs(raw_data) {
+        let mut songs = match parser::parse_related_songs(raw_data) {
             Ok(songs) => songs,
             Err(e) => {
                 log_to_file(&e);
                 Vec::new()
             }
         };
+        songs.insert(0, song);
         Ok(songs)
     }
 }

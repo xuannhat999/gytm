@@ -43,7 +43,6 @@ async fn main() -> YResult<()> {
             std::process::exit(1);
         }
     };
-    println!(" Fetching data from Youtube Music...");
     let worker_client = client.clone();
     tokio::spawn(async move {
         while let Some(cmd) = api_cmd_rx.recv().await {
@@ -128,9 +127,8 @@ async fn main() -> YResult<()> {
                 ApiCmd::GetRelatedSongsToPlay(song) => {
                     match worker_client.get_params(&song.video_id).await {
                         Ok(params) => {
-                            let related_songs = worker_client
-                                .get_related_songs(&song.video_id, &params)
-                                .await;
+                            let related_songs =
+                                worker_client.get_related_songs(song, &params).await;
                             ApiResponse::GetRelatedSongsToPlay(related_songs)
                         }
                         Err(e) => ApiResponse::GetRelatedSongsToPlay(Err(e)),
@@ -147,7 +145,6 @@ async fn main() -> YResult<()> {
     });
     app.api_cmd_tx.send(ApiCmd::FetchLibraryData).ok();
     app.api_loading_kind = Some(api::protocol::ApiLoadingKind::FetchLibraryData);
-    println!(" Setting up mpv...");
     let mut player = Player::default();
     let (tx_event, mut rx) = mpsc::channel::<MpvEvent>(32);
 
