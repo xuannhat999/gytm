@@ -1,4 +1,4 @@
-use data::{PlayList, PlayListPrivacy, Song};
+use data::{PlayListPrivacy, Playlist, Song};
 use error::{YError, YResult, log_to_file};
 use reqwest::{
     Client, Url,
@@ -15,6 +15,7 @@ use crate::request::{
     SaveUnsaveListRequest, SearchRequest, TargetContent, TargetRequest, VideoIdRequest,
 };
 pub mod parser;
+pub mod protocol;
 pub mod request;
 pub struct YClient {
     pub http: Client,
@@ -242,7 +243,7 @@ impl YClient {
         title: &str,
         desc: &str,
         privacy: PlayListPrivacy,
-    ) -> YResult<PlayList> {
+    ) -> YResult<Playlist> {
         let res = self.create_playlist_raw(title, desc, privacy).await?;
         let playlist = parser::parse_created_playlist(res)?;
         Ok(playlist)
@@ -347,11 +348,12 @@ impl YClient {
         Ok(response)
     }
 
-    pub async fn save_to_playlist(&self, video_id: &str, playlist_id: &str) -> YResult<()> {
+    pub async fn save_to_playlist(&self, song: &Song, playlist_id: &str) -> YResult<()> {
         let url = format!(
             "{}/youtubei/v1/browse/edit_playlist?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
         );
+        let video_id = &song.video_id;
         let actions = vec![ActionsContent {
             action: "ACTION_ADD_VIDEO",
             added_video_id: Some(video_id),
@@ -388,12 +390,9 @@ impl YClient {
     }
 
     // REMOVE SONG FROM PLAYLIST
-    pub async fn unsave_to_playlist(
-        &self,
-        video_id: &str,
-        playlist_id: &str,
-        set_video_id: &str,
-    ) -> YResult<()> {
+    pub async fn unsave_to_playlist(&self, song: &Song, playlist_id: &str) -> YResult<()> {
+        let video_id = &song.video_id;
+        let set_video_id = &song.set_video_id;
         let url = format!(
             "{}/youtubei/v1/browse/edit_playlist?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -432,18 +431,41 @@ impl YClient {
             ))),
         }
     }
-    pub async fn like_or_unlike_song(&self, video_id: &str, is_like: bool) -> YResult<()> {
-        let url = if is_like {
-            format!(
-                "{}/youtubei/v1/like/like?key={}&alt=json",
-                YTM_DOMAIN, self.innertube_api_key
-            )
-        } else {
-            format!(
-                "{}/youtubei/v1/like/removelike?key={}&alt=json",
-                YTM_DOMAIN, self.innertube_api_key
-            )
+    pub async fn unlike_song(&self, song: &Song) -> YResult<()> {
+        let video_id = &song.video_id;
+        let url = format!(
+            "{}/youtubei/v1/like/removelike?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
+        let body = TargetRequest {
+            context: self.get_context(),
+            target: TargetContent {
+                video_id: Some(video_id),
+                playlist_id: None,
+            },
         };
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers()?)
+            .json(&body)
+            .send()
+            .await?;
+
+        let status = response.status();
+        if status.is_success() {
+            Ok(())
+        } else {
+            Err(YError::BadStatus(String::from("Like Song")))
+        }
+    }
+
+    pub async fn like_song(&self, song: &Song) -> YResult<()> {
+        let video_id = &song.video_id;
+        let url = format!(
+            "{}/youtubei/v1/like/like?key={}&alt=json",
+            YTM_DOMAIN, self.innertube_api_key
+        );
 
         let body = TargetRequest {
             context: self.get_context(),
@@ -464,14 +486,14 @@ impl YClient {
         if status.is_success() {
             Ok(())
         } else {
-            Err(YError::BadStatus(String::from("Like/Unlike Song")))
+            Err(YError::BadStatus(String::from("Like Song")))
         }
     }
 
     // FETCH ALBUMS/PLAYLIST IN LIBRARY
-    pub async fn get_lists(&self) -> YResult<(Vec<PlayList>, Vec<PlayList>, Vec<usize>)> {
-        let mut all_albums: Vec<PlayList> = Vec::new();
-        let mut all_playlists: Vec<PlayList> = Vec::new();
+    pub async fn get_lists(&self) -> YResult<(Vec<Playlist>, Vec<Playlist>, Vec<usize>)> {
+        let mut all_albums: Vec<Playlist> = Vec::new();
+        let mut all_playlists: Vec<Playlist> = Vec::new();
         let mut all_cus_playlists: Vec<usize> = Vec::new();
         let raw_data = match self.get_raw_lists().await {
             Ok(raw_lists) => raw_lists,
@@ -530,7 +552,7 @@ impl YClient {
     }
 
     // FETCH SEARCH RESULT ALBUMS
-    pub async fn get_search_albums(&self, query: &str) -> YResult<Vec<PlayList>> {
+    pub async fn get_search_albums(&self, query: &str) -> YResult<Vec<Playlist>> {
         let raw_list = match self.get_raw_search_albums(query, 2).await {
             Ok(raw_data) => raw_data,
             Err(e) => {

@@ -3,7 +3,7 @@ use serde_json::Value;
 pub mod file_path;
 
 #[derive(Debug, Clone)]
-pub struct PlayList {
+pub struct Playlist {
     pub title: String,
     pub artist: String,
     pub browse_id: String,
