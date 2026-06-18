@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 pub mod file_path;
+
 #[derive(Debug, Clone)]
 pub struct PlayList {
     pub title: String,
@@ -53,13 +54,11 @@ pub enum MpvCommand {
     Clear,
     Quit,
 }
-#[derive(Default, PartialEq)]
+#[derive(PartialEq)]
 pub enum PlayerStatus {
-    #[default]
     Idle,
     Playing,
     Paused,
-    Loading,
 }
 
 #[derive(Default, PartialEq, Serialize, Deserialize, Debug, Clone)]

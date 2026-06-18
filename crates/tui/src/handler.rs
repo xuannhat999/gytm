@@ -18,9 +18,6 @@ pub fn handle_mpv_event(app: &mut App, state: &mut AppState, event: MpvEvent) {
         MpvEvent::ListChange(list) => {
             let ids = helper::list_vid_id_from_list_url(list);
             app.mpv_list = ids;
-            if !app.mpv_list.is_empty() && app.playing_song.is_some() {
-                app.status = PlayerStatus::Loading;
-            }
         }
         MpvEvent::StartPlaying(url) => {
             let video_id = helper::get_vid_id_from_url(&url);

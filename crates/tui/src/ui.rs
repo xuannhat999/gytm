@@ -329,7 +329,6 @@ fn render_queue(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
 fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let song_info = match app.status {
         PlayerStatus::Idle => vec![Line::from("   No song is playing ".to_string())],
-        PlayerStatus::Loading => vec![Line::from("   Loading...".to_string())],
         _ => {
             let icon = if app.status == PlayerStatus::Playing {
                 ""
@@ -726,4 +725,13 @@ fn render_privacy_selector(
     );
 
     frame.render_widget(p, area);
+}
+fn render_spinner(f: &mut Frame, area: Rect, start_time: std::time::Instant) {
+    let spinners = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+    let elapsed = start_time.elapsed().as_millis();
+    let index = ((elapsed / 80) as usize) % spinners.len();
+
+    let spinner_widget = Paragraph::new(spinners[index]);
+    f.render_widget(spinner_widget, area);
 }
