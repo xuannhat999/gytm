@@ -43,13 +43,18 @@ async fn main() -> YResult<()> {
     println!(" Setting up mpv...");
     let mut player = Player::default();
     let (tx_event, mut rx) = mpsc::channel::<MpvEvent>(32);
-    if player.reconnect(tx_event.clone()).await.is_err() {
+
+    if Player::check_socket_exists().is_ok()
+        && let Ok(stream) = player.connect_mpv().await
+    {
+        let _ = app.load_queue_file();
+        player.observe_mpv(stream, tx_event).await?;
+    } else {
         remove_queue_file();
         player.spawn_mpv()?;
-        player.connect_observe_mpv(tx_event).await?;
+        let stream = player.connect_mpv().await?;
+        player.observe_mpv(stream, tx_event).await?;
         player.send_mpv_command(MpvCommand::SetVol(app.volume))?;
-    } else {
-        let _ = app.load_queue_file();
     }
     enable_raw_mode()?;
     let mut stdout = io::stdout();
