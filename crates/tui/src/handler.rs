@@ -5,7 +5,9 @@ use crate::{
 use api::protocol::{ApiCmd, ApiLoadingKind, ApiResponse};
 use crossterm::event::{KeyCode, KeyEvent};
 use data::{
-    AppPage, CreatePlaylistFocus, FocusArea, MpvCommand, MpvEvent, PlayListPrivacy, PlayMode,
+    AppPage, CreatePlaylistFocus,
+    FocusArea::{self},
+    MpvCommand, MpvEvent, PlayListPrivacy, PlayMode,
     PlayerStatus::{self},
     Song,
 };
@@ -510,6 +512,8 @@ fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
                             Some(list.playlist_id.clone()),
                         ) {
                             log_to_file(&e);
+                        } else {
+                            app.focus_area = FocusArea::Queue;
                         }
                     }
                 } else {
