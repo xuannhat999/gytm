@@ -1,3 +1,5 @@
+use std::fs;
+
 use crate::{
     app::{App, PopupState},
     helper::{self, get_url_from_vid_id},
@@ -20,6 +22,8 @@ pub fn handle_mpv_event(app: &mut App, state: &mut AppState, event: MpvEvent) {
         MpvEvent::ListChange(list) => {
             let ids = helper::list_vid_id_from_list_url(list);
             app.mpv_list = ids;
+            app.save_queue_file().ok();
+            fs::remove_file(data::file_path::MPV_PLAYLIST).ok();
         }
         MpvEvent::StartPlaying(url) => {
             let video_id = helper::get_vid_id_from_url(&url);
@@ -78,8 +82,6 @@ pub fn handle_key_events(
                 KeyCode::Char('q') => {
                     if app.queue.is_empty() {
                         App::shutdown(player);
-                    } else {
-                        let _ = app.save_queue_file();
                     }
                     app.is_exit = true;
                 }
