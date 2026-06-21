@@ -46,7 +46,7 @@ pub fn render(app: &mut App, frame: &mut Frame, theme: &Theme, start_time: std::
         frame,
         top_layout[1],
         theme,
-        vec![("Quit", "Q"), ("Minimize", "q"), ("Next tab", "Tab")],
+        vec![("Next tab", "Tab"), ("Minimize", "q"), ("Quit", "Q")],
     );
     render_queue(frame, app, main_layout[3], theme, start_time);
     render_player(frame, app, main_layout[4], theme);
@@ -106,7 +106,7 @@ fn render_help_line(frame: &mut Frame, area: Rect, theme: &Theme, items: Vec<(&s
     let mut spans = Vec::new();
     for (i, (desc, key)) in items.iter().enumerate() {
         spans.push(Span::styled(format!("{}: ", desc), theme.text_style()));
-        spans.push(Span::styled(format!("[{}]", key), theme.key_style()));
+        spans.push(Span::styled(key.to_string(), theme.key_style()));
         if i < items.len() - 1 {
             spans.push(Span::styled(" | ", theme.text_style()));
         }
@@ -186,7 +186,7 @@ fn render_list(
     if app.api_loading_kind == Some(ApiLoadingKind::FetchLibraryData) {
         let inner_area = block.inner(area);
         frame.render_widget(block, area);
-        render_spinner(frame, inner_area, start_time);
+        render_spinner(frame, inner_area, theme, start_time);
         return;
     }
     let result = match area_type {
@@ -208,7 +208,7 @@ fn render_list(
                     format!("  {} - {}", item.title, item.artist)
                 };
                 if is_playing {
-                    ListItem::new(content).style(Style::default().fg(theme.secondary))
+                    ListItem::new(content).style(Style::default().fg(theme.primary))
                 } else {
                     ListItem::new(content)
                 }
@@ -268,7 +268,7 @@ fn render_songs(
         .border_style(border_style);
     if app.api_loading_kind == Some(ApiLoadingKind::GetSongsToView) {
         let inner_area = block.inner(area);
-        render_spinner(frame, inner_area, start_time);
+        render_spinner(frame, inner_area, theme, start_time);
         frame.render_widget(block, area);
         return;
     }
@@ -336,7 +336,7 @@ fn render_queue(
 
     if app.api_loading_kind == Some(ApiLoadingKind::GetSongsToPlay) {
         let inner_area = block.inner(area);
-        render_spinner(frame, inner_area, start_time);
+        render_spinner(frame, inner_area, theme, start_time);
         frame.render_widget(block, area);
         return;
     }
@@ -483,7 +483,7 @@ fn render_search_input(
         .style(Style::default().fg(theme.base));
     frame.render_widget(input, layout[1]);
     if app.api_loading_kind == Some(ApiLoadingKind::Search) {
-        render_spinner(frame, layout[0], start_time);
+        render_spinner(frame, layout[0], theme, start_time);
     }
 }
 
@@ -641,7 +641,7 @@ fn render_save_song_to_playlist_popup(
     frame.render_widget(block, center_area);
     frame.render_widget(title, title_layout[1]);
     if app.api_loading_kind == Some(ApiLoadingKind::SaveToPlaylist) {
-        render_spinner(frame, title_layout[0], start_time);
+        render_spinner(frame, title_layout[0], theme, start_time);
     }
     frame.render_widget(line, layout[1]);
     frame.render_stateful_widget(list_widget, layout[2], &mut app.cus_playlists_liststate);
@@ -695,7 +695,7 @@ fn render_create_playlist_popup(
     frame.render_widget(Clear, center_area);
     frame.render_widget(block, center_area);
     if app.api_loading_kind == Some(ApiLoadingKind::CreatePlaylist) {
-        render_spinner(frame, layout[0], start_time);
+        render_spinner(frame, layout[0], theme, start_time);
     }
     render_input_field(
         frame,
@@ -807,7 +807,7 @@ fn render_privacy_selector(
 
     frame.render_widget(p, area);
 }
-fn render_spinner(f: &mut Frame, area: Rect, start_time: std::time::Instant) {
+fn render_spinner(f: &mut Frame, area: Rect, theme: &Theme, start_time: std::time::Instant) {
     let spinners = ["", "", "", "", "", ""];
     let elapsed = start_time.elapsed().as_millis();
     let index = ((elapsed / 80) as usize) % spinners.len();
@@ -816,7 +816,7 @@ fn render_spinner(f: &mut Frame, area: Rect, start_time: std::time::Instant) {
         .areas(area);
 
     let spinner_widget = Paragraph::new(spinners[index])
-        .style(Style::default().bold())
+        .style(theme.text_style())
         .alignment(Alignment::Center);
 
     f.render_widget(spinner_widget, centered_area);
