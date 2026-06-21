@@ -3,6 +3,7 @@ use error::{YError, YResult, log_to_file};
 use std::{
     fs,
     io::Write,
+    os::unix::process::CommandExt,
     process::{Command, Stdio},
 };
 
@@ -34,6 +35,7 @@ impl Player {
             .arg("--demuxer-max-back-bytes=1MiB")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
+            .process_group(0)
             .spawn()
             .map_err(|_| YError::MpvSpawnError)?;
         Ok(())

@@ -75,6 +75,7 @@ pub struct App {
     pub api_cmd_tx: mpsc::UnboundedSender<ApiCmd>,
     pub api_loading_kind: Option<ApiLoadingKind>,
 }
+
 impl App {
     pub fn new(player_state: &PlayerState, api_cmd_tx: mpsc::UnboundedSender<ApiCmd>) -> Self {
         Self {

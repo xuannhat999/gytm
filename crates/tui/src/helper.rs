@@ -25,6 +25,6 @@ pub fn remove_queue_file() {
     if let Ok(queue_file) = get_queue_file()
         && queue_file.exists()
     {
-        let _ = fs::remove_file(queue_file);
+        fs::remove_file(queue_file).ok();
     }
 }

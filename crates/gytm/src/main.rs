@@ -7,12 +7,12 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use data::{MpvCommand, MpvEvent, file_path::MPV_PLAYLIST};
+use data::{MpvCommand, MpvEvent};
 use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use state::AppState;
-use std::{fs, io, sync::Arc, time::Duration};
+use std::{io, sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 use tui::{
     app::App,
@@ -200,7 +200,6 @@ async fn main() -> YResult<()> {
             }
         }
         if app.is_exit {
-            let _ = fs::remove_file(MPV_PLAYLIST);
             break;
         }
 

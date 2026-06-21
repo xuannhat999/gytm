@@ -155,7 +155,7 @@ impl YClient {
         Ok(response)
     }
 
-    pub async fn get_raw_search_albums(&self, query: &str, rtype: u8) -> YResult<Value> {
+    pub async fn get_search_albums_raw(&self, query: &str, rtype: u8) -> YResult<Value> {
         let params = if rtype == 1 {
             "EgWKAQIIAWoSEAQQAxAFEAoQDhAJEBUQEBAR" // SONG
         } else {
@@ -553,7 +553,7 @@ impl YClient {
 
     // FETCH SEARCH RESULT ALBUMS
     pub async fn get_search_albums(&self, query: &str) -> YResult<Vec<Playlist>> {
-        let raw_list = match self.get_raw_search_albums(query, 2).await {
+        let raw_list = match self.get_search_albums_raw(query, 2).await {
             Ok(raw_data) => raw_data,
             Err(e) => {
                 log_to_file(&e);
@@ -572,7 +572,7 @@ impl YClient {
 
     // FETCH SEARCH REUSLT SONGS
     pub async fn get_search_songs(&self, query: &str) -> YResult<Vec<Song>> {
-        let raw_data = match self.get_raw_search_albums(query, 1).await {
+        let raw_data = match self.get_search_albums_raw(query, 1).await {
             Ok(raw) => raw,
             Err(e) => {
                 log_to_file(&e);
