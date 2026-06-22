@@ -1,5 +1,5 @@
 use api::{
-    YClient,
+    YTBus, YTDao,
     protocol::{ApiCmd, ApiResponse},
 };
 use crossterm::{
@@ -13,17 +13,19 @@ use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use state::AppState;
 use std::{io, sync::Arc, time::Duration};
-use tokio::sync::mpsc;
+use tokio::sync::mpsc::{self};
 use tui::{
     app::App,
     handler,
     helper::remove_queue_file,
     theme::Theme,
     ui::{self},
+    worker::spawn_api_worker,
 };
 
 #[tokio::main]
 async fn main() -> YResult<()> {
+    // Setup App State
     let mut app_state = match AppState::load() {
         Ok(c) => c,
         Err(e) => {
@@ -31,120 +33,27 @@ async fn main() -> YResult<()> {
             std::process::exit(1);
         }
     };
-    let (api_cmd_tx, mut api_cmd_rx) = mpsc::unbounded_channel::<ApiCmd>();
+
+    // Setup API client
+    let (api_cmd_tx, api_cmd_rx) = mpsc::unbounded_channel::<ApiCmd>();
     let (api_res_tx, mut api_res_rx) = mpsc::unbounded_channel::<ApiResponse>();
     let mut app = App::new(&app_state.player_state, api_cmd_tx);
+
     println!("󱘖 Connecting to YouTube Music...");
-    let client = match YClient::new().await {
-        Ok(c) => Arc::new(c),
+    let dao = match YTDao::new().await {
+        Ok(d) => d,
         Err(e) => {
             log_to_file(&e);
             println!("{}", e);
             std::process::exit(1);
         }
     };
-    let worker_client = client.clone();
-    tokio::spawn(async move {
-        while let Some(cmd) = api_cmd_rx.recv().await {
-            let res = match cmd {
-                ApiCmd::CreatePlaylist {
-                    title,
-                    description,
-                    privacy,
-                } => ApiResponse::CreatePlaylist(
-                    worker_client
-                        .create_playlist(&title, &description, privacy)
-                        .await,
-                ),
-                ApiCmd::SaveSong { song, playlist_id } => ApiResponse::SaveSong(
-                    match worker_client.save_to_playlist(&song, &playlist_id).await {
-                        Ok(_) => Ok((song, playlist_id)),
-                        Err(e) => Err(e),
-                    },
-                ),
-                ApiCmd::Search(query) => {
-                    let (albums, songs) = tokio::join!(
-                        worker_client.get_search_albums(&query),
-                        worker_client.get_search_songs(&query)
-                    );
-                    ApiResponse::Search { albums, songs }
-                }
-                ApiCmd::LikeSong(song) => {
-                    ApiResponse::LikeSong(match worker_client.like_song(&song).await {
-                        Ok(_) => Ok(song),
-                        Err(e) => Err(e),
-                    })
-                }
-                ApiCmd::UnlikeSong(song) => {
-                    let res = match worker_client.unlike_song(&song).await {
-                        Ok(_) => Ok(()),
-                        Err(e) => Err(e),
-                    };
-                    ApiResponse::UnlikeSong((res, song.title))
-                }
-                ApiCmd::UnsaveSong { song, playlist_id } => {
-                    let res = match worker_client.unsave_to_playlist(&song, &playlist_id).await {
-                        Ok(_) => Ok(()),
-                        Err(e) => Err(e),
-                    };
-                    ApiResponse::UnsaveSong((res, song.title))
-                }
-                ApiCmd::GetSongsToView(playlist) => {
-                    let songs = worker_client.get_songs(&playlist.browse_id).await;
-                    ApiResponse::GetSongsToView { songs, playlist }
-                }
-                ApiCmd::GetSongsToPlay(playlist) => {
-                    let songs = worker_client.get_songs(&playlist.browse_id).await;
-                    ApiResponse::GetSongsToPlay {
-                        songs,
-                        playlist_id: playlist.playlist_id,
-                    }
-                }
-                ApiCmd::UnsaveAlbum(playlist) => {
-                    let res = match worker_client.unsave_album_raw(&playlist.playlist_id).await {
-                        Ok(_) => Ok(()),
-                        Err(e) => Err(e),
-                    };
-                    ApiResponse::UnsaveAlbum((res, playlist))
-                }
-                ApiCmd::UnsaveCusPlaylist(playlist) => {
-                    let res = match worker_client
-                        .unsave_cus_playlist_raw(&playlist.playlist_id)
-                        .await
-                    {
-                        Ok(_) => Ok(()),
-                        Err(e) => Err(e),
-                    };
-                    ApiResponse::UnsaveCusPlaylist((res, playlist.title))
-                }
-                ApiCmd::SaveAlbum(album) => {
-                    let res = match worker_client.save_album_raw(&album.playlist_id).await {
-                        Ok(_) => Ok(()),
-                        Err(e) => Err(e),
-                    };
-                    ApiResponse::SaveAlbum((res, album))
-                }
-                ApiCmd::GetRelatedSongsToPlay(song) => {
-                    match worker_client.get_params(&song.video_id).await {
-                        Ok(params) => {
-                            let related_songs =
-                                worker_client.get_related_songs(song, &params).await;
-                            ApiResponse::GetRelatedSongsToPlay(related_songs)
-                        }
-                        Err(e) => ApiResponse::GetRelatedSongsToPlay(Err(e)),
-                    }
-                }
-                ApiCmd::FetchLibraryData => {
-                    ApiResponse::FetchLibraryData(worker_client.get_lists().await)
-                }
-            };
-            if api_res_tx.send(res).is_err() {
-                break;
-            }
-        }
-    });
+    let bus = YTBus::new(Arc::new(dao));
+    spawn_api_worker(api_cmd_rx, api_res_tx, bus);
     app.api_cmd_tx.send(ApiCmd::FetchLibraryData).ok();
     app.api_loading_kind = Some(api::protocol::ApiLoadingKind::FetchLibraryData);
+
+    // Setup MPV player
     let mut player = Player::default();
     let (tx_event, mut rx) = mpsc::channel::<MpvEvent>(32);
 
@@ -160,14 +69,13 @@ async fn main() -> YResult<()> {
         player.observe_mpv(stream, tx_event).await?;
         player.send_mpv_command(MpvCommand::SetVol(app.volume))?;
     }
+
+    // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-
-    app.albums_liststate.select(Some(0));
-    app.playlists_liststate.select(Some(0));
 
     let theme = Theme::default();
 
