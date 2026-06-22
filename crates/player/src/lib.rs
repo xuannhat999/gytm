@@ -48,7 +48,7 @@ impl Player {
         let _ = fs::remove_file(data::file_path::MPV_SOCKET);
     }
 
-    // START MPV SOCKET
+    // OBSERVE MPV SOCKET
     pub async fn observe_mpv(
         &mut self,
         stream: UnixStream,
