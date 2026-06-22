@@ -674,6 +674,13 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
 }
 
 fn append_song_to_queue(app: &mut App, player: &mut Player, song: &Song) -> YResult<()> {
+    if app.queue.iter().any(|s| s.video_id == song.video_id) {
+        app.notify(
+            data::NotifyType::Error,
+            format!("'{}' already in queue", song.title),
+        );
+        return Ok(());
+    }
     let url = get_url_from_vid_id(&song.video_id);
     player.send_mpv_command(MpvCommand::AppendSong(url))?;
     let new_song = song.clone();
