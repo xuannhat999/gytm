@@ -124,19 +124,14 @@ impl Player {
                     line = lines.next_line() => {
                         match line {
                             Ok(Some(ref l)) => {
-                                if let Ok(reply) = serde_json::from_str::<serde_json::Value>(l) {
-                                    if reply.get("event").is_none() {
-                                        if let (Some("success"), Some(v)) = (
-                                            reply.get("error").and_then(|e| e.as_str()),
-                                            reply.get("data").and_then(|d| d.as_f64()),
-                                        ) {
-                                            let _ = tx_event.send(MpvEvent::TimePos(v)).await;
-                                        }
-                                    }
-                                }
                                 if let Ok(msg) = serde_json::from_str::<MpvResponse>(l) {
-                                    if msg.event.as_deref() == Some("property-change") {
-                                        match msg.name.as_deref() {
+                                    match msg.event.as_deref() {
+                                        None => {
+                                            if let Some(v) = msg.data.and_then(|d| d.as_f64()) {
+                                                let _ = tx_event.send(MpvEvent::TimePos(v)).await;
+                                            }
+                                        }
+                                        Some("property-change") => match msg.name.as_deref() {
                                             Some("playlist") => {
                                                 if let Some(items) =
                                                     msg.data.and_then(|d| d.as_array().cloned())
@@ -188,7 +183,8 @@ impl Player {
                                                 }
                                             }
                                             _ => {}
-                                        }
+                                        },
+                                        _ => {}
                                     }
                                 }
                             }

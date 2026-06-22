@@ -185,6 +185,7 @@ impl App {
     pub fn is_popup_active(&self) -> bool {
         !matches!(self.popup_state, PopupState::None)
     }
+
     pub fn save_queue_file(&self) -> YResult<()> {
         let path = helper::get_queue_file()?;
         if let Some(dir) = path.parent() {
