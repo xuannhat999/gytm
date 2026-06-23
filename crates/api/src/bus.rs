@@ -1,15 +1,14 @@
 use data::{PlayListPrivacy, Playlist, Song};
 use error::{YResult, log_to_file};
-use std::sync::Arc;
 
 use crate::{dao::YTDao, parser};
 
 pub struct YTBus {
-    dao: Arc<YTDao>,
+    dao: YTDao,
 }
 
 impl YTBus {
-    pub fn new(dao: Arc<YTDao>) -> Self {
+    pub fn new(dao: YTDao) -> Self {
         Self { dao }
     }
 
