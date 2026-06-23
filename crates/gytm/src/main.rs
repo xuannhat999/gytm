@@ -12,7 +12,7 @@ use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use state::AppState;
-use std::{io, sync::Arc, time::Duration};
+use std::{io, time::Duration};
 use tokio::sync::mpsc::{self};
 use tui::{
     app::App,
@@ -48,7 +48,7 @@ async fn main() -> YResult<()> {
             std::process::exit(1);
         }
     };
-    let bus = YTBus::new(Arc::new(dao));
+    let bus = YTBus::new(dao);
     spawn_api_worker(api_cmd_rx, api_res_tx, bus);
     app.api_cmd_tx.send(ApiCmd::FetchLibraryData).ok();
     app.api_loading_kind = Some(api::protocol::ApiLoadingKind::FetchLibraryData);

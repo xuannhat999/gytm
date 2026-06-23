@@ -6,7 +6,6 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
 };
 use rookie::{any_browser, common::enums::Cookie, load};
-use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
 
 use crate::request::{
@@ -90,7 +89,7 @@ impl YTDao {
         }
     }
 
-    pub async fn get_raw_lists(&self) -> YResult<Value> {
+    pub async fn get_raw_lists(&self) -> YResult<String> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -107,12 +106,12 @@ impl YTDao {
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
+            .text()
             .await?;
         Ok(response)
     }
 
-    pub async fn get_continuation_raw(&self, token: &str) -> YResult<Value> {
+    pub async fn get_continuation_raw(&self, token: &str) -> YResult<String> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -129,13 +128,13 @@ impl YTDao {
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
+            .text()
             .await?;
 
         Ok(response)
     }
 
-    pub async fn get_songs_raw(&self, browse_id: &str) -> YResult<Value> {
+    pub async fn get_songs_raw(&self, browse_id: &str) -> YResult<String> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -144,19 +143,19 @@ impl YTDao {
             context: self.get_context(),
             browse_id,
         };
-        let response = self
+        let text = self
             .http
             .post(&url)
             .headers(self.get_api_headers()?)
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
+            .text()
             .await?;
-        Ok(response)
+        Ok(text)
     }
 
-    pub async fn get_search_albums_raw(&self, query: &str, rtype: u8) -> YResult<Value> {
+    pub async fn get_search_albums_raw(&self, query: &str, rtype: u8) -> YResult<String> {
         let params = if rtype == 1 {
             "EgWKAQIIAWoSEAQQAxAFEAoQDhAJEBUQEBAR" // SONG
         } else {
@@ -179,12 +178,12 @@ impl YTDao {
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
+            .text()
             .await?;
         Ok(response)
     }
 
-    pub async fn get_params_raw(&self, video_id: &str) -> YResult<Value> {
+    pub async fn get_params_raw(&self, video_id: &str) -> YResult<String> {
         let url = format!(
             "{}/youtubei/v1/next?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -200,7 +199,7 @@ impl YTDao {
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
+            .text()
             .await?;
         Ok(response)
     }
@@ -210,7 +209,7 @@ impl YTDao {
         title: &str,
         desc: &str,
         privacy: PlayListPrivacy,
-    ) -> YResult<Value> {
+    ) -> YResult<String> {
         let url = format!(
             "{}/youtubei/v1/playlist/create?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -233,12 +232,12 @@ impl YTDao {
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
+            .text()
             .await?;
         Ok(response)
     }
 
-    pub async fn get_related_songs_raw(&self, playlist_id: &str, params: &str) -> YResult<Value> {
+    pub async fn get_related_songs_raw(&self, playlist_id: &str, params: &str) -> YResult<String> {
         let url = format!(
             "{}/youtubei/v1/next?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -256,12 +255,12 @@ impl YTDao {
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
+            .text()
             .await?;
         Ok(response)
     }
 
-    pub async fn save_album_raw(&self, playlist_id: &str) -> YResult<Value> {
+    pub async fn save_album_raw(&self, playlist_id: &str) -> YResult<()> {
         let url = format!(
             "{}/youtubei/v1/like/like?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -275,19 +274,23 @@ impl YTDao {
             status: "LIKE",
         };
 
-        let response = self
+        let status = self
             .http
             .post(&url)
             .headers(self.get_api_headers()?)
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
-            .await?;
-        Ok(response)
+            .status()
+            .is_success();
+        if status {
+            Ok(())
+        } else {
+            Err(YError::BadStatus(String::from("Unsave custom playlist")))
+        }
     }
 
-    pub async fn unsave_cus_playlist_raw(&self, playlist_id: &str) -> YResult<Value> {
+    pub async fn unsave_cus_playlist_raw(&self, playlist_id: &str) -> YResult<()> {
         let url = format!(
             "{}/youtubei/v1/playlist/delete?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -297,19 +300,23 @@ impl YTDao {
             context: self.get_context(),
             playlist_id,
         };
-        let response = self
+        let status = self
             .http
             .post(&url)
             .headers(self.get_api_headers()?)
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
-            .await?;
-        Ok(response)
+            .status()
+            .is_success();
+        if status {
+            Ok(())
+        } else {
+            Err(YError::BadStatus(String::from("Unsave custom playlist")))
+        }
     }
 
-    pub async fn unsave_album_raw(&self, playlist_id: &str) -> YResult<Value> {
+    pub async fn unsave_album_raw(&self, playlist_id: &str) -> YResult<()> {
         let url = format!(
             "{}/youtubei/v1/like/removelike?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -322,19 +329,23 @@ impl YTDao {
             },
         };
 
-        let response = self
+        let status = self
             .http
             .post(&url)
             .headers(self.get_api_headers()?)
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
-            .await?;
-        Ok(response)
+            .status()
+            .is_success();
+        if status {
+            Ok(())
+        } else {
+            Err(YError::BadStatus(String::from("Unsave album")))
+        }
     }
 
-    pub async fn save_to_playlist_raw(&self, song: &Song, playlist_id: &str) -> YResult<Value> {
+    pub async fn save_to_playlist_raw(&self, song: &Song, playlist_id: &str) -> YResult<()> {
         let url = format!(
             "{}/youtubei/v1/browse/edit_playlist?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -360,19 +371,20 @@ impl YTDao {
             .json(&body)
             .send()
             .await?;
-
         let status = response.status();
-        let bytes = response.bytes().await?;
-
-        let val: Value = serde_json::from_slice(&bytes)?;
-
         if !status.is_success() {
-            return Err(YError::BadStatus(String::from("Save song to playlist")));
+            Err(YError::BadStatus(String::from("Save song to playlist")))
+        } else {
+            let text = response.text().await?;
+            if text.contains(r#""STATUS_SUCCEEDED""#) {
+                Ok(())
+            } else {
+                Err(YError::AlreadyInPlaylist)
+            }
         }
-        Ok(val)
     }
 
-    pub async fn unsave_to_playlist_raw(&self, song: &Song, playlist_id: &str) -> YResult<Value> {
+    pub async fn unsave_to_playlist_raw(&self, song: &Song, playlist_id: &str) -> YResult<()> {
         let video_id = &song.video_id;
         let set_video_id = &song.set_video_id;
         let url = format!(
@@ -399,16 +411,17 @@ impl YTDao {
             .json(&body)
             .send()
             .await?;
-
         let status = response.status();
-        let bytes = response.bytes().await?;
-
-        let val: Value = serde_json::from_slice(&bytes)?;
-
         if !status.is_success() {
-            return Err(YError::BadStatus(String::from("Unsave song to playlist")));
+            Err(YError::BadStatus(String::from("Unsave song to playlist")))
+        } else {
+            let text = response.text().await?;
+            if text.contains(r#""STATUS_SUCCEEDED""#) {
+                Ok(())
+            } else {
+                Err(YError::AlreadyInPlaylist)
+            }
         }
-        Ok(val)
     }
 
     pub async fn unlike_song_raw(&self, song: &Song) -> YResult<()> {
