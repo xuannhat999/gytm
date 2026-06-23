@@ -86,6 +86,7 @@ dependencies = [
  "data",
  "dirs",
  "error",
+ "gjson",
  "reqwest",
  "rookie",
  "serde",
@@ -1186,6 +1187,12 @@ dependencies = [
  "opaque-debug",
  "polyval",
 ]
+
+[[package]]
+name = "gjson"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43503cc176394dd30a6525f5f36e838339b8b5619be33ed9a7783841580a97b6"
 
 [[package]]
 name = "glob"

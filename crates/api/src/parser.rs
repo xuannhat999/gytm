@@ -53,34 +53,69 @@ pub fn parse_lists(data: Value) -> YResult<(Vec<Playlist>, Vec<Playlist>, Option
     Ok((albums, playlists, continuation_token))
 }
 
-// EXTRACT SONGS FROM RESPONSED DATA (JSON TYPE)
-pub fn parse_songs(data: Value) -> YResult<Vec<Song>> {
-    let mut songs = Vec::new();
+// pub fn parse_songs(data: Value) -> YResult<Vec<Song>> {
+//     let mut songs = Vec::new();
+//
+//     let track_list = data.pointer("/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicShelfRenderer/contents")
+//         .or_else(|| data.pointer("/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicPlaylistShelfRenderer/contents"))
+//         .and_then(|v| v.as_array())
+//         .ok_or(YError::InvalidResponse("Browse songs".to_string()))?;
+//
+//     for item in track_list {
+//         if let Some(renderer) = item.get("musicResponsiveListItemRenderer") {
+//             let song = Song {
+//                 title: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
+//                     .and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
+//
+//                 set_video_id: renderer.pointer("/overlay/musicItemThumbnailOverlayRenderer/content/musicPlayButtonRenderer/playNavigationEndpoint/watchEndpoint/playlistSetVideoId")
+//                     .and_then(|v| v.as_str()).unwrap_or("").to_string(),
+//                 video_id: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId")
+//                     .or_else(|| renderer.pointer("/playlistItemData/videoId"))
+//                     .and_then(|v| v.as_str()).unwrap_or("").to_string(),
+//                 duration: renderer.pointer("/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+//             };
+//             if !song.video_id.is_empty() {
+//                 songs.push(song);
+//             }
+//         }
+//     }
+//     Ok(songs)
+// }
 
-    let track_list = data.pointer("/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicShelfRenderer/contents")
-        .or_else(|| data.pointer("/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents/0/musicPlaylistShelfRenderer/contents"))
-        .and_then(|v| v.as_array())
-        .ok_or(YError::InvalidResponse("Browse songs".to_string()))?;
+pub fn parse_songs(data: &str) -> YResult<Vec<Song>> {
+    let path = "contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer.contents.0.musicShelfRenderer.contents";
+    let alt_path = "contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer.contents.0.musicPlaylistShelfRenderer.contents";
 
-    for item in track_list {
-        if let Some(renderer) = item.get("musicResponsiveListItemRenderer") {
-            let song = Song {
-                title: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/text")
-                    .and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
-
-                set_video_id: renderer.pointer("/overlay/musicItemThumbnailOverlayRenderer/content/musicPlayButtonRenderer/playNavigationEndpoint/watchEndpoint/playlistSetVideoId")
-                    .and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                video_id: renderer.pointer("/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId")
-                    .or_else(|| renderer.pointer("/playlistItemData/videoId"))
-                    .and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                duration: renderer.pointer("/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            };
-            if !song.video_id.is_empty() {
-                songs.push(song);
-            }
-        }
+    let json = gjson::get(data, path);
+    let json = if json.exists() {
+        json
+    } else {
+        gjson::get(data, alt_path)
+    };
+    if !json.exists() {
+        return Err(YError::InvalidResponse("Browse songs".to_string()));
     }
-
+    let mut songs = Vec::new();
+    json.each(|_, item| {
+        let r = item.get("musicResponsiveListItemRenderer");
+        if !r.exists() {
+            return true;
+        }
+        let video_id = r.get("flexColumns.0.musicResponsiveListItemFlexColumnRenderer.text.runs.0.navigationEndpoint.watchEndpoint.videoId");
+        let video_id = if video_id.exists() { video_id } else { r.get("playlistItemData.videoId") };
+        if !video_id.str().is_empty() {
+            let title = r.get("flexColumns.0.musicResponsiveListItemFlexColumnRenderer.text.runs.0.text");
+            let set_video_id = r.get("overlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer.playNavigationEndpoint.watchEndpoint.playlistSetVideoId");
+            let duration = r.get("fixedColumns.0.musicResponsiveListItemFixedColumnRenderer.text.runs.0.text");
+            songs.push(Song {
+                video_id: video_id.str().to_string(),
+                set_video_id: set_video_id.str().to_string(),
+                title: if title.str().is_empty() { "Unknown".to_string() } else { title.str().to_string() },
+                duration: duration.str().to_string(),
+            });
+        }
+        true
+    });
     Ok(songs)
 }
 
@@ -234,33 +269,75 @@ pub fn parse_search_songs(data: Value) -> YResult<Vec<Song>> {
     Ok(songs)
 }
 
-pub fn parse_params(data: Value) -> YResult<String> {
-    let params = data
-        .pointer("/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents/1/automixPreviewVideoRenderer/content/automixPlaylistVideoRenderer/navigationEndpoint/watchPlaylistEndpoint/params")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    params.ok_or(YError::InvalidResponse("Get Params".to_string()))
-}
-pub fn parse_related_songs(data: Value) -> YResult<Vec<Song>> {
-    let mut songs = Vec::new();
-    let contents = data.pointer("/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents").and_then(|c|c.as_array()).ok_or(YError::InvalidResponse("Get related songs".to_string()))?;
-    for item in contents {
-        if let Some(video) = item.get("playlistPanelVideoRenderer") {
-            let video_id = video.get("videoId").and_then(|v| v.as_str());
-            let title = video.pointer("/title/runs/0/text").and_then(|v| v.as_str());
-            let duration = video
-                .pointer("/lengthText/runs/0/text")
-                .and_then(|v| v.as_str());
+// pub fn parse_params(data: Value) -> YResult<String> {
+//     let params = data
+//         .pointer("/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents/1/automixPreviewVideoRenderer/content/automixPlaylistVideoRenderer/navigationEndpoint/watchPlaylistEndpoint/params")
+//         .and_then(|v| v.as_str())
+//         .map(|s| s.to_string());
+//     params.ok_or(YError::InvalidResponse("Get Params".to_string()))
+// }
 
-            if let (Some(vid), Some(t), Some(duration)) = (video_id, title, duration) {
+pub fn parse_params(data: &str) -> YResult<String> {
+    let path = "contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs.0.tabRenderer.content.musicQueueRenderer.content.playlistPanelRenderer.contents.1.automixPreviewVideoRenderer.content.automixPlaylistVideoRenderer.navigationEndpoint.watchPlaylistEndpoint.params";
+    let val = gjson::get(data, path);
+    if val.exists() {
+        Ok(val.str().to_string())
+    } else {
+        Err(YError::InvalidResponse("Get Params".to_string()))
+    }
+}
+//
+// pub fn parse_related_songs(data: Value) -> YResult<Vec<Song>> {
+//     let mut songs = Vec::new();
+//     let contents = data.pointer("/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents").and_then(|c|c.as_array()).ok_or(YError::InvalidResponse("Get related songs".to_string()))?;
+//     for item in contents {
+//         if let Some(video) = item.get("playlistPanelVideoRenderer") {
+//             let video_id = video.get("videoId").and_then(|v| v.as_str());
+//             let title = video.pointer("/title/runs/0/text").and_then(|v| v.as_str());
+//             let duration = video
+//                 .pointer("/lengthText/runs/0/text")
+//                 .and_then(|v| v.as_str());
+//
+//             if let (Some(vid), Some(t), Some(duration)) = (video_id, title, duration) {
+//                 songs.push(Song {
+//                     video_id: vid.to_string(),
+//                     set_video_id: "".to_string(),
+//                     title: t.to_string(),
+//                     duration: duration.to_string(),
+//                 });
+//             }
+//         }
+//     }
+//     Ok(songs)
+// }
+
+pub fn parse_related_songs(data: &str) -> YResult<Vec<Song>> {
+    let json = gjson::get(
+        data,
+        "contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs.0.tabRenderer.content.musicQueueRenderer.content.playlistPanelRenderer.contents",
+    );
+
+    let mut songs = Vec::new();
+    json.each(|_, item| {
+        let video = item.get("playlistPanelVideoRenderer");
+        if video.exists() {
+            let video_id = video.get("videoId");
+            let title = video.get("title.runs.0.text");
+            let duration = video.get("lengthText.runs.0.text");
+            if !video_id.str().is_empty() {
                 songs.push(Song {
-                    video_id: vid.to_string(),
-                    set_video_id: "".to_string(),
-                    title: t.to_string(),
-                    duration: duration.to_string(),
+                    video_id: video_id.str().to_string(),
+                    set_video_id: String::new(),
+                    title: if title.str().is_empty() {
+                        "Unknown".to_string()
+                    } else {
+                        title.str().to_string()
+                    },
+                    duration: duration.str().to_string(),
                 });
             }
         }
-    }
+        true
+    });
     Ok(songs)
 }

@@ -1,5 +1,5 @@
 use data::{PlayListPrivacy, Playlist, Song};
-use error::{YError, YResult, log_to_file};
+use error::{YResult, log_to_file};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -67,21 +67,20 @@ impl YTBus {
     }
 
     pub async fn get_songs(&self, browse_id: &str) -> YResult<Vec<Song>> {
-        let raw_songs = match self.dao.get_songs_raw(browse_id).await {
-            Ok(raw_songs) => raw_songs,
+        let raw = match self.dao.get_songs_raw(browse_id).await {
+            Ok(raw) => raw,
             Err(e) => {
                 log_to_file(&e);
-                Value::Null
+                return Ok(Vec::new());
             }
         };
-        let songs = match parser::parse_songs(raw_songs) {
-            Ok(songs) => songs,
+        match parser::parse_songs(&raw) {
+            Ok(songs) => Ok(songs),
             Err(e) => {
                 log_to_file(&e);
-                Vec::new()
+                Ok(Vec::new())
             }
-        };
-        Ok(songs)
+        }
     }
 
     pub async fn get_search_albums(&self, query: &str) -> YResult<Vec<Playlist>> {
@@ -125,10 +124,10 @@ impl YTBus {
             Ok(raw) => raw,
             Err(e) => {
                 log_to_file(&e);
-                Value::Null
+                String::new()
             }
         };
-        let params = match parser::parse_params(raw_data) {
+        let params = match parser::parse_params(&raw_data) {
             Ok(params) => params,
             Err(e) => {
                 log_to_file(&e);
@@ -145,10 +144,10 @@ impl YTBus {
             Ok(raw) => raw,
             Err(e) => {
                 log_to_file(&e);
-                Value::Null
+                String::new()
             }
         };
-        let mut songs = match parser::parse_related_songs(raw_data) {
+        let mut songs = match parser::parse_related_songs(&raw_data) {
             Ok(songs) => songs,
             Err(e) => {
                 log_to_file(&e);
@@ -160,19 +159,11 @@ impl YTBus {
     }
 
     pub async fn save_to_playlist(&self, song: &Song, playlist_id: &str) -> YResult<()> {
-        let val = self.dao.save_to_playlist_raw(song, playlist_id).await?;
-        match val["status"].as_str() {
-            Some("STATUS_SUCCEEDED") => Ok(()),
-            _ => Err(YError::AlreadyInPlaylist),
-        }
+        self.dao.save_to_playlist_raw(song, playlist_id).await
     }
 
     pub async fn unsave_to_playlist(&self, song: &Song, playlist_id: &str) -> YResult<()> {
-        let val = self.dao.unsave_to_playlist_raw(song, playlist_id).await?;
-        match val["status"].as_str() {
-            Some("STATUS_SUCCEEDED") => Ok(()),
-            _ => Err(YError::AlreadyInPlaylist),
-        }
+        self.dao.unsave_to_playlist_raw(song, playlist_id).await
     }
 
     pub async fn like_song(&self, song: &Song) -> YResult<()> {
@@ -184,17 +175,14 @@ impl YTBus {
     }
 
     pub async fn save_album(&self, playlist_id: &str) -> YResult<()> {
-        self.dao.save_album_raw(playlist_id).await?;
-        Ok(())
+        self.dao.save_album_raw(playlist_id).await
     }
 
     pub async fn unsave_album(&self, playlist_id: &str) -> YResult<()> {
-        self.dao.unsave_album_raw(playlist_id).await?;
-        Ok(())
+        self.dao.unsave_album_raw(playlist_id).await
     }
 
     pub async fn unsave_cus_playlist(&self, playlist_id: &str) -> YResult<()> {
-        self.dao.unsave_cus_playlist_raw(playlist_id).await?;
-        Ok(())
+        self.dao.unsave_cus_playlist_raw(playlist_id).await
     }
 }

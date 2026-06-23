@@ -12,3 +12,4 @@ serde_json = { workspace = true }
 rookie = { workspace = true }
 reqwest = { workspace = true }
 dirs = { workspace = true }
+gjson = { workspace = true }
