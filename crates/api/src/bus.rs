@@ -1,6 +1,5 @@
 use data::{PlayListPrivacy, Playlist, Song};
 use error::{YResult, log_to_file};
-use serde_json::Value;
 use std::sync::Arc;
 
 use crate::{dao::YTDao, parser};
@@ -33,11 +32,11 @@ impl YTBus {
             Ok(raw_lists) => raw_lists,
             Err(e) => {
                 log_to_file(&e);
-                Value::Null
+                String::new()
             }
         };
 
-        let (mut albums, mut playlists, mut token) = match parser::parse_lists(raw_data) {
+        let (mut albums, mut playlists, mut token) = match parser::parse_lists(&raw_data) {
             Ok((albums, playlists, token)) => (albums, playlists, token),
             Err(e) => {
                 log_to_file(&e);
@@ -50,7 +49,7 @@ impl YTBus {
         while let Some(current_token) = token {
             let next_raw_data = self.dao.get_continuation_raw(&current_token).await?;
             let (mut next_albums, mut next_playlists, next_token) =
-                parser::parse_lists(next_raw_data)?;
+                parser::parse_lists(&next_raw_data)?;
             all_albums.append(&mut next_albums);
             all_playlists.append(&mut next_playlists);
             token = next_token;
@@ -88,10 +87,10 @@ impl YTBus {
             Ok(raw_data) => raw_data,
             Err(e) => {
                 log_to_file(&e);
-                Value::Null
+                String::new()
             }
         };
-        let albums = match parser::parse_search_albums(raw_list) {
+        let albums = match parser::parse_search_albums(&raw_list) {
             Ok(list) => list,
             Err(e) => {
                 log_to_file(&e);
@@ -106,10 +105,10 @@ impl YTBus {
             Ok(raw) => raw,
             Err(e) => {
                 log_to_file(&e);
-                Value::Null
+                String::new()
             }
         };
-        let songs = match parser::parse_search_songs(raw_data) {
+        let songs = match parser::parse_search_songs(&raw_data) {
             Ok(songs) => songs,
             Err(e) => {
                 log_to_file(&e);

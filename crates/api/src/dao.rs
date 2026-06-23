@@ -90,7 +90,7 @@ impl YTDao {
         }
     }
 
-    pub async fn get_raw_lists(&self) -> YResult<Value> {
+    pub async fn get_raw_lists(&self) -> YResult<String> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -107,12 +107,12 @@ impl YTDao {
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
+            .text()
             .await?;
         Ok(response)
     }
 
-    pub async fn get_continuation_raw(&self, token: &str) -> YResult<Value> {
+    pub async fn get_continuation_raw(&self, token: &str) -> YResult<String> {
         let url = format!(
             "{}/youtubei/v1/browse?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -129,7 +129,7 @@ impl YTDao {
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
+            .text()
             .await?;
 
         Ok(response)
@@ -156,7 +156,7 @@ impl YTDao {
         Ok(text)
     }
 
-    pub async fn get_search_albums_raw(&self, query: &str, rtype: u8) -> YResult<Value> {
+    pub async fn get_search_albums_raw(&self, query: &str, rtype: u8) -> YResult<String> {
         let params = if rtype == 1 {
             "EgWKAQIIAWoSEAQQAxAFEAoQDhAJEBUQEBAR" // SONG
         } else {
@@ -179,7 +179,7 @@ impl YTDao {
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
+            .text()
             .await?;
         Ok(response)
     }
