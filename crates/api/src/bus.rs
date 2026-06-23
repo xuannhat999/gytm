@@ -19,7 +19,7 @@ impl YTBus {
         privacy: PlayListPrivacy,
     ) -> YResult<Playlist> {
         let res = self.dao.create_playlist_raw(title, desc, privacy).await?;
-        let playlist = parser::parse_created_playlist(res)?;
+        let playlist = parser::parse_created_playlist(&res)?;
         Ok(playlist)
     }
 
@@ -27,13 +27,7 @@ impl YTBus {
         let mut all_albums: Vec<Playlist> = Vec::new();
         let mut all_playlists: Vec<Playlist> = Vec::new();
         let mut all_cus_playlists: Vec<usize> = Vec::new();
-        let raw_data = match self.dao.get_raw_lists().await {
-            Ok(raw_lists) => raw_lists,
-            Err(e) => {
-                log_to_file(&e);
-                String::new()
-            }
-        };
+        let raw_data = self.dao.get_raw_lists().await?;
 
         let (mut albums, mut playlists, mut token) = match parser::parse_lists(&raw_data) {
             Ok((albums, playlists, token)) => (albums, playlists, token),
@@ -65,13 +59,7 @@ impl YTBus {
     }
 
     pub async fn get_songs(&self, browse_id: &str) -> YResult<Vec<Song>> {
-        let raw = match self.dao.get_songs_raw(browse_id).await {
-            Ok(raw) => raw,
-            Err(e) => {
-                log_to_file(&e);
-                return Ok(Vec::new());
-            }
-        };
+        let raw = self.dao.get_songs_raw(browse_id).await?;
         match parser::parse_songs(&raw) {
             Ok(songs) => Ok(songs),
             Err(e) => {
@@ -82,13 +70,7 @@ impl YTBus {
     }
 
     pub async fn get_search_albums(&self, query: &str) -> YResult<Vec<Playlist>> {
-        let raw_list = match self.dao.get_search_albums_raw(query, 2).await {
-            Ok(raw_data) => raw_data,
-            Err(e) => {
-                log_to_file(&e);
-                String::new()
-            }
-        };
+        let raw_list = self.dao.get_search_albums_raw(query, 2).await?;
         let albums = match parser::parse_search_albums(&raw_list) {
             Ok(list) => list,
             Err(e) => {
@@ -100,13 +82,7 @@ impl YTBus {
     }
 
     pub async fn get_search_songs(&self, query: &str) -> YResult<Vec<Song>> {
-        let raw_data = match self.dao.get_search_albums_raw(query, 1).await {
-            Ok(raw) => raw,
-            Err(e) => {
-                log_to_file(&e);
-                String::new()
-            }
-        };
+        let raw_data = self.dao.get_search_albums_raw(query, 1).await?;
         let songs = match parser::parse_search_songs(&raw_data) {
             Ok(songs) => songs,
             Err(e) => {
@@ -118,13 +94,7 @@ impl YTBus {
     }
 
     pub async fn get_params(&self, video_id: &str) -> YResult<String> {
-        let raw_data = match self.dao.get_params_raw(video_id).await {
-            Ok(raw) => raw,
-            Err(e) => {
-                log_to_file(&e);
-                String::new()
-            }
-        };
+        let raw_data = self.dao.get_params_raw(video_id).await?;
         let params = match parser::parse_params(&raw_data) {
             Ok(params) => params,
             Err(e) => {
@@ -138,13 +108,7 @@ impl YTBus {
     pub async fn get_related_songs(&self, song: Song, params: &str) -> YResult<Vec<Song>> {
         let video_id = &song.video_id;
         let playlist_id = format!("RDAMVM{}", video_id);
-        let raw_data = match self.dao.get_related_songs_raw(&playlist_id, params).await {
-            Ok(raw) => raw,
-            Err(e) => {
-                log_to_file(&e);
-                String::new()
-            }
-        };
+        let raw_data = self.dao.get_related_songs_raw(&playlist_id, params).await?;
         let mut songs = match parser::parse_related_songs(&raw_data) {
             Ok(songs) => songs,
             Err(e) => {

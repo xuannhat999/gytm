@@ -1,6 +1,5 @@
 use data::{Playlist, Song};
 use error::{YError, YResult};
-use serde_json::Value;
 
 // pub fn parse_lists(data: Value) -> YResult<(Vec<Playlist>, Vec<Playlist>, Option<String>)> {
 //     let mut albums: Vec<Playlist> = Vec::new();
@@ -192,34 +191,61 @@ pub fn parse_songs(data: &str) -> YResult<Vec<Song>> {
     Ok(songs)
 }
 
-pub fn parse_created_playlist(data: Value) -> YResult<Playlist> {
-    let playlist_id = data["playlistId"]
-        .as_str()
-        .ok_or(YError::InvalidResponse("Create playlist".to_string()))?
-        .to_string();
+// pub fn parse_created_playlist(data: Value) -> YResult<Playlist> {
+//     let playlist_id = data["playlistId"]
+//         .as_str()
+//         .ok_or(YError::InvalidResponse("Create playlist".to_string()))?
+//         .to_string();
+//
+//     let renderer = data["actions"][1]
+//         .get("handlePlaylistCreationCommand")
+//         .and_then(|h| h.get("createdPlaylist"))
+//         .and_then(|c| c.get("musicTwoRowItemRenderer"))
+//         .ok_or(YError::InvalidResponse("Create playlist".to_string()))?;
+//
+//     let title = renderer["title"]["runs"][0]["text"]
+//         .as_str()
+//         .unwrap_or("Unknown")
+//         .to_string();
+//
+//     let artist = renderer["subtitle"]["runs"][0]["text"]
+//         .as_str()
+//         .unwrap_or("Unknown")
+//         .to_string();
+//
+//     let browse_id = renderer
+//         .pointer("/navigationEndpoint/browseEndpoint/browseId")
+//         .and_then(|v| v.as_str())
+//         .unwrap_or("")
+//         .to_string();
+//
+//     Ok(Playlist {
+//         title,
+//         artist,
+//         browse_id,
+//         playlist_id,
+//         is_saved: true,
+//         is_custom: true,
+//     })
+// }
 
-    let renderer = data["actions"][1]
-        .get("handlePlaylistCreationCommand")
-        .and_then(|h| h.get("createdPlaylist"))
-        .and_then(|c| c.get("musicTwoRowItemRenderer"))
-        .ok_or(YError::InvalidResponse("Create playlist".to_string()))?;
-
-    let title = renderer["title"]["runs"][0]["text"]
-        .as_str()
-        .unwrap_or("Unknown")
-        .to_string();
-
-    let artist = renderer["subtitle"]["runs"][0]["text"]
-        .as_str()
-        .unwrap_or("Unknown")
-        .to_string();
-
+pub fn parse_created_playlist(data: &str) -> YResult<Playlist> {
+    let playlist_id = gjson::get(data, "playlistId").str().to_string();
+    if playlist_id.is_empty() {
+        return Err(YError::InvalidResponse("Create playlist".to_string()));
+    }
+    let renderer_path =
+        "actions.1.handlePlaylistCreationCommand.createdPlaylist.musicTwoRowItemRenderer";
+    let renderer = gjson::get(data, renderer_path);
+    if playlist_id.is_empty() || !renderer.exists() {
+        return Err(YError::InvalidResponse("Create playlist".to_string()));
+    }
+    let title = renderer.get("title.runs.0.text").str().to_string();
+    let artist = renderer.get("subtitle.runs.0.text").str().to_string();
     let browse_id = renderer
-        .pointer("/navigationEndpoint/browseEndpoint/browseId")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
+        .get("navigationEndpoint.browseEndpoint.browseId")
+        .str()
         .to_string();
-
     Ok(Playlist {
         title,
         artist,
@@ -489,6 +515,9 @@ pub fn parse_related_songs(data: &str) -> YResult<Vec<Song>> {
 
     let mut songs = Vec::new();
     json.each(|_, item| {
+        if songs.len() >= 30 {
+            return false;
+        }
         let video = item.get("playlistPanelVideoRenderer");
         if video.exists() {
             let video_id = video.get("videoId");

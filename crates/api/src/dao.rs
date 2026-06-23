@@ -6,7 +6,6 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
 };
 use rookie::{any_browser, common::enums::Cookie, load};
-use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
 
 use crate::request::{
@@ -202,7 +201,6 @@ impl YTDao {
             .await?
             .text()
             .await?;
-
         Ok(response)
     }
 
@@ -211,7 +209,7 @@ impl YTDao {
         title: &str,
         desc: &str,
         privacy: PlayListPrivacy,
-    ) -> YResult<Value> {
+    ) -> YResult<String> {
         let url = format!(
             "{}/youtubei/v1/playlist/create?key={}&alt=json",
             YTM_DOMAIN, self.innertube_api_key
@@ -234,7 +232,7 @@ impl YTDao {
             .json(&body)
             .send()
             .await?
-            .json::<Value>()
+            .text()
             .await?;
         Ok(response)
     }
