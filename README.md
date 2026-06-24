@@ -4,19 +4,13 @@ Stream Youtube Music from your terminal !
 
 # Demo
 
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/19c07cbd-1a6f-42bc-a175-0271d27a992d" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/d093dfc0-4689-44fb-8f24-f826cd794cf1" />
 <br></br>
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/d27a339a-2c63-4ff5-84fc-38b745b531c9" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/7dd370ed-9b9b-40f1-8ad2-aeede4dfb13b" />
 <br></br>
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/1c63a8c0-51a0-4446-a1ab-1b5e9a6a8289" />
-
-
-
-
-https://github.com/user-attachments/assets/d181735e-08c5-4098-944a-d615b74b6e73
-
-
-
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/84cdfafd-f2a6-439f-837a-3c9211b63a04" />
+<br></br>
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/ba49d5c9-1334-4f77-933e-e6a16fb80e02" />
 <br><br>
 
 # Features
