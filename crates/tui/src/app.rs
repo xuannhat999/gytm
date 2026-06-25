@@ -126,9 +126,7 @@ impl App {
             api_loading_kind: None,
         }
     }
-}
 
-impl App {
     // TOGGLE NEXT ITEM IN LISTSTATE
     pub fn next_item(state: &mut ListState, len: usize) {
         if len == 0 {
@@ -182,6 +180,7 @@ impl App {
         }
         self.cus_playlists = new_cus;
     }
+
     pub fn is_popup_active(&self) -> bool {
         !matches!(self.popup_state, PopupState::None)
     }
