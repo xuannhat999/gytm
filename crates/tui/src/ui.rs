@@ -147,7 +147,7 @@ fn render_list(
     } else {
         "[2]-󰲸 Playlists"
     };
-    let is_focused = app.focus_area == area_type;
+    let is_focused = app.focus_area == area_type && !app.is_popup_active();
     let border_style = if is_focused {
         theme.active_border_style()
     } else {
