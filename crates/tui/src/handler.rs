@@ -1,5 +1,3 @@
-use std::fs;
-
 use crate::{
     app::{App, PopupState},
     helper::{self, get_url_from_vid_id},
@@ -16,6 +14,7 @@ use data::{
 use error::{YError, YResult, log_to_file};
 use player::Player;
 use state::AppState;
+use std::fs;
 
 pub fn handle_mpv_event(app: &mut App, state: &mut AppState, event: MpvEvent) {
     match event {
@@ -62,16 +61,12 @@ pub fn handle_key_events(
     player: &mut Player,
     state: &mut AppState,
 ) {
-    if app.focus_area == FocusArea::Albums
-        || app.focus_area == FocusArea::Playlists
-        || app.focus_area == FocusArea::Queue
-        || (app.focus_area == FocusArea::SearchAlbums && !app.is_insert)
-        || (app.focus_area == FocusArea::SearchSongs && !app.is_insert)
-        || (app.focus_area == FocusArea::Songs)
+    if (!app.is_popup_active() && !app.is_insert)
+        || matches!(app.popup_state, PopupState::SaveSong { .. })
     {
         handle_lists_event(key_event, app);
     }
-    if !matches!(app.popup_state, PopupState::None) {
+    if app.is_popup_active() {
         handle_popup_event(key_event, app);
     } else {
         if key_event.code == KeyCode::Tab {
@@ -347,9 +342,6 @@ pub fn handle_key_events(
 }
 
 fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
-    if matches!(app.popup_state, PopupState::CreatePlaylist { .. }) {
-        return;
-    }
     let (state, len) = if matches!(app.popup_state, PopupState::SaveSong { .. }) {
         (&mut app.cus_playlists_liststate, app.cus_playlists.len())
     } else {
@@ -669,7 +661,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             }
             _ => {}
         },
-        PopupState::None => {}
+        _ => {}
     }
 }
 

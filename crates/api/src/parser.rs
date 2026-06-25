@@ -78,7 +78,6 @@ pub fn parse_lists(data: &str) -> YResult<(Vec<Playlist>, Vec<Playlist>, Option<
 
             let page_type_v = renderer.get("navigationEndpoint.browseEndpoint.browseEndpointContextSupportedConfigs.browseEndpointContextMusicConfig.pageType");
             let page_type = page_type_v.str();
-
             let mut is_custom = false;
             let menu = renderer.get("menu.menuRenderer.items");
             if menu.exists() {
@@ -482,7 +481,7 @@ pub fn parse_params(data: &str) -> YResult<String> {
         Err(YError::InvalidResponse("Get Params".to_string()))
     }
 }
-//
+
 // pub fn parse_related_songs(data: Value) -> YResult<Vec<Song>> {
 //     let mut songs = Vec::new();
 //     let contents = data.pointer("/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents").and_then(|c|c.as_array()).ok_or(YError::InvalidResponse("Get related songs".to_string()))?;

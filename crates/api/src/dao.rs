@@ -56,14 +56,10 @@ impl YTDao {
             .as_secs();
 
         let mut hasher = sha1_smol::Sha1::new();
-
         let message = format!("{timestamp} {} {YTM_DOMAIN}", self.sapisid);
         hasher.update(message.as_bytes());
-
         let result = hasher.digest();
-
         let hex_hash = result.to_string();
-
         format!("{}_{}", timestamp, hex_hash)
     }
 
