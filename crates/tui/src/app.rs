@@ -212,14 +212,14 @@ impl App {
         if let Ok(notif) = Notification::new(msg)
             .level(Level::Info)
             .anchor(Anchor::TopRight)
-            .auto_dismiss(AutoDismiss::After(Duration::from_millis(1600)))
+            .auto_dismiss(AutoDismiss::After(Duration::from_millis(2000)))
             .max_size(
                 ratatui_notifications::SizeConstraint::Percentage(25.0),
                 ratatui_notifications::SizeConstraint::Absolute(4),
             )
             .timing(
                 ratatui_notifications::Timing::Fixed(Duration::from_millis(50)),
-                ratatui_notifications::Timing::Fixed(Duration::from_millis(1500)),
+                ratatui_notifications::Timing::Fixed(Duration::from_millis(2000)),
                 ratatui_notifications::Timing::Fixed(Duration::from_millis(50)),
             )
             .style(style)

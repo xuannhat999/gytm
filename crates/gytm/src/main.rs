@@ -48,6 +48,7 @@ async fn main() -> YResult<()> {
             std::process::exit(1);
         }
     };
+    let is_logged_out = dao.sapisid.is_none();
     let bus = YTBus::new(dao);
     spawn_api_worker(api_cmd_rx, api_res_tx, bus);
     app.api_cmd_tx.send(ApiCmd::FetchLibraryData).ok();
@@ -78,6 +79,13 @@ async fn main() -> YResult<()> {
     let mut terminal = Terminal::new(backend)?;
 
     let theme = Theme::default();
+
+    if is_logged_out {
+        app.notify(
+            data::NotifyType::Error,
+            "Running in logged-out mode — some features unavailable".to_string(),
+        );
+    }
 
     let mut render = true;
     let mut last_tick = std::time::Instant::now();
