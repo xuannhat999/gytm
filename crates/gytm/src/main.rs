@@ -61,7 +61,7 @@ async fn main() -> YResult<()> {
     if Player::check_socket_exists().is_ok()
         && let Ok(stream) = player.connect_mpv().await
     {
-        let _ = app.load_queue_file();
+        app.load_queue_file().ok();
         player.observe_mpv(stream, tx_event).await?;
     } else {
         remove_queue_file();

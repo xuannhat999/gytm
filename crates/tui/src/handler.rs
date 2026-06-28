@@ -830,7 +830,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 log_to_file(&e);
                 app.notify(
                     data::NotifyType::Error,
-                    format!("Failed to unlike '{}': {}", title, e),
+                    format!("Failed to unlike '{}'\nError: {}", title, e),
                 );
             }
         },
@@ -842,7 +842,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 log_to_file(&e);
                 app.notify(
                     data::NotifyType::Error,
-                    format!("Failed to unsave '{}': {}", title, e),
+                    format!("Failed to unsave '{}'\nError: {}", title, e),
                 );
             }
         },
@@ -858,7 +858,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 log_to_file(&e);
                 app.notify(
                     data::NotifyType::Error,
-                    format!("Failed to fetch songs: {e}"),
+                    format!("Failed to fetch songs\nError: {e}"),
                 );
             }
         },
@@ -870,7 +870,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 log_to_file(&e);
                 app.notify(
                     data::NotifyType::Error,
-                    format!("Failed to fetch songs: {e}"),
+                    format!("Failed to fetch songs\nError: {e}"),
                 );
             }
         },
@@ -885,7 +885,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 log_to_file(&e);
                 app.notify(
                     data::NotifyType::Error,
-                    format!("Failed to unsave album '{}': {}", list.title, e),
+                    format!("Failed to unsave album '{}'\nError: {}", list.title, e),
                 );
             }
         },
@@ -901,7 +901,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 log_to_file(&e);
                 app.notify(
                     data::NotifyType::Error,
-                    format!("Failed to unsave playlist '{}': {}", title, e),
+                    format!("Failed to unsave playlist '{}'\nError: {}", title, e),
                 );
             }
         },
@@ -916,7 +916,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 log_to_file(&e);
                 app.notify(
                     data::NotifyType::Error,
-                    format!("Failed to save album '{}': {}", album.title, e),
+                    format!("Failed to save album '{}'\nError: {}", album.title, e),
                 );
             }
         },
@@ -928,7 +928,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 log_to_file(&e);
                 app.notify(
                     data::NotifyType::Error,
-                    format!("Failed to fetch related songs {e}"),
+                    format!("Failed to fetch related songs\nError: {e}"),
                 );
             }
         },
