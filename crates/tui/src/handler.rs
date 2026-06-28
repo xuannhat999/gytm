@@ -250,17 +250,17 @@ pub fn handle_key_events(
                                                 app.api_cmd_tx
                                                     .send(ApiCmd::SaveAlbum(selected.clone()))
                                                     .ok();
-                                                if let Some(idx) = app.albums.iter().position(|a| {
-                                                    a.playlist_id == selected.playlist_id
-                                                }) {
-                                                    app.albums.remove(idx);
-                                                }
+                                                app.albums.push(selected.clone());
                                             } else {
                                                 app.api_cmd_tx
                                                     .send(ApiCmd::UnsaveAlbum(selected.clone()))
                                                     .ok();
                                                 selected.is_saved = false;
-                                                app.albums.push(selected.clone());
+                                                if let Some(idx) = app.albums.iter().position(|a| {
+                                                    a.playlist_id == selected.playlist_id
+                                                }) {
+                                                    app.albums.remove(idx);
+                                                }
                                             }
                                         }
                                     }
@@ -546,7 +546,7 @@ fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
                 } else {
                     app.notify(
                         data::NotifyType::Error,
-                        String::from("Unable to edit this Album/Playlistt"),
+                        String::from("Unable to edit this Album/Playlist"),
                     );
                 }
             }
@@ -911,7 +911,6 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                     data::NotifyType::Success,
                     format!("Saved album '{}'", album.title),
                 );
-                app.albums.push(album);
             }
             Err(e) => {
                 log_to_file(&e);
