@@ -16,7 +16,7 @@ use crate::request::{
 
 pub struct YTDao {
     pub http: Client,
-    pub sapisid: String,
+    pub sapisid: Option<String>,
     pub innertube_api_key: String,
     pub client_version: String,
 }
@@ -32,13 +32,11 @@ impl YTDao {
             .build()?;
 
         let response_text = http.get(YTM_DOMAIN).send().await?.text().await?;
-
         let innertube_api_key = extract_between(&response_text, "INNERTUBE_API_KEY\":\"", "\"")
             .ok_or_else(|| YError::InvalidCookie)?;
 
         let client_version = extract_between(&response_text, "INNERTUBE_CLIENT_VERSION\":\"", "\"")
             .ok_or_else(|| YError::InvalidCookie)?;
-
         Ok(Self {
             http,
             sapisid,
@@ -49,14 +47,14 @@ impl YTDao {
 
     // This function is adapted from: https://github.com/ccgauche/ytermusic.git
     // Original source: https://github.com/ccgauche/ytermusic/blob/master/crates/ytpapi2/src/lib.rs
-    fn compute_sapi_hash(&self) -> String {
+    fn compute_sapi_hash(&self, sapisid: &str) -> String {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
 
         let mut hasher = sha1_smol::Sha1::new();
-        let message = format!("{timestamp} {} {YTM_DOMAIN}", self.sapisid);
+        let message = format!("{timestamp} {} {YTM_DOMAIN}", sapisid);
         hasher.update(message.as_bytes());
         let result = hasher.digest();
         let hex_hash = result.to_string();
@@ -65,15 +63,16 @@ impl YTDao {
 
     // This function is adapted from: https://github.com/ccgauche/ytermusic.git
     // Original source: https://github.com/ccgauche/ytermusic/blob/master/crates/ytpapi2/src/lib.rs
-    pub fn get_api_headers(&self) -> YResult<HeaderMap> {
+    pub fn get_api_headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
         headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
         headers.insert("X-Goog-AuthUser", HeaderValue::from_static("0"));
-        let auth_val = HeaderValue::from_str(&format!("SAPISIDHASH {}", self.compute_sapi_hash()))
-            .map_err(YError::InvalidHeader);
-        headers.insert("Authorization", auth_val?);
-        Ok(headers)
+        if let Some(ref sapisid) = self.sapisid {
+            let auth_val = format!("SAPISIDHASH {}", self.compute_sapi_hash(sapisid));
+            headers.insert("Authorization", HeaderValue::from_str(&auth_val).unwrap());
+        }
+        headers
     }
 
     fn get_context(&self) -> RequestContext<'_> {
@@ -98,7 +97,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?
@@ -120,7 +119,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?
@@ -142,7 +141,7 @@ impl YTDao {
         let text = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?
@@ -170,7 +169,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?
@@ -191,7 +190,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?
@@ -224,7 +223,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?
@@ -247,7 +246,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?
@@ -273,7 +272,7 @@ impl YTDao {
         let status = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?
@@ -299,7 +298,7 @@ impl YTDao {
         let status = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?
@@ -328,7 +327,7 @@ impl YTDao {
         let status = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?
@@ -363,7 +362,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?;
@@ -403,7 +402,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?;
@@ -436,7 +435,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?;
@@ -466,7 +465,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers()?)
+            .headers(self.get_api_headers())
             .json(&body)
             .send()
             .await?;
@@ -481,14 +480,14 @@ impl YTDao {
 }
 
 // ONLY WORKS WITH CHROMIUM BASED BROWSER ( No idea )
-pub fn load_cookies() -> YResult<(Jar, String)> {
+pub fn load_cookies() -> YResult<(Jar, Option<String>)> {
     let jar = Jar::default();
     let url = YTM_DOMAIN.parse::<Url>()?;
     let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
     let mut sapisid_extracted = String::new();
     let mut cookies = load(Some(domains)).unwrap_or_else(|_| Vec::new());
     if cookies.is_empty() {
-        cookies = load_cookies_other_browsers()?;
+        cookies = load_cookies_other_browsers();
     }
 
     for cookie in cookies {
@@ -501,14 +500,17 @@ pub fn load_cookies() -> YResult<(Jar, String)> {
         );
         jar.add_cookie_str(&cookie_str, &url);
     }
-    if sapisid_extracted.is_empty() {
-        return Err(YError::InvalidCookie);
-    }
 
-    Ok((jar, sapisid_extracted))
+    let sapisid = if sapisid_extracted.is_empty() {
+        None
+    } else {
+        Some(sapisid_extracted)
+    };
+
+    Ok((jar, sapisid))
 }
 
-pub fn load_cookies_other_browsers() -> YResult<Vec<Cookie>> {
+pub fn load_cookies_other_browsers() -> Vec<Cookie> {
     let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
     let browser_dirs = vec![
         "mozilla/firefox",
@@ -517,8 +519,10 @@ pub fn load_cookies_other_browsers() -> YResult<Vec<Cookie>> {
         "BraveSoftware/Brave-Origin",
     ];
     let target_filename = vec!["cookies.sqlite", "Cookies"];
-    let config_dir =
-        dirs::config_dir().ok_or_else(|| YError::InvalidPath("~/.config/".to_string()))?;
+    let config_dir = match dirs::config_dir() {
+        Some(d) => d,
+        None => return Vec::new(),
+    };
     let mut target_db_path: Option<PathBuf> = None;
     'outer: for browser in browser_dirs {
         let base_path = config_dir.join(browser);
@@ -541,15 +545,12 @@ pub fn load_cookies_other_browsers() -> YResult<Vec<Cookie>> {
         }
     }
 
-    let cookies_path = target_db_path
-        .ok_or_else(|| YError::InvalidPath("~/.config/browser_dirs/../Cookie".to_string()))?
-        .to_string_lossy()
-        .into_owned();
+    let cookies_path = match target_db_path {
+        Some(p) => p.to_string_lossy().into_owned(),
+        None => return Vec::new(),
+    };
 
-    let cookies =
-        any_browser(&cookies_path, Some(domains), None).map_err(|_| YError::InvalidCookie)?;
-
-    Ok(cookies)
+    any_browser(&cookies_path, Some(domains), None).unwrap_or_default()
 }
 
 fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
