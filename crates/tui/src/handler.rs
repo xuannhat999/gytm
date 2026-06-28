@@ -250,7 +250,6 @@ pub fn handle_key_events(
                                                 app.api_cmd_tx
                                                     .send(ApiCmd::SaveAlbum(selected.clone()))
                                                     .ok();
-                                                app.albums.push(selected.clone());
                                             } else {
                                                 app.api_cmd_tx
                                                     .send(ApiCmd::UnsaveAlbum(selected.clone()))
@@ -285,7 +284,7 @@ pub fn handle_key_events(
                                     .selected()
                                     .map(|i| app.search_songs[i].clone())
                                 {
-                                    if let Err(e) = append_song_to_queue(app, player, &song) {
+                                    if let Err(e) = append_song_to_queue(app, player, song) {
                                         log_to_file(&e);
                                     }
                                 }
@@ -520,7 +519,7 @@ fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
         }
         KeyCode::Char('a') => {
             if let Some(song) = app.songs_liststate.selected().map(|i| app.songs[i].clone()) {
-                if let Err(e) = append_song_to_queue(app, player, &song) {
+                if let Err(e) = append_song_to_queue(app, player, song) {
                     log_to_file(&e);
                 }
             }
@@ -665,7 +664,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
     }
 }
 
-fn append_song_to_queue(app: &mut App, player: &mut Player, song: &Song) -> YResult<()> {
+fn append_song_to_queue(app: &mut App, player: &mut Player, song: Song) -> YResult<()> {
     if app.queue.iter().any(|s| s.video_id == song.video_id) {
         app.notify(
             data::NotifyType::Error,
@@ -675,8 +674,7 @@ fn append_song_to_queue(app: &mut App, player: &mut Player, song: &Song) -> YRes
     }
     let url = get_url_from_vid_id(&song.video_id);
     player.send_mpv_command(MpvCommand::AppendSong(url))?;
-    let new_song = song.clone();
-    app.queue.push(new_song);
+    app.queue.push(song);
     app.notify(
         data::NotifyType::Success,
         String::from("Added song to Queue"),
@@ -911,6 +909,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                     data::NotifyType::Success,
                     format!("Saved album '{}'", album.title),
                 );
+                app.albums.push(album);
             }
             Err(e) => {
                 log_to_file(&e);
