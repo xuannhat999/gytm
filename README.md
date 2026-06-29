@@ -3,10 +3,9 @@
 Stream Youtube Music from your terminal !
 
 # Demo
-
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/d093dfc0-4689-44fb-8f24-f826cd794cf1" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/55c8ff61-3d53-4a26-8bf0-f79efa5bbd44" />
 <br></br>
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/7dd370ed-9b9b-40f1-8ad2-aeede4dfb13b" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/fad1679b-f0fd-4475-bed5-3139d9795c76" />
 <br></br>
 
 # Features
@@ -17,7 +16,7 @@ Stream Youtube Music from your terminal !
 - Add / Remove Songs in Queue
 - When select to play a song in search result, it will automatically load list of related songs into Queue
 - Create / Edit personal playlists
-- Keep playing in background alfter quit app ( Minimize )
+- Keep playing in background after quit app ( Minimize )
 ## Supported OS
 
 - **Linux** (Tested on Arch Linux)
@@ -106,7 +105,18 @@ paru -S gytm-git
 - <kbd>d</kbd>:
   - [3]Queue: Remove song from Queue
 - <kbd>c</kbd>: Clear Queue
+## Configuration
 
+File path: `$XDG_CONFIG_HOME/gytm/config.toml` (defaults to `~/.config/gytm/config.toml`)
+
+### Default Configuration
+
+```toml
+# Theme options: "catppuccin_mocha", "tokyo_night", "gruvbox", "dracula"
+theme = "catppuccin_mocha"
+background = true
+seek_seconds = 5
+```
 # ⚠️ Troubleshooting (App freezes on startup)
 
 If you are using a standalone **Window Manager (Hyprland, i3, Sway, etc.)** and the app freezes on startup, your browser's secure storage is likely locked. Because these environments lack a default graphical interface to prompt for your password, the application hangs waiting for permission.
