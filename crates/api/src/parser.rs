@@ -77,16 +77,20 @@ pub fn parse_lists(data: &str) -> YResult<(Vec<Playlist>, Vec<Playlist>, Option<
 
 pub fn parse_songs(data: &str) -> YResult<Vec<Song>> {
     let path = "contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer.contents.0.musicShelfRenderer.contents";
-    let alt_path = "contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer.contents.0.musicPlaylistShelfRenderer.contents";
+    let alt_path = "contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer.contents.0.musicPlaylistShelfRenderer";
+    let alt_path_contents = "contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer.contents.0.musicPlaylistShelfRenderer.contents";
     let json = gjson::get(data, path);
     let json = if json.exists() {
         json
-    } else {
-        gjson::get(data, alt_path)
-    };
-    if !json.exists() {
+    } else if !gjson::get(data, alt_path).exists() {
         return Err(YError::InvalidResponse("Browse songs".to_string()));
-    }
+    } else {
+        let contents = gjson::get(data, alt_path_contents);
+        if !contents.exists() {
+            return Ok(Vec::new());
+        }
+        contents
+    };
     let mut songs = Vec::new();
     json.each(|_, item| {
         let r = item.get("musicResponsiveListItemRenderer");

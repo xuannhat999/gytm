@@ -33,7 +33,7 @@ impl YTBus {
             Ok((albums, playlists, token)) => (albums, playlists, token),
             Err(e) => {
                 log_to_file(&e);
-                (Vec::new(), Vec::new(), None)
+                return Err(e);
             }
         };
         all_albums.append(&mut albums);
@@ -64,45 +64,42 @@ impl YTBus {
             Ok(songs) => Ok(songs),
             Err(e) => {
                 log_to_file(&e);
-                Ok(Vec::new())
+                Err(e)
             }
         }
     }
 
     pub async fn get_search_albums(&self, query: &str) -> YResult<Vec<Playlist>> {
         let raw_list = self.dao.get_search_albums_raw(query, 2).await?;
-        let albums = match parser::parse_search_albums(&raw_list) {
-            Ok(list) => list,
+        match parser::parse_search_albums(&raw_list) {
+            Ok(list) => Ok(list),
             Err(e) => {
                 log_to_file(&e);
-                Vec::new()
+                Err(e)
             }
-        };
-        Ok(albums)
+        }
     }
 
     pub async fn get_search_songs(&self, query: &str) -> YResult<Vec<Song>> {
         let raw_data = self.dao.get_search_albums_raw(query, 1).await?;
-        let songs = match parser::parse_search_songs(&raw_data) {
-            Ok(songs) => songs,
+        match parser::parse_search_songs(&raw_data) {
+            Ok(songs) => Ok(songs),
             Err(e) => {
                 log_to_file(&e);
-                Vec::new()
+                Err(e)
             }
-        };
-        Ok(songs)
+        }
     }
 
     pub async fn get_params(&self, video_id: &str) -> YResult<String> {
         let raw_data = self.dao.get_params_raw(video_id).await?;
-        let params = match parser::parse_params(&raw_data) {
-            Ok(params) => params,
+        match parser::parse_params(&raw_data) {
+            Ok(params) => Ok(params),
             Err(e) => {
                 log_to_file(&e);
-                String::new()
+                Err(e)
             }
-        };
-        Ok(params)
+        }
     }
 
     pub async fn get_related_songs(&self, song: Song, params: &str) -> YResult<Vec<Song>> {
