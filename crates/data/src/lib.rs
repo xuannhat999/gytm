@@ -38,8 +38,8 @@ pub enum MpvEvent {
 pub enum MpvCommand {
     Shuffle,
     Unshuffle,
-    SeekForward,
-    SeekBackward,
+    SeekForward(i64),
+    SeekBackward(i64),
     PlayNext,
     PlayPrev,
     TogglePause,

@@ -2,6 +2,7 @@ use api::{
     YTBus, YTDao,
     protocol::{ApiCmd, ApiResponse},
 };
+use config::Config;
 use crossterm::{
     event::{self, Event},
     execute,
@@ -18,7 +19,6 @@ use tui::{
     app::App,
     handler,
     helper::remove_queue_file,
-    theme::Theme,
     ui::{self},
     worker::spawn_api_worker,
 };
@@ -78,7 +78,7 @@ async fn main() -> YResult<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let theme = Theme::default();
+    let config = Config::load();
 
     if is_logged_out {
         app.notify(
@@ -106,7 +106,7 @@ async fn main() -> YResult<()> {
         if event::poll(Duration::from_millis(50))? {
             match event::read()? {
                 Event::Key(key) => {
-                    handler::handle_key_events(key, &mut app, &mut player, &mut app_state);
+                    handler::handle_key_events(key, &mut app, &mut player, &mut app_state, &config);
                     render = true;
                 }
                 Event::Resize(_, _) => {
@@ -127,7 +127,7 @@ async fn main() -> YResult<()> {
         }
         if render {
             terminal.draw(|f| {
-                ui::render(&mut app, f, &theme, start_time);
+                ui::render(&mut app, f, &config, start_time);
                 app.noti.render(f, f.area());
             })?;
             render = false;

@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "crates/api",
+  "crates/config",
   "crates/tui",
   "crates/data",
   "crates/error",
@@ -39,6 +40,8 @@ data = { path = "crates/data" }
 error = { path = "crates/error" }
 gytm = { path = "crates/gytm" }
 state = { path = "crates/state" }
+config = { path = "crates/config" }
+toml = "0.8"
 
 [profile.release]
 opt-level = "z"

@@ -3,6 +3,7 @@ use crate::{
     helper::{self, get_url_from_vid_id},
 };
 use api::protocol::{ApiCmd, ApiLoadingKind, ApiResponse};
+use config::Config;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::{
     AppPage, CreatePlaylistFocus,
@@ -60,6 +61,7 @@ pub fn handle_key_events(
     app: &mut App,
     player: &mut Player,
     state: &mut AppState,
+    config: &Config,
 ) {
     if (!app.is_popup_active() && !app.is_insert)
         || matches!(app.popup_state, PopupState::SaveSong { .. })
@@ -109,7 +111,7 @@ pub fn handle_key_events(
                 }
                 _ => {}
             }
-            handle_player_event(key_event, app, player, state);
+            handle_player_event(key_event, app, player, state, config);
         }
 
         match app.page {
@@ -426,6 +428,7 @@ fn handle_player_event(
     app: &mut App,
     player: &mut Player,
     state: &mut AppState,
+    config: &Config,
 ) {
     match key_event.code {
         KeyCode::Char(' ') if app.playing_song.is_some() => {
@@ -478,12 +481,12 @@ fn handle_player_event(
             }
         }
         KeyCode::Left => {
-            if let Err(e) = player.send_mpv_command(MpvCommand::SeekBackward) {
+            if let Err(e) = player.send_mpv_command(MpvCommand::SeekBackward(config.seek_seconds as i64)) {
                 log_to_file(&e);
             }
         }
         KeyCode::Right => {
-            if let Err(e) = player.send_mpv_command(MpvCommand::SeekForward) {
+            if let Err(e) = player.send_mpv_command(MpvCommand::SeekForward(config.seek_seconds as i64)) {
                 log_to_file(&e);
             }
         }

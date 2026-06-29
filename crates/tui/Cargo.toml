@@ -9,6 +9,7 @@ api = { workspace = true }
 error = { workspace = true }
 player = { workspace = true }
 state = { workspace = true }
+config = { workspace = true }
 
 tokio = { workspace = true, features = ["time", "macros"] }
 serde_json = { workspace = true }

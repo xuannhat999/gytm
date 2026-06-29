@@ -262,8 +262,12 @@ fn match_mpv_command(mpv_cmd: MpvCommand) -> String {
                 + r#"{"command": ["set_property", "pause", false]}"#
                 + "\n";
         }
-        MpvCommand::SeekBackward => r#"{"command": ["seek", -5, "relative"]}"#,
-        MpvCommand::SeekForward => r#"{"command": ["seek", 5, "relative"]}"#,
+        MpvCommand::SeekBackward(secs) => {
+            return format!(r#"{{"command": ["seek", -{}, "relative"]}}"#, secs) + "\n";
+        }
+        MpvCommand::SeekForward(secs) => {
+            return format!(r#"{{"command": ["seek", {}, "relative"]}}"#, secs) + "\n";
+        }
         MpvCommand::DecreaseVol => r#"{"command": ["add", "volume", -5]}"#,
         MpvCommand::IncreaseVol => r#"{"command": ["add", "volume", 5]}"#,
         MpvCommand::TogglePause => r#"{"command": ["cycle", "pause"]}"#,

@@ -13,6 +13,7 @@ api = { workspace = true }
 error = { workspace = true }
 player = { workspace = true }
 state = { workspace = true }
+config = { workspace = true }
 
 crossterm = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
