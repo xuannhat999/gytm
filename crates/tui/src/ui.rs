@@ -1,10 +1,12 @@
 use crate::app::{App, PopupState};
 use crate::helper;
-use crate::theme::Theme;
 use api::protocol::ApiLoadingKind;
+use config::Config;
+use config::theme::Theme;
 use data::AppPage::Library;
 use data::{AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus};
 use ratatui::layout::Flex;
+use ratatui::style::Color;
 use ratatui::{
     self, Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -13,7 +15,10 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs},
 };
 
-pub fn render(app: &mut App, frame: &mut Frame, theme: &Theme, start_time: std::time::Instant) {
+pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std::time::Instant) {
+    if config.background {
+        render_background(frame, frame.area(), config.theme.bg);
+    }
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -41,16 +46,16 @@ pub fn render(app: &mut App, frame: &mut Frame, theme: &Theme, start_time: std::
             Constraint::Length(2),
         ])
         .split(main_layout[0]);
-    render_tabs(frame, top_layout[0], theme, app.page as usize);
+    render_tabs(frame, top_layout[0], &config.theme, app.page as usize);
     render_help_line(
         frame,
         top_layout[1],
-        theme,
+        &config.theme,
         vec![("Next tab", "Tab"), ("Minimize", "q"), ("Quit", "Q")],
     );
-    render_queue(frame, app, main_layout[3], theme, start_time);
-    render_player(frame, app, main_layout[4], theme);
-    render_songs(frame, app, hor_layout[1], theme, start_time);
+    render_queue(frame, app, main_layout[3], &config.theme, start_time);
+    render_player(frame, app, main_layout[4], &config.theme);
+    render_songs(frame, app, hor_layout[1], &config.theme, start_time);
 
     match app.page {
         AppPage::Library => {
@@ -69,7 +74,7 @@ pub fn render(app: &mut App, frame: &mut Frame, theme: &Theme, start_time: std::
                 app,
                 list_layout[0],
                 FocusArea::Albums,
-                theme,
+                &config.theme,
                 start_time,
             );
             render_list(
@@ -77,7 +82,7 @@ pub fn render(app: &mut App, frame: &mut Frame, theme: &Theme, start_time: std::
                 app,
                 list_layout[1],
                 FocusArea::Playlists,
-                theme,
+                &config.theme,
                 start_time,
             );
         }
@@ -86,18 +91,18 @@ pub fn render(app: &mut App, frame: &mut Frame, theme: &Theme, start_time: std::
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
                 .split(hor_layout[0]);
-            render_search_input(frame, app, main_layout[1], theme, start_time);
-            render_search_albums(frame, app, result_layout[0], theme);
-            render_search_songs(frame, app, result_layout[1], theme);
+            render_search_input(frame, app, main_layout[1], &config.theme, start_time);
+            render_search_albums(frame, app, result_layout[0], &config.theme);
+            render_search_songs(frame, app, result_layout[1], &config.theme);
         }
     }
     match &app.popup_state {
         PopupState::None => {}
         PopupState::SaveSong { .. } => {
-            render_save_song_to_playlist_popup(frame, app, frame.area(), theme, start_time);
+            render_save_song_to_playlist_popup(frame, app, frame.area(), config, start_time);
         }
         PopupState::CreatePlaylist { .. } => {
-            render_create_playlist_popup(frame, app, frame.area(), theme, start_time);
+            render_create_playlist_popup(frame, app, frame.area(), config, start_time);
         }
     }
 }
@@ -121,11 +126,8 @@ fn render_tabs(frame: &mut Frame, area: Rect, theme: &Theme, current_idx: usize)
         .highlight_style(
             theme
                 .key_style()
-                .bg(theme
-                    .text_style()
-                    .fg
-                    .unwrap_or(ratatui::style::Color::DarkGray))
-                .fg(ratatui::style::Color::Black)
+                .bg(theme.active)
+                .fg(theme.bg)
                 .add_modifier(Modifier::BOLD),
         )
         .select(current_idx)
@@ -580,7 +582,7 @@ fn render_save_song_to_playlist_popup(
     frame: &mut Frame,
     app: &mut App,
     area: Rect,
-    theme: &Theme,
+    config: &Config,
     start_time: std::time::Instant,
 ) {
     let PopupState::SaveSong { selected_save_song } = &app.popup_state else {
@@ -601,19 +603,20 @@ fn render_save_song_to_playlist_popup(
         .collect();
 
     let keymap = Line::from(vec![
-        Span::styled("[ Save: ", theme.text_style()),
-        Span::styled("Enter ", theme.key_style()),
-        Span::styled("| Close: ", theme.text_style()),
-        Span::styled("Esc ", theme.key_style()),
-        Span::styled("]", theme.text_style()),
+        Span::styled("[ Save: ", config.theme.text_style()),
+        Span::styled("Enter ", config.theme.key_style()),
+        Span::styled("| Close: ", config.theme.text_style()),
+        Span::styled("Esc ", config.theme.key_style()),
+        Span::styled("]", config.theme.text_style()),
     ]);
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
+        .border_type(BorderType::Thick)
+        .border_style(config.theme.active_border_style())
         .title_bottom(keymap.centered());
 
-    let center_area = area.centered(Constraint::Percentage(40), Constraint::Percentage(50));
+    let center_area = area.centered(Constraint::Percentage(50), Constraint::Percentage(50));
     let inner_area = block.inner(center_area);
 
     let layout = Layout::default()
@@ -624,24 +627,30 @@ fn render_save_song_to_playlist_popup(
             Constraint::Min(0),
         ])
         .split(inner_area);
+
     let title_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(3), Constraint::Percentage(100)])
         .split(layout[0]);
-    let list_widget = List::new(items).highlight_style(theme.selected_item());
+    let list_widget = List::new(items).highlight_style(config.theme.selected_item());
 
     let title = Line::from(vec![
         Span::raw(" Saving "),
-        Span::styled(&selected_save_song.title, theme.key_style()),
+        Span::styled(&selected_save_song.title, config.theme.key_style()),
         Span::raw(" to:"),
     ]);
-    let line = Block::default().borders(Borders::TOP);
+    let line = Block::default()
+        .borders(Borders::TOP)
+        .border_style(config.theme.active_border_style());
 
     frame.render_widget(Clear, center_area);
+    if config.background {
+        render_background(frame, center_area, config.theme.bg_popup);
+    }
     frame.render_widget(block, center_area);
     frame.render_widget(title, title_layout[1]);
     if app.api_loading_kind == Some(ApiLoadingKind::SaveToPlaylist) {
-        render_spinner(frame, title_layout[0], theme, start_time);
+        render_spinner(frame, title_layout[0], &config.theme, start_time);
     }
     frame.render_widget(line, layout[1]);
     frame.render_stateful_widget(list_widget, layout[2], &mut app.cus_playlists_liststate);
@@ -651,7 +660,7 @@ fn render_create_playlist_popup(
     frame: &mut Frame,
     app: &mut App,
     area: Rect,
-    theme: &Theme,
+    config: &Config,
     start_time: std::time::Instant,
 ) {
     let PopupState::CreatePlaylist {
@@ -665,22 +674,23 @@ fn render_create_playlist_popup(
     };
 
     let keymap = Line::from(vec![
-        Span::styled("[ Tab: ", theme.text_style()),
-        Span::styled("Next ", theme.key_style()),
-        Span::styled("| Enter: ", theme.text_style()),
-        Span::styled("Create ", theme.key_style()),
-        Span::styled("| Esc: ", theme.text_style()),
-        Span::styled("Cancel ", theme.key_style()),
-        Span::styled("]", theme.text_style()),
+        Span::styled("[ Tab: ", config.theme.text_style()),
+        Span::styled("Next ", config.theme.key_style()),
+        Span::styled("| Enter: ", config.theme.text_style()),
+        Span::styled("Create ", config.theme.key_style()),
+        Span::styled("| Esc: ", config.theme.text_style()),
+        Span::styled("Cancel ", config.theme.key_style()),
+        Span::styled("]", config.theme.text_style()),
     ]);
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
+        .border_type(BorderType::Thick)
+        .border_style(config.theme.active_border_style())
         .title(" Create Playlist ")
         .title_bottom(keymap.centered());
 
-    let center_area = area.centered(Constraint::Percentage(40), Constraint::Length(15));
+    let center_area = area.centered(Constraint::Percentage(50), Constraint::Length(20));
     let inner_area = block.inner(center_area);
 
     let layout = Layout::default()
@@ -693,14 +703,17 @@ fn render_create_playlist_popup(
         ])
         .split(inner_area);
     frame.render_widget(Clear, center_area);
+    if config.background {
+        render_background(frame, center_area, config.theme.bg_popup);
+    }
     frame.render_widget(block, center_area);
     if app.api_loading_kind == Some(ApiLoadingKind::CreatePlaylist) {
-        render_spinner(frame, layout[0], theme, start_time);
+        render_spinner(frame, layout[0], &config.theme, start_time);
     }
     render_input_field(
         frame,
         layout[1],
-        theme,
+        &config.theme,
         " Title:",
         title,
         matches!(focused_field, CreatePlaylistFocus::Title),
@@ -708,7 +721,7 @@ fn render_create_playlist_popup(
     render_input_field(
         frame,
         layout[2],
-        theme,
+        &config.theme,
         " Desc:",
         description,
         matches!(focused_field, CreatePlaylistFocus::Description),
@@ -716,7 +729,7 @@ fn render_create_playlist_popup(
     render_privacy_selector(
         frame,
         layout[3],
-        theme,
+        &config.theme,
         privacy,
         matches!(focused_field, CreatePlaylistFocus::Privacy),
     );
@@ -820,4 +833,8 @@ fn render_spinner(f: &mut Frame, area: Rect, theme: &Theme, start_time: std::tim
         .alignment(Alignment::Center);
 
     f.render_widget(spinner_widget, centered_area);
+}
+
+fn render_background(frame: &mut Frame, area: Rect, color: Color) {
+    frame.render_widget(Paragraph::new("").style(Style::default().bg(color)), area);
 }

@@ -1,0 +1,10 @@
+[package]
+name = "config"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+error = { workspace = true }
+dirs = { workspace = true }
+toml = { workspace = true }
+ratatui = { workspace = true }

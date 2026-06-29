@@ -1,9 +1,6 @@
 use std::time::Duration;
 
-use crate::{
-    helper::{self, get_queue_file},
-    theme::{error_style, success_style},
-};
+use crate::helper::{self, get_queue_file};
 use api::protocol::{ApiCmd, ApiLoadingKind};
 use data::{
     AppPage, CreatePlaylistFocus, FocusArea, NotifyType, PlayListPrivacy, PlayMode, PlayerState,
@@ -11,7 +8,10 @@ use data::{
 };
 use error::{YResult, log_to_file};
 use player::Player;
-use ratatui::widgets::ListState;
+use ratatui::{
+    style::{Color, Style},
+    widgets::ListState,
+};
 use ratatui_notifications::{Anchor, AutoDismiss, Level, Notification, Notifications};
 use tokio::sync::mpsc;
 
@@ -206,8 +206,8 @@ impl App {
 
     pub fn notify(&mut self, noti_type: NotifyType, msg: String) {
         let style = match noti_type {
-            NotifyType::Error => error_style(),
-            NotifyType::Success => success_style(),
+            NotifyType::Error => Style::default().fg(Color::Rgb(243, 139, 168)),
+            NotifyType::Success => Style::default().fg(Color::Rgb(166, 227, 161)),
         };
         if let Ok(notif) = Notification::new(msg)
             .level(Level::Info)
