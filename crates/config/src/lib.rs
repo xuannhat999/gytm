@@ -1,8 +1,6 @@
-pub mod theme;
-
+use data::theme::Theme;
 use error::log_to_file;
 use std::{fs, path::PathBuf};
-use theme::Theme;
 
 #[derive(Debug, Clone)]
 pub struct Config {

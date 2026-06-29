@@ -1,4 +1,4 @@
-use data::{PlayListPrivacy, Song};
+use data::app::{PlayListPrivacy, Song};
 use error::{YError, YResult};
 use reqwest::{
     Client, Url,

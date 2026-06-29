@@ -1,4 +1,4 @@
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Color, Style};
 
 #[derive(Debug, Clone)]
 pub struct Theme {
@@ -85,15 +85,11 @@ impl Theme {
     }
 
     pub fn key_style(&self) -> Style {
-        Style::default()
-            .fg(self.secondary)
-            .add_modifier(Modifier::BOLD)
+        Style::default().fg(self.secondary).bold()
     }
 
     pub fn active_border_style(&self) -> Style {
-        Style::default()
-            .fg(self.active)
-            .add_modifier(Modifier::BOLD)
+        Style::default().fg(self.active).bold()
     }
 
     pub fn inactive_border_style(&self) -> Style {
@@ -102,5 +98,13 @@ impl Theme {
 
     pub fn selected_item(&self) -> Style {
         Style::default().bg(self.surface).fg(self.primary)
+    }
+
+    pub fn error_style(&self) -> Style {
+        Style::default().fg(Color::Rgb(243, 139, 168))
+    }
+
+    pub fn success_style(&self) -> Style {
+        Style::default().fg(Color::Rgb(166, 227, 161))
     }
 }

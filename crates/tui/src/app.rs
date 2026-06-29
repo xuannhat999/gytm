@@ -1,18 +1,17 @@
-use std::time::Duration;
-
-use crate::helper::{self, get_queue_file};
+use crate::{
+    helper::{self, get_queue_file},
+    notification::NotificationManager,
+};
 use api::protocol::{ApiCmd, ApiLoadingKind};
-use data::{
-    AppPage, CreatePlaylistFocus, FocusArea, NotifyType, PlayListPrivacy, PlayMode, PlayerState,
-    PlayerStatus, Playlist, Song,
+use config::Config;
+use data::app::{
+    AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus, Playlist,
+    Song,
 };
-use error::{YResult, log_to_file};
+use error::YResult;
 use player::Player;
-use ratatui::{
-    style::{Color, Style},
-    widgets::ListState,
-};
-use ratatui_notifications::{Anchor, AutoDismiss, Level, Notification, Notifications};
+use ratatui::widgets::ListState;
+use state::PlayerState;
 use tokio::sync::mpsc;
 
 pub enum PopupState {
@@ -67,7 +66,7 @@ pub struct App {
     pub volume: u8,
     pub play_mode: PlayMode,
 
-    pub noti: Notifications,
+    pub noti: NotificationManager,
     pub page: AppPage,
     pub is_exit: bool,
 
@@ -77,7 +76,11 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(player_state: &PlayerState, api_cmd_tx: mpsc::UnboundedSender<ApiCmd>) -> Self {
+    pub fn new(
+        player_state: &PlayerState,
+        config: &Config,
+        api_cmd_tx: mpsc::UnboundedSender<ApiCmd>,
+    ) -> Self {
         Self {
             // PAGE LIBRARY
             albums: Vec::new(),
@@ -117,7 +120,7 @@ impl App {
             cus_playlists_liststate: ListState::default(),
             popup_state: PopupState::None,
             //OTHER
-            noti: Notifications::new(),
+            noti: NotificationManager::new(config),
             is_exit: false,
             page: AppPage::Library,
 
@@ -204,33 +207,6 @@ impl App {
         Ok(())
     }
 
-    pub fn notify(&mut self, noti_type: NotifyType, msg: String) {
-        let style = match noti_type {
-            NotifyType::Error => Style::default().fg(Color::Rgb(243, 139, 168)),
-            NotifyType::Success => Style::default().fg(Color::Rgb(166, 227, 161)),
-        };
-        if let Ok(notif) = Notification::new(msg)
-            .level(Level::Info)
-            .anchor(Anchor::TopRight)
-            .auto_dismiss(AutoDismiss::After(Duration::from_millis(2500)))
-            .max_size(
-                ratatui_notifications::SizeConstraint::Percentage(25.0),
-                ratatui_notifications::SizeConstraint::Absolute(4),
-            )
-            .timing(
-                ratatui_notifications::Timing::Fixed(Duration::from_millis(50)),
-                ratatui_notifications::Timing::Fixed(Duration::from_millis(2400)),
-                ratatui_notifications::Timing::Fixed(Duration::from_millis(50)),
-            )
-            .style(style)
-            .border_style(style)
-            .build()
-        {
-            if let Err(e) = self.noti.add(notif) {
-                log_to_file(&e);
-            }
-        }
-    }
     pub fn shutdown(player: &mut Player) {
         helper::remove_queue_file();
         player.shutdown();

@@ -1,16 +1,20 @@
 use crate::{
     app::{App, PopupState},
     helper::{self, get_url_from_vid_id},
+    notification::NotifyType,
 };
 use api::protocol::{ApiCmd, ApiLoadingKind, ApiResponse};
 use config::Config;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::{
-    AppPage, CreatePlaylistFocus,
-    FocusArea::{self},
-    MpvCommand, MpvEvent, PlayListPrivacy, PlayMode,
-    PlayerStatus::{self},
-    Song,
+    app::{
+        AppPage, CreatePlaylistFocus,
+        FocusArea::{self},
+        PlayListPrivacy, PlayMode,
+        PlayerStatus::{self},
+        Song,
+    },
+    mpv::{MpvCommand, MpvEvent},
 };
 use error::{YError, YResult, log_to_file};
 use player::Player;
@@ -180,8 +184,8 @@ pub fn handle_key_events(
                         if let Some(i) = app.playlists_liststate.selected() {
                             if let Some(playlist) = app.playlists.get(i) {
                                 if playlist.playlist_id == "LM" || playlist.playlist_id == "SE" {
-                                    app.notify(
-                                        data::NotifyType::Error,
+                                    app.noti.notify(
+                                        NotifyType::Error,
                                         String::from("Can not remove this playlist"),
                                     );
                                 } else {
@@ -373,12 +377,6 @@ fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
                         remove_song_from_queue(app, player, i, idx_mpv);
                     }
                 }
-                if app.queue.is_empty() {
-                    app.status = PlayerStatus::Idle;
-                    app.playing_song = None;
-                    app.playing_playlist_id = None;
-                    app.time_pos = None;
-                }
             }
         }
         KeyCode::Enter => {
@@ -481,12 +479,16 @@ fn handle_player_event(
             }
         }
         KeyCode::Left => {
-            if let Err(e) = player.send_mpv_command(MpvCommand::SeekBackward(config.seek_seconds as i64)) {
+            if let Err(e) =
+                player.send_mpv_command(MpvCommand::SeekBackward(config.seek_seconds as i64))
+            {
                 log_to_file(&e);
             }
         }
         KeyCode::Right => {
-            if let Err(e) = player.send_mpv_command(MpvCommand::SeekForward(config.seek_seconds as i64)) {
+            if let Err(e) =
+                player.send_mpv_command(MpvCommand::SeekForward(config.seek_seconds as i64))
+            {
                 log_to_file(&e);
             }
         }
@@ -513,8 +515,8 @@ fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
                         }
                     }
                 } else {
-                    app.notify(
-                        data::NotifyType::Error,
+                    app.noti.notify(
+                        NotifyType::Error,
                         String::from("Playlist/Album's already been playing, change song in Queue"),
                     );
                 }
@@ -546,8 +548,8 @@ fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
                         app.songs.remove(i);
                     }
                 } else {
-                    app.notify(
-                        data::NotifyType::Error,
+                    app.noti.notify(
+                        NotifyType::Error,
                         String::from("Unable to edit this Album/Playlist"),
                     );
                 }
@@ -607,10 +609,8 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             }
             KeyCode::Enter => {
                 if title.is_empty() {
-                    app.notify(
-                        data::NotifyType::Error,
-                        String::from("Title must not be empty"),
-                    );
+                    app.noti
+                        .notify(NotifyType::Error, String::from("Title must not be empty"));
                 } else {
                     app.api_cmd_tx
                         .send(ApiCmd::CreatePlaylist {
@@ -669,22 +669,23 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
 
 fn append_song_to_queue(app: &mut App, player: &mut Player, song: Song) -> YResult<()> {
     if app.queue.iter().any(|s| s.video_id == song.video_id) {
-        app.notify(
-            data::NotifyType::Error,
+        app.noti.notify(
+            NotifyType::Error,
             format!("'{}' already in queue", song.title),
         );
         return Ok(());
     }
     let url = get_url_from_vid_id(&song.video_id);
     player.send_mpv_command(MpvCommand::AppendSong(url))?;
-    app.queue.push(song);
-    app.notify(
-        data::NotifyType::Success,
-        String::from("Added song to Queue"),
-    );
     if app.play_mode == PlayMode::ShuffleMode && app.queue.len() == 3 {
         player.send_mpv_command(MpvCommand::Shuffle)?;
     }
+    app.noti.notify(
+        NotifyType::Success,
+        format!("Appended '{}' in queue", song.title),
+    );
+    app.queue.push(song);
+
     Ok(())
 }
 
@@ -693,10 +694,14 @@ fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_id
         log_to_file(&e);
     } else {
         app.queue.remove(idx);
-        app.notify(
-            data::NotifyType::Success,
-            String::from("Removed song from Queue"),
-        );
+        if app.queue.is_empty() {
+            app.status = PlayerStatus::Idle;
+            app.playing_song = None;
+            app.playing_playlist_id = None;
+            app.time_pos = None;
+        }
+        app.noti
+            .notify(NotifyType::Success, String::from("Removed song from Queue"));
     }
 }
 
@@ -708,7 +713,8 @@ fn clear_queue(app: &mut App, player: &mut Player) -> YResult<()> {
     app.time_pos = None;
     app.queue = Vec::new();
     app.playing_playlist_id = None;
-    app.notify(data::NotifyType::Success, String::from("Cleared Queue"));
+    app.noti
+        .notify(NotifyType::Success, String::from("Cleared Queue"));
     Ok(())
 }
 
@@ -741,20 +747,19 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 app.playlists.push(playlist);
                 app.cus_playlists.push(app.playlists.len() - 1);
                 app.popup_state = PopupState::None;
-                app.notify(data::NotifyType::Success, "Created playlist".to_string());
+                app.noti
+                    .notify(NotifyType::Success, "Created playlist".to_string());
             }
             Err(e) => {
                 log_to_file(&e);
-                app.notify(
-                    data::NotifyType::Error,
-                    "Failed to create playlist".to_string(),
-                );
+                app.noti
+                    .notify(NotifyType::Error, "Failed to create playlist".to_string());
             }
         },
         ApiResponse::SaveSong(res) => match res {
             Ok((song, playlist_id)) => {
-                app.notify(
-                    data::NotifyType::Success,
+                app.noti.notify(
+                    NotifyType::Success,
                     format!("Saved '{}' to playlist", song.title),
                 );
                 if let Some(viewing_list) = &app.viewing_list
@@ -769,14 +774,13 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 }
             }
             Err(YError::AlreadyInPlaylist) => {
-                app.notify(
-                    data::NotifyType::Error,
-                    "Song already in playlist".to_string(),
-                );
+                app.noti
+                    .notify(NotifyType::Error, "Song already in playlist".to_string());
             }
             Err(e) => {
                 log_to_file(&e);
-                app.notify(data::NotifyType::Error, format!("Failed to save: {e}"));
+                app.noti
+                    .notify(NotifyType::Error, format!("Failed to save: {e}"));
             }
         },
         ApiResponse::Search { albums, songs } => {
@@ -806,7 +810,8 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
         }
         ApiResponse::LikeSong(res) => match res {
             Ok(song) => {
-                app.notify(data::NotifyType::Success, format!("Liked '{}'", song.title));
+                app.noti
+                    .notify(NotifyType::Success, format!("Liked '{}'", song.title));
                 if let Some(viewing_list) = &app.viewing_list
                     && viewing_list.playlist_id.eq("LM")
                 {
@@ -820,29 +825,32 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             }
             Err(e) => {
                 log_to_file(&e);
-                app.notify(data::NotifyType::Error, format!("Failed to like: {e}"));
+                app.noti
+                    .notify(NotifyType::Error, format!("Failed to like: {e}"));
             }
         },
         ApiResponse::UnlikeSong((res, title)) => match res {
             Ok(_) => {
-                app.notify(data::NotifyType::Success, format!("UnLiked '{}'", title));
+                app.noti
+                    .notify(NotifyType::Success, format!("UnLiked '{}'", title));
             }
             Err(e) => {
                 log_to_file(&e);
-                app.notify(
-                    data::NotifyType::Error,
+                app.noti.notify(
+                    NotifyType::Error,
                     format!("Failed to unlike '{}'\nError: {}", title, e),
                 );
             }
         },
         ApiResponse::UnsaveSong((res, title)) => match res {
             Ok(_) => {
-                app.notify(data::NotifyType::Success, format!("Unsaved '{}'", title));
+                app.noti
+                    .notify(NotifyType::Success, format!("Unsaved '{}'", title));
             }
             Err(e) => {
                 log_to_file(&e);
-                app.notify(
-                    data::NotifyType::Error,
+                app.noti.notify(
+                    NotifyType::Error,
                     format!("Failed to unsave '{}'\nError: {}", title, e),
                 );
             }
@@ -857,8 +865,8 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             }
             Err(e) => {
                 log_to_file(&e);
-                app.notify(
-                    data::NotifyType::Error,
+                app.noti.notify(
+                    NotifyType::Error,
                     format!("Failed to fetch songs\nError: {e}"),
                 );
             }
@@ -869,55 +877,53 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             }
             Err(e) => {
                 log_to_file(&e);
-                app.notify(
-                    data::NotifyType::Error,
+                app.noti.notify(
+                    NotifyType::Error,
                     format!("Failed to fetch songs\nError: {e}"),
                 );
             }
         },
         ApiResponse::UnsaveAlbum((res, list)) => match res {
             Ok(_) => {
-                app.notify(
-                    data::NotifyType::Success,
+                app.noti.notify(
+                    NotifyType::Success,
                     format!("Unsaved album '{}'", list.title),
                 );
             }
             Err(e) => {
                 log_to_file(&e);
-                app.notify(
-                    data::NotifyType::Error,
+                app.noti.notify(
+                    NotifyType::Error,
                     format!("Failed to unsave album '{}'\nError: {}", list.title, e),
                 );
             }
         },
         ApiResponse::UnsaveCusPlaylist((res, title)) => match res {
             Ok(_) => {
-                app.notify(
-                    data::NotifyType::Success,
-                    format!("Unsaved playlist '{}'", title),
-                );
+                app.noti
+                    .notify(NotifyType::Success, format!("Unsaved playlist '{}'", title));
                 app.refresh_cus_playlist();
             }
             Err(e) => {
                 log_to_file(&e);
-                app.notify(
-                    data::NotifyType::Error,
+                app.noti.notify(
+                    NotifyType::Error,
                     format!("Failed to unsave playlist '{}'\nError: {}", title, e),
                 );
             }
         },
         ApiResponse::SaveAlbum((res, album)) => match res {
             Ok(_) => {
-                app.notify(
-                    data::NotifyType::Success,
+                app.noti.notify(
+                    NotifyType::Success,
                     format!("Saved album '{}'", album.title),
                 );
                 app.albums.push(album);
             }
             Err(e) => {
                 log_to_file(&e);
-                app.notify(
-                    data::NotifyType::Error,
+                app.noti.notify(
+                    NotifyType::Error,
                     format!("Failed to save album '{}'\nError: {}", album.title, e),
                 );
             }
@@ -928,8 +934,8 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             }
             Err(e) => {
                 log_to_file(&e);
-                app.notify(
-                    data::NotifyType::Error,
+                app.noti.notify(
+                    NotifyType::Error,
                     format!("Failed to fetch related songs\nError: {e}"),
                 );
             }
@@ -948,8 +954,8 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             }
             Err(e) => {
                 log_to_file(&e);
-                app.notify(
-                    data::NotifyType::Error,
+                app.noti.notify(
+                    NotifyType::Error,
                     format!("Failed to fetch Library data: {e}"),
                 );
             }

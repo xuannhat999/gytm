@@ -1,4 +1,4 @@
-use data::{Playlist, Song};
+use data::app::{Playlist, Song};
 use error::{YError, YResult};
 
 pub fn parse_lists(data: &str) -> YResult<(Vec<Playlist>, Vec<Playlist>, Option<String>)> {

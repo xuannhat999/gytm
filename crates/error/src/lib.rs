@@ -1,4 +1,4 @@
-use data::{MpvCommand, MpvEvent};
+use data::mpv::{MpvCommand, MpvEvent};
 use reqwest::header::InvalidHeaderValue;
 use std::{
     fmt::{Debug, Display},

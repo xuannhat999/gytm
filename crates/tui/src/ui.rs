@@ -2,8 +2,8 @@ use crate::app::{App, PopupState};
 use crate::helper;
 use api::protocol::ApiLoadingKind;
 use config::Config;
-use config::theme::Theme;
-use data::{AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus};
+use data::app::{AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus};
+use data::theme::Theme;
 use ratatui::layout::Flex;
 use ratatui::style::Color;
 use ratatui::{

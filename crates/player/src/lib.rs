@@ -1,4 +1,7 @@
-use data::{MpvCommand, MpvEvent, MpvResponse, Song};
+use data::{
+    app::Song,
+    mpv::{MpvCommand, MpvEvent, MpvResponse},
+};
 use error::{YError, YResult, log_to_file};
 use std::{
     fs,

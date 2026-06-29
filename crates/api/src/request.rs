@@ -1,4 +1,4 @@
-use data::PlayListPrivacy;
+use data::app::PlayListPrivacy;
 use serde::Serialize;
 
 #[derive(Serialize)]
