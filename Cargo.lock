@@ -514,9 +514,9 @@ name = "config"
 version = "0.1.0"
 dependencies = [
  "basic-toml",
+ "data",
  "dirs",
  "error",
- "ratatui",
  "serde_json",
 ]
 
@@ -716,6 +716,7 @@ dependencies = [
 name = "data"
 version = "0.1.0"
 dependencies = [
+ "ratatui",
  "serde",
  "serde_json",
 ]

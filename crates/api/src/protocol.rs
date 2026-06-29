@@ -1,4 +1,4 @@
-use data::{PlayListPrivacy, Playlist, Song};
+use data::app::{PlayListPrivacy, Playlist, Song};
 use error::YResult;
 
 pub enum ApiCmd {

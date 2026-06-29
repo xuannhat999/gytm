@@ -1,4 +1,4 @@
-use data::{PlayListPrivacy, Playlist, Song};
+use data::app::{PlayListPrivacy, Playlist, Song};
 use error::{YResult, log_to_file};
 
 use crate::{dao::YTDao, parser};
@@ -38,7 +38,6 @@ impl YTBus {
         };
         all_albums.append(&mut albums);
         all_playlists.append(&mut playlists);
-
         while let Some(current_token) = token {
             let next_raw_data = self.dao.get_continuation_raw(&current_token).await?;
             let (mut next_albums, mut next_playlists, next_token) =

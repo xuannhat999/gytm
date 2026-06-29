@@ -1,8 +1,24 @@
-use data::PlayerState;
+use data::app::PlayMode;
 use error::{YError, YResult};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Write, path::Path};
-#[derive(Debug, Deserialize, Serialize, Default)]
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PlayerState {
+    pub volume: u8,
+    pub play_mode: PlayMode,
+}
+
+impl Default for PlayerState {
+    fn default() -> Self {
+        PlayerState {
+            volume: 100,
+            play_mode: PlayMode::DefaultMode,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct AppState {
     pub player_state: PlayerState,
 }

@@ -2,9 +2,8 @@ use crate::app::{App, PopupState};
 use crate::helper;
 use api::protocol::ApiLoadingKind;
 use config::Config;
-use config::theme::Theme;
-use data::AppPage::Library;
-use data::{AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus};
+use data::app::{AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus};
+use data::theme::Theme;
 use ratatui::layout::Flex;
 use ratatui::style::Color;
 use ratatui::{
@@ -23,7 +22,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1),
-            if app.page == Library {
+            if app.page == AppPage::Library {
                 Constraint::Length(0)
             } else {
                 Constraint::Length(3)

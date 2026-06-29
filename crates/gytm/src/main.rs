@@ -8,7 +8,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use data::{MpvCommand, MpvEvent};
+use data::mpv::{MpvCommand, MpvEvent};
 use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
@@ -34,10 +34,11 @@ async fn main() -> YResult<()> {
         }
     };
 
+    let config = Config::load();
     // Setup API client
     let (api_cmd_tx, api_cmd_rx) = mpsc::unbounded_channel::<ApiCmd>();
     let (api_res_tx, mut api_res_rx) = mpsc::unbounded_channel::<ApiResponse>();
-    let mut app = App::new(&app_state.player_state, api_cmd_tx);
+    let mut app = App::new(&app_state.player_state, &config, api_cmd_tx);
 
     println!("󱘖 Connecting to YouTube Music...");
     let dao = match YTDao::new().await {
@@ -77,12 +78,9 @@ async fn main() -> YResult<()> {
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-
-    let config = Config::load();
-
     if is_logged_out {
-        app.notify(
-            data::NotifyType::Error,
+        app.noti.notify(
+            tui::notification::NotifyType::Error,
             "Running in logged-out mode — some features unavailable".to_string(),
         );
     }
