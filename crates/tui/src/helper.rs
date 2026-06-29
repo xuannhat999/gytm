@@ -14,8 +14,15 @@ pub fn list_vid_id_from_list_url(urls: Vec<String>) -> Vec<String> {
 }
 
 pub fn format_time(secs: f64) -> String {
-    let s = secs as u64;
-    format!("{}:{:02}", s / 60, s % 60)
+    let total = secs as u64;
+    let h = total / 3600;
+    let m = (total % 3600) / 60;
+    let s = total % 60;
+    if h > 0 {
+        format!("{}:{:02}:{:02}", h, m, s)
+    } else {
+        format!("{}:{:02}", m, s)
+    }
 }
 
 pub fn get_queue_file() -> YResult<PathBuf> {

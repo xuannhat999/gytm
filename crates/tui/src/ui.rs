@@ -14,6 +14,10 @@ use ratatui::{
 };
 
 pub fn render(app: &mut App, frame: &mut Frame, theme: &Theme, start_time: std::time::Instant) {
+    frame.render_widget(
+        Paragraph::new("").style(Style::default().bg(theme.bg)),
+        frame.area(),
+    );
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([

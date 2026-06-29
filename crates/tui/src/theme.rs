@@ -6,6 +6,8 @@ pub struct Theme {
     pub active: Color,
     pub inactive: Color,
     pub base: Color,
+    pub bg: Color,
+    pub surface: Color,
 }
 impl Default for Theme {
     fn default() -> Self {
@@ -16,19 +18,23 @@ impl Theme {
     pub const fn catppuccin_mocha() -> Self {
         Theme {
             primary: Color::Rgb(203, 166, 247),
-            secondary: Color::Rgb(166, 227, 161),
+            secondary: Color::Rgb(249, 226, 175),
             active: Color::Rgb(137, 180, 250),
             inactive: Color::Rgb(108, 112, 134),
             base: Color::Rgb(205, 214, 244),
+            bg: Color::Rgb(30, 30, 46),
+            surface: Color::Rgb(69, 71, 90),
         }
     }
     pub const fn tokyo_night() -> Self {
         Theme {
             primary: Color::Rgb(187, 154, 247),
-            secondary: Color::Rgb(158, 206, 106),
+            secondary: Color::Rgb(224, 175, 104),
             active: Color::Rgb(122, 162, 247),
             inactive: Color::Rgb(86, 95, 137),
             base: Color::Rgb(169, 177, 214),
+            bg: Color::Rgb(26, 27, 38),
+            surface: Color::Rgb(41, 46, 66),
         }
     }
     pub fn text_style(&self) -> Style {
@@ -49,7 +55,7 @@ impl Theme {
         Style::default().fg(self.inactive)
     }
     pub fn selected_item(&self) -> Style {
-        Style::default().bg(Color::Rgb(69, 71, 90)).fg(self.primary)
+        Style::default().bg(self.surface).fg(self.primary)
     }
 }
 pub fn success_style() -> Style {
