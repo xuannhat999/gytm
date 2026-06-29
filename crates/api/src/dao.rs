@@ -371,7 +371,7 @@ impl YTDao {
             Err(YError::BadStatus(String::from("Save song to playlist")))
         } else {
             let text = response.text().await?;
-            if text.contains(r#""STATUS_SUCCEEDED""#) {
+            if text.contains("STATUS_SUCCEEDED") {
                 Ok(())
             } else {
                 Err(YError::AlreadyInPlaylist)
@@ -411,7 +411,7 @@ impl YTDao {
             Err(YError::BadStatus(String::from("Unsave song to playlist")))
         } else {
             let text = response.text().await?;
-            if text.contains(r#""STATUS_SUCCEEDED""#) {
+            if text.contains("STATUS_SUCCEEDED") {
                 Ok(())
             } else {
                 Err(YError::AlreadyInPlaylist)
