@@ -44,7 +44,7 @@ impl Config {
             }
         };
 
-        let table: toml::Value = match content.parse() {
+        let table: serde_json::Value = match basic_toml::from_str(&content) {
             Ok(v) => v,
             Err(e) => {
                 log_to_file(format!("Config parse error at {}: {}", path.display(), e));
@@ -52,7 +52,7 @@ impl Config {
             }
         };
 
-        let table = match table.as_table() {
+        let table = match table.as_object() {
             Some(t) => t,
             None => return Config::default(),
         };
@@ -78,7 +78,7 @@ impl Config {
 
             seek_seconds: table
                 .get("seek_seconds")
-                .and_then(|v| v.as_integer())
+                .and_then(|v| v.as_i64())
                 .map(|n| n as u8)
                 .filter(|&n| (1..=60).contains(&n))
                 .unwrap_or(5),
