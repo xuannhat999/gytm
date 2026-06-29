@@ -3,7 +3,6 @@ use crate::helper;
 use api::protocol::ApiLoadingKind;
 use config::Config;
 use config::theme::Theme;
-use data::AppPage::Library;
 use data::{AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus};
 use ratatui::layout::Flex;
 use ratatui::style::Color;
@@ -23,7 +22,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1),
-            if app.page == Library {
+            if app.page == AppPage::Library {
                 Constraint::Length(0)
             } else {
                 Constraint::Length(3)
@@ -60,10 +59,6 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
     match app.page {
         AppPage::Library => {
             // HORIZONTAL LAYOUT (ALBUMS | PLAYLISTS)
-            let hor_layout = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
-                .split(main_layout[2]);
             let list_layout = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
@@ -122,10 +117,8 @@ fn render_help_line(frame: &mut Frame, area: Rect, theme: &Theme, items: Vec<(&s
 fn render_tabs(frame: &mut Frame, area: Rect, theme: &Theme, current_idx: usize) {
     let titles = vec![Line::from("  Library "), Line::from("  Search ")];
     let tabs = Tabs::new(titles)
-        .style(theme.text_style())
         .highlight_style(
-            theme
-                .key_style()
+            Style::default()
                 .bg(theme.active)
                 .fg(theme.bg)
                 .add_modifier(Modifier::BOLD),
@@ -351,9 +344,11 @@ fn render_queue(
         .iter()
         .enumerate()
         .map(|(i, song)| {
-            if Option::map_or(app.playing_song.as_ref(), false, |playing| {
-                playing.video_id == song.video_id
-            }) {
+            if app
+                .playing_song
+                .as_ref()
+                .is_some_and(|playing| playing.video_id == song.video_id)
+            {
                 let content = format!("{:>3}. {}", i + 1, song.title);
                 ListItem::new(content).style(Style::default().fg(theme.primary))
             } else {

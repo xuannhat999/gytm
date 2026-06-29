@@ -75,6 +75,13 @@ impl YTDao {
         headers
     }
 
+    fn api_url(&self, endpoint: &str) -> String {
+        format!(
+            "{}/youtubei/v1/{}?key={}&alt=json",
+            YTM_DOMAIN, endpoint, self.innertube_api_key
+        )
+    }
+
     fn get_context(&self) -> RequestContext<'_> {
         RequestContext {
             client: RequestClient {
@@ -85,10 +92,7 @@ impl YTDao {
     }
 
     pub async fn get_raw_lists(&self) -> YResult<String> {
-        let url = format!(
-            "{}/youtubei/v1/browse?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("browse");
 
         let body = BrowseIdRequest {
             context: self.get_context(),
@@ -107,11 +111,7 @@ impl YTDao {
     }
 
     pub async fn get_continuation_raw(&self, token: &str) -> YResult<String> {
-        let url = format!(
-            "{}/youtubei/v1/browse?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
-
+        let url = self.api_url("browse");
         let body = GetContinuationRequest {
             context: self.get_context(),
             continuation: token,
@@ -128,12 +128,8 @@ impl YTDao {
 
         Ok(response)
     }
-
     pub async fn get_songs_raw(&self, browse_id: &str) -> YResult<String> {
-        let url = format!(
-            "{}/youtubei/v1/browse?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("browse");
         let body = BrowseIdRequest {
             context: self.get_context(),
             browse_id,
@@ -156,10 +152,7 @@ impl YTDao {
         } else {
             "EgWKAQIYAWoSEAUQAxAJEAQQChAQEBUQDhAR" // ALBUM
         };
-        let url = format!(
-            "{}/youtubei/v1/search?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("search");
 
         let body = SearchRequest {
             context: self.get_context(),
@@ -179,10 +172,7 @@ impl YTDao {
     }
 
     pub async fn get_params_raw(&self, video_id: &str) -> YResult<String> {
-        let url = format!(
-            "{}/youtubei/v1/next?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("next");
         let body = VideoIdRequest {
             context: self.get_context(),
             video_id,
@@ -205,10 +195,7 @@ impl YTDao {
         desc: &str,
         privacy: PlayListPrivacy,
     ) -> YResult<String> {
-        let url = format!(
-            "{}/youtubei/v1/playlist/create?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("playlist/create");
         let body = CreatePlaylistRequest {
             context: self.get_context(),
             title,
@@ -233,10 +220,7 @@ impl YTDao {
     }
 
     pub async fn get_related_songs_raw(&self, playlist_id: &str, params: &str) -> YResult<String> {
-        let url = format!(
-            "{}/youtubei/v1/next?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("next");
         let body = GetRelatedSongsRequest {
             context: self.get_context(),
             playlist_id,
@@ -256,10 +240,7 @@ impl YTDao {
     }
 
     pub async fn save_album_raw(&self, playlist_id: &str) -> YResult<()> {
-        let url = format!(
-            "{}/youtubei/v1/like/like?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("like/like");
         let body = SaveAlbumRequest {
             context: self.get_context(),
             target: TargetContent {
@@ -286,10 +267,7 @@ impl YTDao {
     }
 
     pub async fn unsave_cus_playlist_raw(&self, playlist_id: &str) -> YResult<()> {
-        let url = format!(
-            "{}/youtubei/v1/playlist/delete?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("playlist/delete");
 
         let body = PlaylistIdRequest {
             context: self.get_context(),
@@ -312,10 +290,7 @@ impl YTDao {
     }
 
     pub async fn unsave_album_raw(&self, playlist_id: &str) -> YResult<()> {
-        let url = format!(
-            "{}/youtubei/v1/like/removelike?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("like/removelike");
         let body = TargetRequest {
             context: self.get_context(),
             target: TargetContent {
@@ -341,10 +316,7 @@ impl YTDao {
     }
 
     pub async fn save_to_playlist_raw(&self, song: &Song, playlist_id: &str) -> YResult<()> {
-        let url = format!(
-            "{}/youtubei/v1/browse/edit_playlist?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("browse/edit_playlist");
         let video_id = &song.video_id;
         let actions = vec![ActionsContent {
             action: "ACTION_ADD_VIDEO",
@@ -382,10 +354,7 @@ impl YTDao {
     pub async fn unsave_to_playlist_raw(&self, song: &Song, playlist_id: &str) -> YResult<()> {
         let video_id = &song.video_id;
         let set_video_id = &song.set_video_id;
-        let url = format!(
-            "{}/youtubei/v1/browse/edit_playlist?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("browse/edit_playlist");
         let actions = vec![ActionsContent {
             action: "ACTION_REMOVE_VIDEO",
             added_video_id: None,
@@ -421,10 +390,7 @@ impl YTDao {
 
     pub async fn unlike_song_raw(&self, song: &Song) -> YResult<()> {
         let video_id = &song.video_id;
-        let url = format!(
-            "{}/youtubei/v1/like/removelike?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("like/removelike");
         let body = TargetRequest {
             context: self.get_context(),
             target: TargetContent {
@@ -450,10 +416,7 @@ impl YTDao {
 
     pub async fn like_song_raw(&self, song: &Song) -> YResult<()> {
         let video_id = &song.video_id;
-        let url = format!(
-            "{}/youtubei/v1/like/like?key={}&alt=json",
-            YTM_DOMAIN, self.innertube_api_key
-        );
+        let url = self.api_url("like/like");
 
         let body = TargetRequest {
             context: self.get_context(),

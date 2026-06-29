@@ -2,7 +2,7 @@ use data::PlayerState;
 use error::{YError, YResult};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Write, path::Path};
-#[derive(Debug, Deserialize, Serialize, Default)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct AppState {
     pub player_state: PlayerState,
 }
@@ -20,7 +20,7 @@ impl AppState {
     pub fn save(&self) -> YResult<()> {
         let state_file = Self::get_path()?;
         let f = fs::File::create(state_file)?;
-        serde_json::to_writer_pretty(f, self)?;
+        serde_json::to_writer(f, self)?;
         Ok(())
     }
     pub fn create(file: &Path) -> YResult<AppState> {
@@ -32,7 +32,7 @@ impl AppState {
         let default_config = AppState {
             player_state: PlayerState::default(),
         };
-        let content = serde_json::to_string_pretty(&default_config)?;
+        let content = serde_json::to_string(&default_config)?;
         let mut f = fs::File::create(file)?;
         f.write_all(content.as_bytes())?;
 
