@@ -60,3 +60,16 @@ pub enum PlayListPrivacy {
     Public,
     Unlisted,
 }
+
+pub enum PopupState {
+    None,
+    SaveSong {
+        selected_save_song: Song,
+    },
+    CreatePlaylist {
+        title: String,
+        description: String,
+        privacy: PlayListPrivacy,
+        focused_field: CreatePlaylistFocus,
+    },
+}

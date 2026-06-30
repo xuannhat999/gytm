@@ -1,8 +1,10 @@
-use crate::app::{App, PopupState};
+use crate::app::App;
 use crate::helper;
 use api::protocol::ApiLoadingKind;
 use config::Config;
-use data::app::{AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus};
+use data::app::{
+    AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus, PopupState,
+};
 use data::theme::Theme;
 use ratatui::layout::Flex;
 use ratatui::style::Color;
@@ -32,6 +34,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
             Constraint::Length(4),
         ])
         .split(frame.area());
+
     let hor_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
@@ -45,6 +48,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
             Constraint::Length(2),
         ])
         .split(main_layout[0]);
+
     render_tabs(frame, top_layout[0], &config.theme, app.page as usize);
     render_help_line(
         frame,
@@ -344,11 +348,7 @@ fn render_queue(
         .iter()
         .enumerate()
         .map(|(i, song)| {
-            if app
-                .playing_song
-                .as_ref()
-                .is_some_and(|playing| playing.video_id == song.video_id)
-            {
+            if app.playing_song.is_some_and(|playing| playing == i) {
                 let content = format!("{:>3}. {}", i + 1, song.title);
                 ListItem::new(content).style(Style::default().fg(theme.primary))
             } else {
@@ -379,11 +379,16 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
             } else {
                 ""
             };
-            if let (Some(song), Some(time_pos)) = (&app.playing_song, app.time_pos) {
+            if let (Some(idx), Some(time_pos)) = (app.playing_song, app.time_pos)
+                && idx <= app.queue.len()
+            {
                 let time_pos_text = helper::format_time(time_pos);
                 vec![
-                    Line::from(format!(" {}  {} ", icon, song.title)),
-                    Line::from(format!("    {} / {}", time_pos_text, song.duration)),
+                    Line::from(format!(" {}  {} ", icon, app.queue[idx].title)),
+                    Line::from(format!(
+                        "    {} / {}",
+                        time_pos_text, app.queue[idx].duration
+                    )),
                 ]
             } else {
                 vec![Line::from(String::new())]

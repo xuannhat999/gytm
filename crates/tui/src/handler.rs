@@ -1,5 +1,5 @@
 use crate::{
-    app::{App, PopupState},
+    app::App,
     helper::{self, get_url_from_vid_id},
     notification::NotifyType,
 };
@@ -12,16 +12,16 @@ use data::{
         FocusArea::{self},
         PlayListPrivacy, PlayMode,
         PlayerStatus::{self},
-        Song,
+        PopupState, Song,
     },
     mpv::{MpvCommand, MpvEvent},
 };
 use error::{YError, YResult, log_to_file};
 use player::Player;
-use state::AppState;
+use state::PlayerState;
 use std::fs;
 
-pub fn handle_mpv_event(app: &mut App, state: &mut AppState, event: MpvEvent) {
+pub fn handle_mpv_event(app: &mut App, state: &mut PlayerState, event: MpvEvent) {
     match event {
         MpvEvent::ListChange(list) => {
             let ids = helper::list_vid_id_from_list_url(list);
@@ -31,17 +31,16 @@ pub fn handle_mpv_event(app: &mut App, state: &mut AppState, event: MpvEvent) {
         }
         MpvEvent::StartPlaying(url) => {
             let video_id = helper::get_vid_id_from_url(&url);
-            for song in &app.queue {
-                if song.video_id == video_id {
-                    app.playing_song = Some(song.clone());
-                    app.time_pos = Some(0.0);
-                }
+            let idx = app.queue.iter().position(|song| song.video_id == video_id);
+            if idx != app.playing_song {
+                app.status = PlayerStatus::Playing;
+                app.time_pos = Some(0.0);
             }
-            app.status = PlayerStatus::Playing;
+            app.playing_song = idx;
         }
         MpvEvent::VolumeChange(vol) => {
             app.volume = vol;
-            state.player_state.volume = vol;
+            state.volume = vol;
             if let Err(e) = state.save() {
                 log_to_file(&e);
             }
@@ -64,7 +63,7 @@ pub fn handle_key_events(
     key_event: KeyEvent,
     app: &mut App,
     player: &mut Player,
-    state: &mut AppState,
+    state: &mut PlayerState,
     config: &Config,
 ) {
     if (!app.is_popup_active() && !app.is_insert)
@@ -72,6 +71,7 @@ pub fn handle_key_events(
     {
         handle_lists_event(key_event, app);
     }
+
     if app.is_popup_active() {
         handle_popup_event(key_event, app);
     } else {
@@ -425,7 +425,7 @@ fn handle_player_event(
     key_event: KeyEvent,
     app: &mut App,
     player: &mut Player,
-    state: &mut AppState,
+    state: &mut PlayerState,
     config: &Config,
 ) {
     match key_event.code {
@@ -448,7 +448,7 @@ fn handle_player_event(
             if let Err(e) = res {
                 log_to_file(&e);
             } else {
-                state.player_state.play_mode = app.play_mode.clone();
+                state.play_mode = app.play_mode.clone();
                 if let Err(e) = state.save() {
                     log_to_file(&e);
                 }
@@ -693,10 +693,16 @@ fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_id
     if let Err(e) = player.send_mpv_command(MpvCommand::RemovePos(mpv_idx)) {
         log_to_file(&e);
     } else {
+        if let Some(playing_idx) = app.playing_song {
+            if playing_idx > idx {
+                app.playing_song = Some(playing_idx - 1);
+            } else if playing_idx == idx {
+                app.playing_song = None;
+            }
+        }
         app.queue.remove(idx);
         if app.queue.is_empty() {
             app.status = PlayerStatus::Idle;
-            app.playing_song = None;
             app.playing_playlist_id = None;
             app.time_pos = None;
         }

@@ -22,7 +22,7 @@ pub struct Player {
 }
 impl Player {
     pub fn spawn_mpv(&mut self) -> YResult<()> {
-        let _ = std::fs::remove_file(data::file_path::MPV_SOCKET);
+        self.shutdown();
         Command::new("mpv")
             .arg("--idle")
             .arg(format!(
@@ -44,11 +44,12 @@ impl Player {
         Ok(())
     }
     pub fn shutdown(&mut self) {
-        if let Err(e) = self.send_mpv_command(MpvCommand::Quit) {
-            log_to_file(&e);
-        }
+        std::process::Command::new("pkill")
+            .args(["-f", "mpv.*input-ipc-server=/tmp/gytm-mpv-socket"])
+            .output()
+            .ok();
         self.mpv_cmd_sender = None;
-        let _ = fs::remove_file(data::file_path::MPV_SOCKET);
+        fs::remove_file(data::file_path::MPV_SOCKET).ok();
     }
 
     // OBSERVE MPV SOCKET
@@ -225,11 +226,8 @@ impl Player {
             None => Err(YError::MpvSocketError("Connect to mpv failed".to_string())),
         }
     }
-    pub fn check_socket_exists() -> YResult<()> {
-        if !std::path::Path::new(data::file_path::MPV_SOCKET).exists() {
-            return Err(YError::MpvSocketError("MPV socket not found".to_string()));
-        }
-        Ok(())
+    pub fn check_socket_exists() -> bool {
+        std::path::Path::new(data::file_path::MPV_SOCKET).exists()
     }
 
     pub fn send_mpv_command(&self, command: MpvCommand) -> YResult<()> {
@@ -297,7 +295,6 @@ fn match_mpv_command(mpv_cmd: MpvCommand) -> String {
         }
         MpvCommand::Stop => r#"{"command": ["stop"]}"#,
         MpvCommand::Clear => r#"{"command": ["playlist-clear"]}"#,
-        MpvCommand::Quit => r#"{"command": ["quit"]}"#,
     };
     if cmd_str.is_empty() {
         String::new()
