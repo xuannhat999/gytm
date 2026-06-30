@@ -47,7 +47,7 @@ impl Theme {
 
     pub const fn dracula() -> Self {
         Theme {
-            primary: Color::Rgb(189, 147, 249),
+            primary: Color::Rgb(200, 130, 220),
             secondary: Color::Rgb(241, 250, 140),
             active: Color::Rgb(139, 233, 253),
             inactive: Color::Rgb(98, 114, 164),
@@ -70,12 +70,24 @@ impl Theme {
             surface: Color::Rgb(41, 46, 66),
         }
     }
-
+    pub const fn nord() -> Self {
+        Theme {
+            primary: Color::Rgb(136, 192, 208),
+            secondary: Color::Rgb(235, 203, 139),
+            active: Color::Rgb(143, 188, 187),
+            inactive: Color::Rgb(76, 86, 106),
+            base: Color::Rgb(236, 239, 244),
+            bg: Color::Rgb(36, 42, 54),
+            bg_popup: Color::Rgb(59, 66, 82),
+            surface: Color::Rgb(67, 76, 94),
+        }
+    }
     pub fn from_name(name: &str) -> Self {
         match name {
             "tokyo_night" => Self::tokyo_night(),
             "gruvbox" => Self::gruvbox(),
             "dracula" => Self::dracula(),
+            "nord" => Self::nord(),
             _ => Self::catppuccin_mocha(),
         }
     }
@@ -93,7 +105,7 @@ impl Theme {
     }
 
     pub fn inactive_border_style(&self) -> Style {
-        Style::default().fg(self.inactive)
+        Style::default().fg(self.inactive).bold()
     }
 
     pub fn selected_item(&self) -> Style {
