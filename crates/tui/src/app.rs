@@ -177,7 +177,7 @@ impl App {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
         }
-        let content = serde_json::to_string_pretty(&self.queue)?;
+        let content = serde_json::to_string(&self.queue)?;
         std::fs::write(&path, content)?;
         Ok(())
     }
