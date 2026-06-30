@@ -4,28 +4,12 @@ use crate::{
 };
 use api::protocol::{ApiCmd, ApiLoadingKind};
 use config::Config;
-use data::app::{
-    AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus, Playlist,
-    Song,
-};
+use data::app::{AppPage, FocusArea, PlayMode, PlayerStatus, Playlist, PopupState, Song};
 use error::YResult;
 use player::Player;
 use ratatui::widgets::ListState;
 use state::PlayerState;
 use tokio::sync::mpsc;
-
-pub enum PopupState {
-    None,
-    SaveSong {
-        selected_save_song: Song,
-    },
-    CreatePlaylist {
-        title: String,
-        description: String,
-        privacy: PlayListPrivacy,
-        focused_field: CreatePlaylistFocus,
-    },
-}
 
 pub struct App {
     // PAGE LIBRARY
@@ -39,7 +23,7 @@ pub struct App {
     pub queue_liststate: ListState,
 
     pub time_pos: Option<f64>,
-    pub playing_song: Option<Song>,
+    pub playing_song: Option<usize>,
     pub mpv_list: Vec<String>,
 
     pub playing_playlist_id: Option<String>,

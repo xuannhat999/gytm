@@ -1,5 +1,5 @@
 use crate::{
-    app::{App, PopupState},
+    app::App,
     helper::{self, get_url_from_vid_id},
     notification::NotifyType,
 };
@@ -12,7 +12,7 @@ use data::{
         FocusArea::{self},
         PlayListPrivacy, PlayMode,
         PlayerStatus::{self},
-        Song,
+        PopupState, Song,
     },
     mpv::{MpvCommand, MpvEvent},
 };
@@ -31,13 +31,12 @@ pub fn handle_mpv_event(app: &mut App, state: &mut AppState, event: MpvEvent) {
         }
         MpvEvent::StartPlaying(url) => {
             let video_id = helper::get_vid_id_from_url(&url);
-            for song in &app.queue {
-                if song.video_id == video_id {
-                    app.playing_song = Some(song.clone());
-                    app.time_pos = Some(0.0);
-                }
+            let idx = app.queue.iter().position(|song| song.video_id == video_id);
+            if idx != app.playing_song {
+                app.status = PlayerStatus::Playing;
+                app.time_pos = Some(0.0);
             }
-            app.status = PlayerStatus::Playing;
+            app.playing_song = idx;
         }
         MpvEvent::VolumeChange(vol) => {
             app.volume = vol;
@@ -72,6 +71,7 @@ pub fn handle_key_events(
     {
         handle_lists_event(key_event, app);
     }
+
     if app.is_popup_active() {
         handle_popup_event(key_event, app);
     } else {
@@ -693,10 +693,16 @@ fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_id
     if let Err(e) = player.send_mpv_command(MpvCommand::RemovePos(mpv_idx)) {
         log_to_file(&e);
     } else {
+        if let Some(playing_idx) = app.playing_song {
+            if playing_idx > idx {
+                app.playing_song = Some(playing_idx - 1);
+            } else if playing_idx == idx {
+                app.playing_song = None;
+            }
+        }
         app.queue.remove(idx);
         if app.queue.is_empty() {
             app.status = PlayerStatus::Idle;
-            app.playing_song = None;
             app.playing_playlist_id = None;
             app.time_pos = None;
         }

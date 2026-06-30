@@ -34,12 +34,15 @@ impl NotificationManager {
     pub fn has_notification(&self) -> bool {
         self.inner.has_notification()
     }
+
     pub fn tick(&mut self, delta: Duration) {
         self.inner.tick(delta);
     }
+
     pub fn render(&mut self, frame: &mut Frame, area: Rect) {
         self.inner.render(frame, area);
     }
+
     pub fn notify(&mut self, noti_type: NotifyType, msg: String) {
         let style = match noti_type {
             NotifyType::Success => self.success_style,
