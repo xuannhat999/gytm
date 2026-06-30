@@ -13,7 +13,7 @@ use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use state::PlayerState;
-use std::{io, time::Duration};
+use std::{env, io, time::Duration};
 use tokio::sync::mpsc::{self};
 use tui::{
     app::App,
@@ -25,6 +25,14 @@ use tui::{
 
 #[tokio::main]
 async fn main() -> YResult<()> {
+    let mut player = Player::default();
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 1 && args[1] == "quit" {
+        player.shutdown();
+        remove_queue_file();
+        println!("Exited gytm");
+        std::process::exit(0);
+    }
     // Setup App State
     let mut state = match PlayerState::load() {
         Ok(c) => c,
@@ -56,10 +64,9 @@ async fn main() -> YResult<()> {
     app.api_loading_kind = Some(api::protocol::ApiLoadingKind::FetchLibraryData);
 
     // Setup MPV player
-    let mut player = Player::default();
     let (tx_event, mut rx) = mpsc::channel::<MpvEvent>(32);
 
-    if Player::check_socket_exists().is_ok()
+    if Player::check_socket_exists()
         && let Ok(stream) = player.connect_mpv().await
     {
         app.load_queue_file().ok();

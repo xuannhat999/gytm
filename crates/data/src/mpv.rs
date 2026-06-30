@@ -34,5 +34,4 @@ pub enum MpvCommand {
     RemovePos(usize),
     Stop,
     Clear,
-    Quit,
 }
