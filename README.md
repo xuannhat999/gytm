@@ -74,10 +74,9 @@ paru -S gytm-git
 - Firefox based( Firefox, Librewolf, Zen )
 
 # How to use
-
-1. Keep your Youtube/Youtube Music account signed in on your browser.
-2. Launch `gytm`. It will automatically find the active session.
-
+* **Prerequisite:** Keep your YouTube or YouTube Music account signed in on your browser.
+* **Launch:** Run `gytm` in the terminal to automatically detect your active session and start.
+* **Shutdown background playback without opening app interface:** Run `gytm quit`.
 # Keymap
 
 - <kbd>Q</kbd>: Quit app
@@ -112,7 +111,7 @@ File path: `$XDG_CONFIG_HOME/gytm/config.toml` (defaults to `~/.config/gytm/conf
 ### Default Configuration
 
 ```toml
-# Theme options: "catppuccin_mocha", "tokyo_night", "gruvbox", "dracula"
+# Theme options: "catppuccin_mocha", "tokyo_night", "gruvbox", "dracula", "nord"
 theme = "catppuccin_mocha"
 background = true
 seek_seconds = 5
