@@ -12,7 +12,7 @@ use data::mpv::{MpvCommand, MpvEvent};
 use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
-use state::AppState;
+use state::PlayerState;
 use std::{io, time::Duration};
 use tokio::sync::mpsc::{self};
 use tui::{
@@ -26,7 +26,7 @@ use tui::{
 #[tokio::main]
 async fn main() -> YResult<()> {
     // Setup App State
-    let mut app_state = match AppState::load() {
+    let mut state = match PlayerState::load() {
         Ok(c) => c,
         Err(e) => {
             println!("{}", e);
@@ -38,7 +38,7 @@ async fn main() -> YResult<()> {
     // Setup API client
     let (api_cmd_tx, api_cmd_rx) = mpsc::unbounded_channel::<ApiCmd>();
     let (api_res_tx, mut api_res_rx) = mpsc::unbounded_channel::<ApiResponse>();
-    let mut app = App::new(&app_state.player_state, &config, api_cmd_tx);
+    let mut app = App::new(&state, &config, api_cmd_tx);
 
     println!("󱘖 Connecting to YouTube Music...");
     let dao = match YTDao::new().await {
@@ -94,7 +94,7 @@ async fn main() -> YResult<()> {
         last_tick = std::time::Instant::now();
         app.noti.tick(elapsed);
         while let Ok(event) = rx.try_recv() {
-            handler::handle_mpv_event(&mut app, &mut app_state, event);
+            handler::handle_mpv_event(&mut app, &mut state, event);
             render = true;
         }
         while let Ok(response) = api_res_rx.try_recv() {
@@ -104,7 +104,7 @@ async fn main() -> YResult<()> {
         if event::poll(Duration::from_millis(50))? {
             match event::read()? {
                 Event::Key(key) => {
-                    handler::handle_key_events(key, &mut app, &mut player, &mut app_state, &config);
+                    handler::handle_key_events(key, &mut app, &mut player, &mut state, &config);
                     render = true;
                 }
                 Event::Resize(_, _) => {

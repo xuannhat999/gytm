@@ -18,10 +18,10 @@ use data::{
 };
 use error::{YError, YResult, log_to_file};
 use player::Player;
-use state::AppState;
+use state::PlayerState;
 use std::fs;
 
-pub fn handle_mpv_event(app: &mut App, state: &mut AppState, event: MpvEvent) {
+pub fn handle_mpv_event(app: &mut App, state: &mut PlayerState, event: MpvEvent) {
     match event {
         MpvEvent::ListChange(list) => {
             let ids = helper::list_vid_id_from_list_url(list);
@@ -40,7 +40,7 @@ pub fn handle_mpv_event(app: &mut App, state: &mut AppState, event: MpvEvent) {
         }
         MpvEvent::VolumeChange(vol) => {
             app.volume = vol;
-            state.player_state.volume = vol;
+            state.volume = vol;
             if let Err(e) = state.save() {
                 log_to_file(&e);
             }
@@ -63,7 +63,7 @@ pub fn handle_key_events(
     key_event: KeyEvent,
     app: &mut App,
     player: &mut Player,
-    state: &mut AppState,
+    state: &mut PlayerState,
     config: &Config,
 ) {
     if (!app.is_popup_active() && !app.is_insert)
@@ -425,7 +425,7 @@ fn handle_player_event(
     key_event: KeyEvent,
     app: &mut App,
     player: &mut Player,
-    state: &mut AppState,
+    state: &mut PlayerState,
     config: &Config,
 ) {
     match key_event.code {
@@ -448,7 +448,7 @@ fn handle_player_event(
             if let Err(e) = res {
                 log_to_file(&e);
             } else {
-                state.player_state.play_mode = app.play_mode.clone();
+                state.play_mode = app.play_mode.clone();
                 if let Err(e) = state.save() {
                     log_to_file(&e);
                 }
