@@ -102,6 +102,9 @@ pub fn handle_key_events(
                 KeyCode::Char('c') => {
                     if let Err(e) = clear_queue(app, player) {
                         log_to_file(&e);
+                    } else {
+                        app.noti
+                            .notify(NotifyType::Success, String::from("Cleared Queue"));
                     }
                 }
                 _ => {}
@@ -386,15 +389,11 @@ fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
                         log_to_file(&e);
                     }
                 } else {
-                    let target_id = &app.queue[i].video_id;
-                    if let Some(pos) = app.get_mpv_idx(target_id) {
-                        if let Err(e) = player.send_mpv_command(MpvCommand::PlayPos(pos)) {
-                            log_to_file(&e);
-                        } else {
-                            if let Err(e) = player.send_mpv_command(MpvCommand::Shuffle) {
-                                log_to_file(&e);
-                            }
-                        }
+                    let video_id = &app.queue[i].video_id;
+                    if let Some(pos) = app.get_mpv_idx(video_id)
+                        && let Err(e) = player.send_mpv_command(MpvCommand::PlayPos(pos))
+                    {
+                        log_to_file(&e);
                     }
                 }
             }
@@ -711,7 +710,7 @@ fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_id
     }
 }
 
-fn clear_queue(app: &mut App, player: &mut Player) -> YResult<()> {
+fn clear_queue(app: &mut App, player: &Player) -> YResult<()> {
     player.send_mpv_command(MpvCommand::Stop)?;
     player.send_mpv_command(MpvCommand::Clear)?;
     app.status = PlayerStatus::Idle;
@@ -719,8 +718,7 @@ fn clear_queue(app: &mut App, player: &mut Player) -> YResult<()> {
     app.time_pos = None;
     app.queue = Vec::new();
     app.playing_playlist_id = None;
-    app.noti
-        .notify(NotifyType::Success, String::from("Cleared Queue"));
+
     Ok(())
 }
 
@@ -731,18 +729,22 @@ fn load_list(
     start_index: usize,
     playlist_id: Option<String>,
 ) -> YResult<()> {
-    player.write_playlist(&songs)?;
-    player.send_mpv_command(MpvCommand::LoadList)?;
-    if start_index > 0 {
-        player.send_mpv_command(MpvCommand::PlayPos(start_index))?;
+    if !songs.is_empty() {
+        player.write_playlist(&songs)?;
+        player.send_mpv_command(MpvCommand::LoadList)?;
+        if start_index > 0 {
+            player.send_mpv_command(MpvCommand::PlayPos(start_index))?;
+        }
+        if app.play_mode == PlayMode::ShuffleMode {
+            player.send_mpv_command(MpvCommand::Shuffle)?;
+        }
+        app.queue = songs;
+        app.queue_liststate.select(Some(start_index));
+        app.playing_playlist_id = playlist_id;
+        app.playing_song = None;
+    } else {
+        clear_queue(app, player).ok();
     }
-    if app.play_mode == PlayMode::ShuffleMode {
-        player.send_mpv_command(MpvCommand::Shuffle)?;
-    }
-    app.queue = songs;
-    app.queue_liststate.select(Some(start_index));
-    app.playing_playlist_id = playlist_id;
-    app.playing_song = None;
     Ok(())
 }
 
