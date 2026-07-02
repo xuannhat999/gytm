@@ -711,7 +711,6 @@ fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_id
 }
 
 fn clear_queue(app: &mut App, player: &Player) -> YResult<()> {
-    player.send_mpv_command(MpvCommand::Stop)?;
     player.send_mpv_command(MpvCommand::Clear)?;
     app.status = PlayerStatus::Idle;
     app.playing_song = None;

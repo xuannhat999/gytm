@@ -32,6 +32,5 @@ pub enum MpvCommand {
     AppendSong(String),
     LoadList,
     RemovePos(usize),
-    Stop,
     Clear,
 }

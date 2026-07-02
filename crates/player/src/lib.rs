@@ -297,8 +297,12 @@ fn match_mpv_command(mpv_cmd: MpvCommand) -> String {
         MpvCommand::RemovePos(idx) => {
             return format!(r#"{{"command": ["playlist-remove", {}]}}"#, idx) + "\n";
         }
-        MpvCommand::Stop => r#"{"command": ["stop"]}"#,
-        MpvCommand::Clear => r#"{"command": ["playlist-clear"]}"#,
+        MpvCommand::Clear => {
+            return r#"{"command": ["stop"]}"#.to_string()
+                + "\n"
+                + r#"{"command": ["playlist-clear"]}"#
+                + "\n";
+        }
     };
     if cmd_str.is_empty() {
         String::new()
