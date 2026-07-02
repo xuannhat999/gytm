@@ -279,13 +279,17 @@ fn match_mpv_command(mpv_cmd: MpvCommand) -> String {
             return format!(
                 r#"{{"command": ["set_property", "playlist-pos", {}]}}"#,
                 pos
-            ) + "\n";
+            ) + "\n"
+                + r#"{"command": ["set_property", "pause", false]}"#
+                + "\n";
         }
         MpvCommand::LoadList => {
             return format!(
                 r#"{{"command": ["loadlist", "{}", "replace"]}}"#,
                 data::file_path::MPV_PLAYLIST
-            ) + "\n";
+            ) + "\n"
+                + r#"{"command": ["set_property", "pause", false]}"#
+                + "\n";
         }
         MpvCommand::AppendSong(url) => {
             return format!(r#"{{"command": ["loadfile", "{}", "append-play"]}}"#, url) + "\n";
