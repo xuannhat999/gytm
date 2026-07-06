@@ -62,24 +62,28 @@ impl Config {
         }
 
         Config {
-            theme: Theme::from_name(
-                table
-                    .get("theme")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("catppuccin_mocha"),
-            ),
+            theme: Theme::from_name(table.get("theme").and_then(|v| v.as_str()).unwrap_or({
+                log_to_file("Invalid value at field: theme");
+                "catppuccin_mocha"
+            })),
 
             background: table
                 .get("background")
                 .and_then(|v| v.as_bool())
-                .unwrap_or(true),
+                .unwrap_or({
+                    log_to_file("Invalid value at field: background");
+                    true
+                }),
 
             seek_seconds: table
                 .get("seek_seconds")
                 .and_then(|v| v.as_i64())
                 .map(|n| n as u8)
                 .filter(|&n| (1..=60).contains(&n))
-                .unwrap_or(5),
+                .unwrap_or({
+                    log_to_file("Invalid value at field: seek_seconds");
+                    5
+                }),
         }
     }
 }

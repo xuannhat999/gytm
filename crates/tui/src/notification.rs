@@ -65,10 +65,9 @@ impl NotificationManager {
             .style(style)
             .border_style(style)
             .build()
+            && let Err(e) = self.inner.add(notif)
         {
-            if let Err(e) = self.inner.add(notif) {
-                log_to_file(&e);
-            }
+            log_to_file(&e);
         }
     }
 }
