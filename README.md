@@ -104,9 +104,8 @@ paru -S gytm-git
 - <kbd>d</kbd>:
   - [3]Queue: Remove song from Queue
 - <kbd>c</kbd>: Clear Queue
-## Configuration
-
-File path: `$XDG_CONFIG_HOME/gytm/config.toml` (defaults to `~/.config/gytm/config.toml`)
+# Configuration  
+**File path:** `$XDG_CONFIG_HOME/gytm/config.toml` (defaults to `~/.config/gytm/config.toml`)
 
 ### Default Configuration
 
@@ -117,7 +116,8 @@ background = true
 seek_seconds = 5
 ```
 # ⚠️ Troubleshooting (App freezes on startup)
-### Log file path: `$XDG_STATE_HOME/gytm/log.txt` or `~/.local/state/gytm/log.txt`
+**Log file path:** `$XDG_STATE_HOME/gytm/log.txt` or `~/.local/state/gytm/log.txt`  
+
 If you are using a standalone **Window Manager (Hyprland, i3, Sway, etc.)** and the app freezes on startup, your browser's secure storage is likely locked. Because these environments lack a default graphical interface to prompt for your password, the application hangs waiting for permission.
 
 To fix this, you need to ensure your system's credential store is accessible before running `gytm`:
