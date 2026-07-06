@@ -39,8 +39,7 @@ impl Player {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .process_group(0)
-            .spawn()
-            .map_err(|_| YError::MpvSpawnError)?;
+            .spawn()?;
         Ok(())
     }
     pub fn shutdown(&mut self) {

@@ -31,12 +31,6 @@ pub enum YError {
     #[error("MPV Socket Error: {0}")]
     MpvSocketError(String),
 
-    #[error("MPV spawning error")]
-    MpvSpawnError,
-
-    #[error("Playlist Empty: Cannot perform this action")]
-    PlaylistEmpty,
-
     #[error("Invalid Cookie")]
     InvalidCookie,
 
