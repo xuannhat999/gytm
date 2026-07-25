@@ -12,6 +12,8 @@ pub struct Playlist {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Song {
     pub title: String,
+    #[serde(default)]
+    pub artist: String,
     pub set_video_id: String,
     pub video_id: String,
     pub duration: String,

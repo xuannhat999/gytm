@@ -143,8 +143,7 @@ impl Player {
                                                         .iter()
                                                         .filter_map(|i| {
                                                             i["filename"].as_str().map(|s|s.to_string())
-                                                        })
-                                                        .collect();
+                                                        }).collect();
                                                     if let Err(e) =
                                                         tx_event.send(MpvEvent::ListChange(mpv_ids)).await
                                                     {

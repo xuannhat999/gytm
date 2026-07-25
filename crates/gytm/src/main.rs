@@ -53,7 +53,7 @@ async fn main() -> YResult<()> {
         Ok(d) => d,
         Err(e) => {
             log_to_file(&e);
-            println!("{}", e);
+            println!("Internet connection error");
             std::process::exit(1);
         }
     };
@@ -88,7 +88,7 @@ async fn main() -> YResult<()> {
     if is_logged_out {
         app.noti.notify(
             tui::notification::NotifyType::Error,
-            "Running in logged-out mode — some features unavailable".to_string(),
+            "Running in logged-out mode — some features are unavailable".to_string(),
         );
     }
 
