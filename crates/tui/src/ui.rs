@@ -248,7 +248,7 @@ fn render_songs(
         .iter()
         .enumerate()
         .map(|(i, song)| {
-            let content = format!(" {:>3}. {}", i + 1, song.title);
+            let content = format!(" {:>3}. {} - {}", i + 1, song.title, song.artist);
             ListItem::new(content)
         })
         .collect();
@@ -349,10 +349,10 @@ fn render_queue(
         .enumerate()
         .map(|(i, song)| {
             if app.playing_song.is_some_and(|playing| playing == i) {
-                let content = format!("{:>3}. {}", i + 1, song.title);
+                let content = format!("{:>3}. {} - {}", i + 1, song.title, song.artist);
                 ListItem::new(content).style(Style::default().fg(theme.primary))
             } else {
-                let content = format!(" {:>3}. {}", i + 1, song.title);
+                let content = format!(" {:>3}. {} - {}", i + 1, song.title, song.artist);
                 ListItem::new(content)
             }
         })
@@ -541,7 +541,7 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         .search_songs
         .iter()
         .map(|item| {
-            let content = format!("   {}", item.title);
+            let content = format!("   {} - {}", item.title, item.artist);
             ListItem::new(content)
         })
         .collect();

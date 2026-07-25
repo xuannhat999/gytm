@@ -75,6 +75,19 @@ pub fn parse_lists(data: &str) -> YResult<(Vec<Playlist>, Vec<Playlist>, Option<
     Ok((albums, playlists, continuation_token))
 }
 
+fn extract_artist(runs: &gjson::Value) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    runs.each(|_, run| {
+        let t = run.get("text").str().trim().to_string();
+        if t == "•" || t == "|" {
+            return false;
+        }
+        parts.push(run.get("text").str().to_string());
+        true
+    });
+    parts.join("")
+}
+
 pub fn parse_songs(data: &str) -> YResult<Vec<Song>> {
     let path = "contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer.contents.0.musicShelfRenderer.contents";
     let alt_path = "contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer.contents.0.musicPlaylistShelfRenderer";
@@ -91,6 +104,9 @@ pub fn parse_songs(data: &str) -> YResult<Vec<Song>> {
         }
         contents
     };
+    let album_artist_runs = gjson::get(data, "contents.twoColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents.0.musicResponsiveHeaderRenderer.straplineTextOne.runs");
+    let album_artist = if album_artist_runs.exists() { extract_artist(&album_artist_runs) } else { String::new() };
+
     let mut songs = Vec::new();
     json.each(|_, item| {
         let r = item.get("musicResponsiveListItemRenderer");
@@ -103,10 +119,16 @@ pub fn parse_songs(data: &str) -> YResult<Vec<Song>> {
             let title = r.get("flexColumns.0.musicResponsiveListItemFlexColumnRenderer.text.runs.0.text");
             let set_video_id = r.get("overlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer.playNavigationEndpoint.watchEndpoint.playlistSetVideoId");
             let duration = r.get("fixedColumns.0.musicResponsiveListItemFixedColumnRenderer.text.runs.0.text");
+            let runs = r.get("flexColumns.1.musicResponsiveListItemFlexColumnRenderer.text.runs");
+            let mut artist = if runs.exists() { extract_artist(&runs) } else { String::new() };
+            if artist.is_empty() {
+                artist = album_artist.clone();
+            }
             songs.push(Song {
                 video_id: video_id.str().to_string(),
                 set_video_id: set_video_id.str().to_string(),
                 title: if title.str().is_empty() { "Unknown".to_string() } else { title.str().to_string() },
+                artist,
                 duration: duration.str().to_string(),
             });
         }
@@ -214,6 +236,7 @@ pub fn parse_search_songs(data: &str) -> YResult<Vec<Song>> {
 
                 let mut duration = String::new();
                 let runs = renderer.get("flexColumns.1.musicResponsiveListItemFlexColumnRenderer.text.runs");
+                let mut artist = String::new();
                 if runs.exists() {
                     let mut last_text = String::new();
                     runs.each(|_, run| {
@@ -223,12 +246,14 @@ pub fn parse_search_songs(data: &str) -> YResult<Vec<Song>> {
                     if last_text.contains(':') {
                         duration = last_text.trim().to_string();
                     }
+                    artist = extract_artist(&runs);
                 }
 
                 songs.push(Song {
                     video_id: video_id_v.str().to_string(),
                     set_video_id: set_video_id.str().to_string(),
                     title: if title_v.str().is_empty() { "Unknown".to_string() } else { title_v.str().to_string() },
+                    artist,
                     duration,
                 });
             }
@@ -265,6 +290,8 @@ pub fn parse_related_songs(data: &str) -> YResult<Vec<Song>> {
             let video_id = video.get("videoId");
             let title = video.get("title.runs.0.text");
             let duration = video.get("lengthText.runs.0.text");
+            let runs = video.get("longBylineText.runs");
+            let artist = if runs.exists() { extract_artist(&runs) } else { String::new() };
             if !video_id.str().is_empty() {
                 songs.push(Song {
                     video_id: video_id.str().to_string(),
@@ -274,6 +301,7 @@ pub fn parse_related_songs(data: &str) -> YResult<Vec<Song>> {
                     } else {
                         title.str().to_string()
                     },
+                    artist,
                     duration: duration.str().to_string(),
                 });
             }
