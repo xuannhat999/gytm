@@ -384,7 +384,10 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
             {
                 let time_pos_text = helper::format_time(time_pos);
                 vec![
-                    Line::from(format!(" {}  {} ", icon, app.queue[idx].title)),
+                    Line::from(format!(
+                        " {}  {} - {} ",
+                        icon, app.queue[idx].title, app.queue[idx].artist
+                    )),
                     Line::from(format!(
                         "    {} / {}",
                         time_pos_text, app.queue[idx].duration
