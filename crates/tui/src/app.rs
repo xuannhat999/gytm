@@ -4,7 +4,9 @@ use crate::{
 };
 use api::protocol::{ApiCmd, ApiLoadingKind};
 use config::Config;
-use data::app::{AppPage, FocusArea, PlayMode, PlayerStatus, Playlist, PopupState, Song};
+use data::app::{
+    AppPage, FocusArea, PlayMode, PlayerStatus, Playlist, PopupState, QueueData, Song,
+};
 use error::YResult;
 use player::Player;
 use ratatui::widgets::ListState;
@@ -177,7 +179,11 @@ impl App {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
         }
-        let content = serde_json::to_string(&self.queue)?;
+        let data = QueueData {
+            queue: self.queue.clone(),
+            playing_playlist_id: self.playing_playlist_id.clone(),
+        };
+        let content = serde_json::to_string(&data)?;
         std::fs::write(&path, content)?;
         Ok(())
     }
@@ -186,7 +192,9 @@ impl App {
         let path = get_queue_file()?;
         if path.exists() {
             let content = std::fs::read_to_string(path)?;
-            self.queue = serde_json::from_str(&content).unwrap_or_default();
+            let data: QueueData = serde_json::from_str(&content).unwrap_or_default();
+            self.queue = data.queue;
+            self.playing_playlist_id = data.playing_playlist_id;
         }
         Ok(())
     }

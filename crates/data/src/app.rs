@@ -18,6 +18,12 @@ pub struct Song {
     pub video_id: String,
     pub duration: String,
 }
+#[derive(Default, Serialize, Deserialize)]
+pub struct QueueData {
+    #[serde(default)]
+    pub playing_playlist_id: Option<String>,
+    pub queue: Vec<Song>,
+}
 #[derive(PartialEq)]
 pub enum PlayerStatus {
     Idle,

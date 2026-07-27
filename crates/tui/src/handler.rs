@@ -666,7 +666,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
     }
 }
 
-fn append_song_to_queue(app: &mut App, player: &mut Player, song: Song) -> YResult<()> {
+fn append_song_to_queue(app: &mut App, player: &Player, song: Song) -> YResult<()> {
     if app.queue.iter().any(|s| s.video_id == song.video_id) {
         app.noti.notify(
             NotifyType::Error,
@@ -777,7 +777,9 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 if let Some(playing_list) = &app.playing_playlist_id
                     && playing_list.eq(&playlist_id)
                 {
-                    app.queue.push(song);
+                    if let Err(e) = append_song_to_queue(app, player, song) {
+                        log_to_file(&e);
+                    }
                 }
             }
             Err(YError::AlreadyInPlaylist) => {
@@ -827,7 +829,9 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 if let Some(playing_list) = &app.playing_playlist_id
                     && playing_list.eq("LM")
                 {
-                    app.queue.push(song);
+                    if let Err(e) = append_song_to_queue(app, player, song) {
+                        log_to_file(&e);
+                    }
                 }
             }
             Err(e) => {
