@@ -10,8 +10,9 @@ use std::{path::PathBuf, sync::Arc};
 
 use crate::request::{
     ActionsContent, BrowseIdRequest, CreatePlaylistRequest, GetContinuationRequest,
-    GetRelatedSongsRequest, PlaylistIdRequest, RequestClient, RequestContext, SaveAlbumRequest,
-    SaveUnsaveListRequest, SearchRequest, TargetContent, TargetRequest, VideoIdRequest,
+    GetRelatedSongsRequest, PlaylistIdRequest, QueryRequest, QueryWithParamsRequest, RequestClient,
+    RequestContext, SaveAlbumRequest, SaveUnsaveListRequest, TargetContent, TargetRequest,
+    VideoIdRequest,
 };
 
 pub struct YTDao {
@@ -146,15 +147,15 @@ impl YTDao {
         Ok(text)
     }
 
-    pub async fn get_search_albums_raw(&self, query: &str, rtype: u8) -> YResult<String> {
+    pub async fn search_with_params_raw(&self, query: &str, rtype: u8) -> YResult<String> {
         let params = if rtype == 1 {
-            "EgWKAQIIAWoSEAQQAxAFEAoQDhAJEBUQEBAR" // SONG
+            "EgWKAQIIAWoMEAQQAxAFEAkQEBAK" // SONG
         } else {
-            "EgWKAQIYAWoSEAUQAxAJEAQQChAQEBUQDhAR" // ALBUM
+            "EgWKAQIYAWoMEAQQAxAFEAkQEBAK" // ALBUM
         };
         let url = self.api_url("search");
 
-        let body = SearchRequest {
+        let body = QueryWithParamsRequest {
             context: self.get_context(),
             query,
             params,
@@ -170,7 +171,23 @@ impl YTDao {
             .await?;
         Ok(response)
     }
-
+    pub async fn search_raw(&self, query: &str) -> YResult<String> {
+        let body = QueryRequest {
+            context: self.get_context(),
+            query,
+        };
+        let url = self.api_url("search");
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers())
+            .json(&body)
+            .send()
+            .await?
+            .text()
+            .await?;
+        Ok(response)
+    }
     pub async fn get_params_raw(&self, video_id: &str) -> YResult<String> {
         let url = self.api_url("next");
         let body = VideoIdRequest {

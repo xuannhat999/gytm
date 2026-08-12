@@ -69,7 +69,7 @@ impl YTBus {
     }
 
     pub async fn get_search_albums(&self, query: &str) -> YResult<Vec<Playlist>> {
-        let raw_list = self.dao.get_search_albums_raw(query, 2).await?;
+        let raw_list = self.dao.search_with_params_raw(query, 2).await?;
         match parser::parse_search_albums(&raw_list) {
             Ok(list) => Ok(list),
             Err(e) => {
@@ -80,14 +80,25 @@ impl YTBus {
     }
 
     pub async fn get_search_songs(&self, query: &str) -> YResult<Vec<Song>> {
-        let raw_data = self.dao.get_search_albums_raw(query, 1).await?;
-        match parser::parse_search_songs(&raw_data) {
-            Ok(songs) => Ok(songs),
+        let top_res_raw = self.dao.search_raw(query).await?;
+        let raw_songs = self.dao.search_with_params_raw(query, 1).await?;
+        let mut songs = match parser::parse_search_songs(&raw_songs) {
+            Ok(songs) => songs,
             Err(e) => {
                 log_to_file(&e);
-                Err(e)
+                return Err(e);
+            }
+        };
+        if let Ok(top_res) = parser::parse_top_songs(&top_res_raw) {
+            let mut seen: Vec<String> = songs.iter().map(|s| s.video_id.clone()).collect();
+            for song in top_res.into_iter().rev() {
+                if !seen.contains(&song.video_id) {
+                    seen.push(song.video_id.clone());
+                    songs.insert(0, song);
+                }
             }
         }
+        Ok(songs)
     }
 
     pub async fn get_params(&self, video_id: &str) -> YResult<String> {

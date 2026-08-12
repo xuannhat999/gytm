@@ -40,10 +40,15 @@ pub struct GetContinuationRequest<'a> {
 }
 
 #[derive(Serialize)]
-pub struct SearchRequest<'a> {
+pub struct QueryWithParamsRequest<'a> {
     pub context: RequestContext<'a>,
     pub query: &'a str,
     pub params: &'a str,
+}
+#[derive(Serialize)]
+pub struct QueryRequest<'a> {
+    pub context: RequestContext<'a>,
+    pub query: &'a str,
 }
 
 #[derive(Serialize)]
