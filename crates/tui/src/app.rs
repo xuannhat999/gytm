@@ -4,13 +4,14 @@ use crate::{
 };
 use api::protocol::{ApiCmd, ApiLoadingKind};
 use config::Config;
-use data::app::{
-    AppPage, FocusArea, PlayMode, PlayerStatus, Playlist, PopupState, QueueData, Song,
+use data::{
+    app::{AppPage, FocusArea, PlayMode, PlayerStatus, Playlist, PopupState, QueueData, Song},
+    client::Browser,
 };
 use error::YResult;
 use player::Player;
 use ratatui::widgets::ListState;
-use state::PlayerState;
+use state::player_state::PlayerState;
 use tokio::sync::mpsc;
 
 pub struct App {
@@ -46,9 +47,10 @@ pub struct App {
     pub cus_playlists: Vec<usize>,
     pub cus_playlists_liststate: ListState,
     pub popup_state: PopupState,
+    pub browser_liststate: ListState,
 
     // OTHER
-    pub status: PlayerStatus,
+    pub player_status: PlayerStatus,
     pub volume: u8,
     pub play_mode: PlayMode,
 
@@ -97,7 +99,7 @@ impl App {
             is_insert: false,
 
             // PLAYER
-            status: PlayerStatus::Idle,
+            player_status: PlayerStatus::Idle,
             volume: player_state.volume,
             play_mode: player_state.play_mode.clone(),
 
@@ -105,6 +107,9 @@ impl App {
             cus_playlists: Vec::new(),
             cus_playlists_liststate: ListState::default(),
             popup_state: PopupState::None,
+
+            browser_liststate: ListState::default(),
+
             //OTHER
             noti: NotificationManager::new(config),
             is_exit: false,

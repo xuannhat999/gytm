@@ -10,6 +10,7 @@ pub fn spawn_api_worker(
     bus: YTBus,
 ) {
     tokio::spawn(async move {
+        let mut bus = bus;
         while let Some(cmd) = api_cmd_rx.recv().await {
             let res = match cmd {
                 ApiCmd::CreatePlaylist {

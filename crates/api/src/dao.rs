@@ -1,4 +1,7 @@
-use data::app::{PlayListPrivacy, Song};
+use data::{
+    app::{PlayListPrivacy, Song},
+    client::{Browser, BrowserProfile},
+};
 use error::{YError, YResult};
 use reqwest::{
     Client, Url,
@@ -6,13 +9,16 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
 };
 use rookie::{any_browser, common::enums::Cookie, load};
-use std::{path::PathBuf, sync::Arc};
+use std::{fs, path::PathBuf, sync::Arc};
 
-use crate::request::{
-    ActionsContent, BrowseIdRequest, CreatePlaylistRequest, GetContinuationRequest,
-    GetRelatedSongsRequest, PlaylistIdRequest, QueryRequest, QueryWithParamsRequest, RequestClient,
-    RequestContext, SaveAlbumRequest, SaveUnsaveListRequest, TargetContent, TargetRequest,
-    VideoIdRequest,
+use crate::{
+    gecko::GeckoCookie,
+    request::{
+        ActionsContent, BrowseIdRequest, CreatePlaylistRequest, GetContinuationRequest,
+        GetRelatedSongsRequest, PlaylistIdRequest, QueryRequest, QueryWithParamsRequest,
+        RequestClient, RequestContext, SaveAlbumRequest, SaveUnsaveListRequest, TargetContent,
+        TargetRequest, VideoIdRequest,
+    },
 };
 
 pub struct YTDao {
@@ -23,13 +29,24 @@ pub struct YTDao {
 }
 
 const YTM_DOMAIN: &str = "https://music.youtube.com";
+const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 impl YTDao {
+    pub async fn new_from_browser(browser: &Browser, profile: &BrowserProfile) -> YResult<()> {
+        let domains = vec![".youtube.com".to_string()];
+        match browser {
+            Browser::Brave => {
+                let cookies = rookie::brave(Some(domains));
+            }
+            _ => {}
+        }
+        Ok(())
+    }
     pub async fn new() -> YResult<Self> {
         let (jar, sapisid) = load_cookies()?;
         let http = Client::builder()
             .cookie_provider(Arc::new(jar))
-            .user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .user_agent(USER_AGENT)
             .build()?;
 
         let response_text = http.get(YTM_DOMAIN).send().await?.text().await?;
@@ -459,11 +476,19 @@ impl YTDao {
     }
 }
 
+fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
+    source.find(start).and_then(|start_idx| {
+        let start_pos = start_idx + start.len();
+        source[start_pos..]
+            .find(end)
+            .map(|end_idx| source[start_pos..start_pos + end_idx].to_string())
+    })
+}
 // ONLY WORKS WITH CHROMIUM BASED BROWSER ( No idea )
 pub fn load_cookies() -> YResult<(Jar, Option<String>)> {
     let jar = Jar::default();
     let url = YTM_DOMAIN.parse::<Url>()?;
-    let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
+    let domains = vec![".youtube.com".to_string()];
     let mut sapisid_extracted = String::new();
     let mut cookies = load(Some(domains)).unwrap_or_else(|_| Vec::new());
     if cookies.is_empty() {
@@ -489,9 +514,8 @@ pub fn load_cookies() -> YResult<(Jar, Option<String>)> {
 
     Ok((jar, sapisid))
 }
-
 pub fn load_cookies_other_browsers() -> Vec<Cookie> {
-    let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
+    let domains = vec![".youtube.com".to_string()];
     let browser_dirs = vec![
         "mozilla/firefox",
         "librewolf/librewolf",
@@ -532,12 +556,19 @@ pub fn load_cookies_other_browsers() -> Vec<Cookie> {
 
     any_browser(&cookies_path, Some(domains), None).unwrap_or_default()
 }
-
-fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
-    source.find(start).and_then(|start_idx| {
-        let start_pos = start_idx + start.len();
-        source[start_pos..]
-            .find(end)
-            .map(|end_idx| source[start_pos..start_pos + end_idx].to_string())
-    })
+fn build_jar_sapisid_from_chromium_cookies(cookies: Vec<Cookie>) -> YResult<(Jar, Option<String>)> {
+    let url = YTM_DOMAIN.parse::<Url>()?;
+    let jar = Jar::default();
+    let mut sapisid: Option<String> = None;
+    for cookie in cookies {
+        if cookie.name == "SAPISID" {
+            sapisid = Some(cookie.value.clone());
+        }
+        let cookie_str = format!(
+            "{}={}; Path={}; Secure; HttpOnly",
+            cookie.name, cookie.value, cookie.path
+        );
+        jar.add_cookie_str(&cookie_str, &url);
+    }
+    Ok((jar, sapisid))
 }

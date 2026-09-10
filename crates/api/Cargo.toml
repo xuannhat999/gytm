@@ -12,3 +12,5 @@ rookie = { workspace = true }
 reqwest = { workspace = true }
 dirs = { workspace = true }
 gjson = { workspace = true }
+rusqlite = { workspace = true }
+rust-ini = { workspace = true }

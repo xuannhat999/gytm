@@ -89,6 +89,8 @@ dependencies = [
  "gjson",
  "reqwest",
  "rookie",
+ "rusqlite",
+ "rust-ini",
  "serde",
  "sha1_smol",
 ]
@@ -904,6 +906,8 @@ dependencies = [
  "data",
  "dirs",
  "reqwest",
+ "rusqlite",
+ "rust-ini",
  "serde_json",
  "thiserror 2.0.18",
  "time",

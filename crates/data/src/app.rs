@@ -1,4 +1,7 @@
+use ratatui::widgets::ListState;
 use serde::{Deserialize, Serialize};
+
+use crate::client::BrowserProfile;
 
 #[derive(Debug, Clone)]
 pub struct Playlist {
@@ -79,5 +82,10 @@ pub enum PopupState {
         description: String,
         privacy: PlayListPrivacy,
         focused_field: CreatePlaylistFocus,
+    },
+    SwitchBrowser,
+    SwitchBrowserProfile {
+        profiles: Vec<BrowserProfile>,
+        profiles_liststate: ListState,
     },
 }

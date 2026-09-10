@@ -34,6 +34,15 @@ pub enum YError {
     #[error("Invalid Cookie")]
     InvalidCookie,
 
+    #[error("Unavailable feature for logged out mode")]
+    UnavailableFeature,
+
+    #[error("Sqlite Error: {0}")]
+    SqliteError(#[from] rusqlite::Error),
+
+    #[error("Rust Ini Error: {0}")]
+    RustIni(#[from] ini::Error),
+
     #[error("URL parsing failed: {0}")]
     UrlParseError(#[from] url::ParseError),
 

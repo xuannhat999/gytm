@@ -12,7 +12,7 @@ use data::mpv::{MpvCommand, MpvEvent};
 use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
-use state::PlayerState;
+use state::player_state::PlayerState;
 use std::{env, io, time::Duration};
 use tokio::sync::mpsc::{self};
 use tui::{
@@ -33,8 +33,8 @@ async fn main() -> YResult<()> {
         println!("Exited gytm");
         std::process::exit(0);
     }
-    // Setup App State
-    let mut state = match PlayerState::load() {
+    // Setup Player State
+    let mut player_state = match PlayerState::load() {
         Ok(c) => c,
         Err(e) => {
             println!("{}", e);
@@ -42,11 +42,14 @@ async fn main() -> YResult<()> {
         }
     };
 
+    // Setup CLient State
+    // let mut client_state = ClientState::load()?;
+
     let config = Config::load();
     // Setup API client
     let (api_cmd_tx, api_cmd_rx) = mpsc::unbounded_channel::<ApiCmd>();
     let (api_res_tx, mut api_res_rx) = mpsc::unbounded_channel::<ApiResponse>();
-    let mut app = App::new(&state, &config, api_cmd_tx);
+    let mut app = App::new(&player_state, &config, api_cmd_tx);
 
     println!("󱘖 Connecting to YouTube Music...");
     let dao = match YTDao::new().await {
@@ -101,7 +104,7 @@ async fn main() -> YResult<()> {
         last_tick = std::time::Instant::now();
         app.noti.tick(elapsed);
         while let Ok(event) = rx.try_recv() {
-            handler::handle_mpv_event(&mut app, &mut state, event);
+            handler::handle_mpv_event(&mut app, &mut player_state, event);
             render = true;
         }
         while let Ok(response) = api_res_rx.try_recv() {
@@ -111,7 +114,13 @@ async fn main() -> YResult<()> {
         if event::poll(Duration::from_millis(50))? {
             match event::read()? {
                 Event::Key(key) => {
-                    handler::handle_key_events(key, &mut app, &mut player, &mut state, &config);
+                    handler::handle_key_events(
+                        key,
+                        &mut app,
+                        &mut player,
+                        &mut player_state,
+                        &config,
+                    );
                     render = true;
                 }
                 Event::Resize(_, _) => {

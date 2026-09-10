@@ -5,6 +5,7 @@ use config::Config;
 use data::app::{
     AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus, PopupState,
 };
+use data::client::ALL_BROWSERS;
 use data::theme::Theme;
 use ratatui::layout::Flex;
 use ratatui::style::Color;
@@ -97,11 +98,17 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
     }
     match &app.popup_state {
         PopupState::None => {}
+        PopupState::SwitchBrowserProfile { .. } => {
+            render_switch_profile_popup(frame, app, frame.area(), config)
+        }
         PopupState::SaveSong { .. } => {
             render_save_song_to_playlist_popup(frame, app, frame.area(), config, start_time);
         }
         PopupState::CreatePlaylist { .. } => {
             render_create_playlist_popup(frame, app, frame.area(), config, start_time);
+        }
+        PopupState::SwitchBrowser => {
+            render_switch_browser_popup(frame, app, frame.area(), config);
         }
     }
 }
@@ -371,10 +378,10 @@ fn render_queue(
 }
 
 fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
-    let song_info = match app.status {
+    let song_info = match app.player_status {
         PlayerStatus::Idle => vec![Line::from("   No song is playing ".to_string())],
         _ => {
-            let icon = if app.status == PlayerStatus::Playing {
+            let icon = if app.player_status == PlayerStatus::Playing {
                 ""
             } else {
                 ""
@@ -659,6 +666,68 @@ fn render_save_song_to_playlist_popup(
     frame.render_stateful_widget(list_widget, layout[2], &mut app.cus_playlists_liststate);
 }
 
+// PROFILE
+fn render_switch_profile_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
+    let PopupState::SwitchBrowserProfile {
+        profiles,
+        profiles_liststate,
+    } = &mut app.popup_state
+    else {
+        return;
+    };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick)
+        .border_style(config.theme.active_border_style())
+        .title(" Select Profile ");
+    let center_area = area.centered(Constraint::Percentage(50), Constraint::Length(20));
+    let inner_area = block.inner(center_area);
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(0)])
+        .split(inner_area);
+
+    frame.render_widget(Clear, center_area);
+    if config.background {
+        render_background(frame, center_area, config.theme.bg_popup);
+    }
+    frame.render_widget(block, center_area);
+    let items: Vec<ListItem> = profiles
+        .iter()
+        .map(|p| ListItem::new(p.name.clone()))
+        .collect();
+    let list_widget = List::new(items).highlight_style(config.theme.selected_item());
+    frame.render_stateful_widget(list_widget, layout[1], profiles_liststate);
+}
+
+// BROWSER
+fn render_switch_browser_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick)
+        .border_style(config.theme.active_border_style())
+        .title(" Select Browser ");
+    let center_area = area.centered(Constraint::Percentage(50), Constraint::Length(20));
+    let inner_area = block.inner(center_area);
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(0)])
+        .split(inner_area);
+
+    frame.render_widget(Clear, center_area);
+    if config.background {
+        render_background(frame, center_area, config.theme.bg_popup);
+    }
+    frame.render_widget(block, center_area);
+    let items: Vec<ListItem> = ALL_BROWSERS
+        .iter()
+        .map(|b| ListItem::new(format!("{:?}", b)))
+        .collect();
+    let list_widget = List::new(items).highlight_style(config.theme.selected_item());
+    frame.render_stateful_widget(list_widget, layout[1], &mut app.browser_liststate);
+}
+
+// CREATE PLAYLIST
 fn render_create_playlist_popup(
     frame: &mut Frame,
     app: &mut App,

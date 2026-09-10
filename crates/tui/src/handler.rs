@@ -3,7 +3,10 @@ use crate::{
     helper::{self, get_url_from_vid_id},
     notification::NotifyType,
 };
-use api::protocol::{ApiCmd, ApiLoadingKind, ApiResponse};
+use api::{
+    bus, client,
+    protocol::{ApiCmd, ApiLoadingKind, ApiResponse},
+};
 use config::Config;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::{
@@ -14,12 +17,14 @@ use data::{
         PlayerStatus::{self},
         PopupState, Song,
     },
+    client::ALL_BROWSERS,
     mpv::{MpvCommand, MpvEvent},
 };
 use error::{YError, YResult, log_to_file};
 use player::Player;
-use state::PlayerState;
-use std::fs;
+use ratatui::widgets::ListState;
+use state::{self, player_state::PlayerState};
+use std::{fs, process::id};
 
 pub fn handle_mpv_event(app: &mut App, state: &mut PlayerState, event: MpvEvent) {
     match event {
@@ -33,7 +38,7 @@ pub fn handle_mpv_event(app: &mut App, state: &mut PlayerState, event: MpvEvent)
             let video_id = helper::get_vid_id_from_url(&url);
             let idx = app.queue.iter().position(|song| song.video_id == video_id);
             if idx != app.playing_song {
-                app.status = PlayerStatus::Playing;
+                app.player_status = PlayerStatus::Playing;
                 app.time_pos = Some(0.0);
             }
             app.playing_song = idx;
@@ -51,9 +56,9 @@ pub fn handle_mpv_event(app: &mut App, state: &mut PlayerState, event: MpvEvent)
         MpvEvent::PauseChange(is_pause) => {
             if app.playing_song.is_some() {
                 if is_pause {
-                    app.status = PlayerStatus::Paused
+                    app.player_status = PlayerStatus::Paused
                 } else {
-                    app.status = PlayerStatus::Playing
+                    app.player_status = PlayerStatus::Playing
                 }
             }
         }
@@ -68,6 +73,8 @@ pub fn handle_key_events(
 ) {
     if (!app.is_popup_active() && !app.is_insert)
         || matches!(app.popup_state, PopupState::SaveSong { .. })
+        || matches!(app.popup_state, PopupState::SwitchBrowser)
+        || matches!(app.popup_state, PopupState::SwitchBrowserProfile { .. })
     {
         handle_lists_event(key_event, app);
     }
@@ -106,6 +113,10 @@ pub fn handle_key_events(
                         app.noti
                             .notify(NotifyType::Success, String::from("Cleared Queue"));
                     }
+                }
+                KeyCode::Char('B') => {
+                    app.popup_state = PopupState::SwitchBrowser;
+                    app.browser_liststate.select(Some(0));
                 }
                 _ => {}
             }
@@ -352,6 +363,14 @@ pub fn handle_key_events(
 fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
     let (state, len) = if matches!(app.popup_state, PopupState::SaveSong { .. }) {
         (&mut app.cus_playlists_liststate, app.cus_playlists.len())
+    } else if matches!(app.popup_state, PopupState::SwitchBrowser) {
+        (&mut app.browser_liststate, ALL_BROWSERS.len())
+    } else if let PopupState::SwitchBrowserProfile {
+        profiles,
+        profiles_liststate,
+    } = &mut app.popup_state
+    {
+        (profiles_liststate, profiles.len())
     } else {
         match app.focus_area {
             FocusArea::Albums => (&mut app.albums_liststate, app.albums.len()),
@@ -662,6 +681,40 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             }
             _ => {}
         },
+        PopupState::SwitchBrowser => match key_event.code {
+            KeyCode::Esc => app.popup_state = PopupState::None,
+            KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::None,
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                if let Some(index) = app.browser_liststate.selected() {
+                    let browser = &ALL_BROWSERS[index];
+                    match client::get_profiles_from_browser(browser) {
+                        Ok(profiles) => {
+                            let mut profiles_liststate = ListState::default();
+                            if !profiles.is_empty() {
+                                profiles_liststate.select(Some(0));
+                            }
+                            app.popup_state = PopupState::SwitchBrowserProfile {
+                                profiles,
+                                profiles_liststate,
+                            }
+                        }
+                        Err(e) => {
+                            log_to_file(e);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        },
+        PopupState::SwitchBrowserProfile {
+            profiles,
+            profiles_liststate,
+        } => match key_event.code {
+            KeyCode::Esc => app.popup_state = PopupState::None,
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {}
+            KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::SwitchBrowser,
+            _ => {}
+        },
         _ => {}
     }
 }
@@ -701,7 +754,7 @@ fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_id
         }
         app.queue.remove(idx);
         if app.queue.is_empty() {
-            app.status = PlayerStatus::Idle;
+            app.player_status = PlayerStatus::Idle;
             app.playing_playlist_id = None;
             app.time_pos = None;
         }
@@ -712,7 +765,7 @@ fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_id
 
 fn clear_queue(app: &mut App, player: &Player) -> YResult<()> {
     player.send_mpv_command(MpvCommand::Clear)?;
-    app.status = PlayerStatus::Idle;
+    app.player_status = PlayerStatus::Idle;
     app.playing_song = None;
     app.time_pos = None;
     app.queue = Vec::new();
@@ -760,7 +813,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             Err(e) => {
                 log_to_file(&e);
                 app.noti
-                    .notify(NotifyType::Error, "Failed to create playlist".to_string());
+                    .notify(NotifyType::Error, format!("Failed to create playlist: {e}"));
             }
         },
         ApiResponse::SaveSong(res) => match res {
@@ -789,7 +842,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             Err(e) => {
                 log_to_file(&e);
                 app.noti
-                    .notify(NotifyType::Error, format!("Failed to save: {e}"));
+                    .notify(NotifyType::Error, format!("Failed to save song: {e}"));
             }
         },
         ApiResponse::Search { albums, songs } => {
@@ -837,7 +890,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             Err(e) => {
                 log_to_file(&e);
                 app.noti
-                    .notify(NotifyType::Error, format!("Failed to like: {e}"));
+                    .notify(NotifyType::Error, format!("Failed to like song: {e}"));
             }
         },
         ApiResponse::UnlikeSong((res, title)) => match res {
