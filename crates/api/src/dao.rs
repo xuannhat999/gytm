@@ -9,16 +9,13 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
 };
 use rookie::{any_browser, common::enums::Cookie, load};
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
-use crate::{
-    gecko::GeckoCookie,
-    request::{
-        ActionsContent, BrowseIdRequest, CreatePlaylistRequest, GetContinuationRequest,
-        GetRelatedSongsRequest, PlaylistIdRequest, QueryRequest, QueryWithParamsRequest,
-        RequestClient, RequestContext, SaveAlbumRequest, SaveUnsaveListRequest, TargetContent,
-        TargetRequest, VideoIdRequest,
-    },
+use crate::request::{
+    ActionsContent, BrowseIdRequest, CreatePlaylistRequest, GetContinuationRequest,
+    GetRelatedSongsRequest, PlaylistIdRequest, QueryRequest, QueryWithParamsRequest, RequestClient,
+    RequestContext, SaveAlbumRequest, SaveUnsaveListRequest, TargetContent, TargetRequest,
+    VideoIdRequest,
 };
 
 pub struct YTDao {
@@ -517,10 +514,10 @@ pub fn load_cookies() -> YResult<(Jar, Option<String>)> {
 pub fn load_cookies_other_browsers() -> Vec<Cookie> {
     let domains = vec![".youtube.com".to_string()];
     let browser_dirs = vec![
+        "BraveSoftware/Brave-Origin",
         "mozilla/firefox",
         "librewolf/librewolf",
         "zen",
-        "BraveSoftware/Brave-Origin",
     ];
     let target_filename = vec!["cookies.sqlite", "Cookies"];
     let config_dir = match dirs::config_dir() {
@@ -556,6 +553,7 @@ pub fn load_cookies_other_browsers() -> Vec<Cookie> {
 
     any_browser(&cookies_path, Some(domains), None).unwrap_or_default()
 }
+
 fn build_jar_sapisid_from_chromium_cookies(cookies: Vec<Cookie>) -> YResult<(Jar, Option<String>)> {
     let url = YTM_DOMAIN.parse::<Url>()?;
     let jar = Jar::default();

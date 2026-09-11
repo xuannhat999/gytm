@@ -4,6 +4,7 @@ use std::{
     fmt::{Debug, Display},
     fs::{self, OpenOptions},
     io::Write,
+    path::PathBuf,
 };
 use thiserror::Error;
 use time::{OffsetDateTime, format_description};
@@ -54,6 +55,12 @@ pub enum YError {
 
     #[error("Song alredy saved in playlist")]
     AlreadyInPlaylist,
+
+    #[error("Invalid file content in: {0}")]
+    InvalidFileContent(PathBuf),
+
+    #[error("Extract chromium cookie failed: {0}")]
+    RookieError(String),
 
     #[error("Bad Status from: {0}")]
     BadStatus(String),

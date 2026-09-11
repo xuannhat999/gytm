@@ -4,7 +4,7 @@ use crate::{
     notification::NotifyType,
 };
 use api::{
-    bus, client,
+    client::{self, get_geckgo_containers_from_profile},
     protocol::{ApiCmd, ApiLoadingKind, ApiResponse},
 };
 use config::Config;
@@ -17,14 +17,14 @@ use data::{
         PlayerStatus::{self},
         PopupState, Song,
     },
-    client::ALL_BROWSERS,
+    client::{ALL_BROWSERS, BrowserEngine},
     mpv::{MpvCommand, MpvEvent},
 };
 use error::{YError, YResult, log_to_file};
 use player::Player;
-use ratatui::widgets::ListState;
+use ratatui::{symbols::braille, widgets::ListState};
 use state::{self, player_state::PlayerState};
-use std::{fs, process::id};
+use std::fs;
 
 pub fn handle_mpv_event(app: &mut App, state: &mut PlayerState, event: MpvEvent) {
     match event {
@@ -73,8 +73,9 @@ pub fn handle_key_events(
 ) {
     if (!app.is_popup_active() && !app.is_insert)
         || matches!(app.popup_state, PopupState::SaveSong { .. })
-        || matches!(app.popup_state, PopupState::SwitchBrowser)
-        || matches!(app.popup_state, PopupState::SwitchBrowserProfile { .. })
+        || matches!(app.popup_state, PopupState::SelectBrowser)
+        || matches!(app.popup_state, PopupState::SelectBrowserProfile { .. })
+        || matches!(app.popup_state, PopupState::SelectGeckoContainer { .. })
     {
         handle_lists_event(key_event, app);
     }
@@ -115,7 +116,7 @@ pub fn handle_key_events(
                     }
                 }
                 KeyCode::Char('B') => {
-                    app.popup_state = PopupState::SwitchBrowser;
+                    app.popup_state = PopupState::SelectBrowser;
                     app.browser_liststate.select(Some(0));
                 }
                 _ => {}
@@ -363,14 +364,21 @@ pub fn handle_key_events(
 fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
     let (state, len) = if matches!(app.popup_state, PopupState::SaveSong { .. }) {
         (&mut app.cus_playlists_liststate, app.cus_playlists.len())
-    } else if matches!(app.popup_state, PopupState::SwitchBrowser) {
+    } else if matches!(app.popup_state, PopupState::SelectBrowser) {
         (&mut app.browser_liststate, ALL_BROWSERS.len())
-    } else if let PopupState::SwitchBrowserProfile {
+    } else if let PopupState::SelectBrowserProfile {
         profiles,
         profiles_liststate,
+        browser,
     } = &mut app.popup_state
     {
         (profiles_liststate, profiles.len())
+    } else if let PopupState::SelectGeckoContainer {
+        containers,
+        containers_liststate,
+    } = &mut app.popup_state
+    {
+        (containers_liststate, containers.len())
     } else {
         match app.focus_area {
             FocusArea::Albums => (&mut app.albums_liststate, app.albums.len()),
@@ -681,7 +689,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             }
             _ => {}
         },
-        PopupState::SwitchBrowser => match key_event.code {
+        PopupState::SelectBrowser => match key_event.code {
             KeyCode::Esc => app.popup_state = PopupState::None,
             KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::None,
             KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
@@ -693,9 +701,10 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                             if !profiles.is_empty() {
                                 profiles_liststate.select(Some(0));
                             }
-                            app.popup_state = PopupState::SwitchBrowserProfile {
+                            app.popup_state = PopupState::SelectBrowserProfile {
                                 profiles,
                                 profiles_liststate,
+                                browser: browser.clone(),
                             }
                         }
                         Err(e) => {
@@ -706,13 +715,36 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             }
             _ => {}
         },
-        PopupState::SwitchBrowserProfile {
+        PopupState::SelectBrowserProfile {
             profiles,
             profiles_liststate,
+            browser,
         } => match key_event.code {
             KeyCode::Esc => app.popup_state = PopupState::None,
-            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {}
-            KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::SwitchBrowser,
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                if let Some(index) = profiles_liststate.selected() {
+                    if browser.engine() == BrowserEngine::Gecko {
+                        let profile = &profiles[index];
+                        if let Ok(containers) = get_geckgo_containers_from_profile(&profile.path) {
+                            let mut containers_liststate = ListState::default();
+                            containers_liststate.select(Some(0));
+                            app.popup_state = PopupState::SelectGeckoContainer {
+                                containers,
+                                containers_liststate,
+                            };
+                        }
+                    }
+                }
+            }
+            KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::SelectBrowser,
+            _ => {}
+        },
+        PopupState::SelectGeckoContainer {
+            containers,
+            containers_liststate,
+        } => match key_event.code {
+            KeyCode::Esc => app.popup_state = PopupState::None,
+            KeyCode::Char('h') | KeyCode::Left => {}
             _ => {}
         },
         _ => {}

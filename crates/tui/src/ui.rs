@@ -98,8 +98,11 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
     }
     match &app.popup_state {
         PopupState::None => {}
-        PopupState::SwitchBrowserProfile { .. } => {
-            render_switch_profile_popup(frame, app, frame.area(), config)
+        PopupState::SelectGeckoContainer { .. } => {
+            render_select_gecko_container_popup(frame, app, frame.area(), config);
+        }
+        PopupState::SelectBrowserProfile { .. } => {
+            render_select_profile_popup(frame, app, frame.area(), config)
         }
         PopupState::SaveSong { .. } => {
             render_save_song_to_playlist_popup(frame, app, frame.area(), config, start_time);
@@ -107,7 +110,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
         PopupState::CreatePlaylist { .. } => {
             render_create_playlist_popup(frame, app, frame.area(), config, start_time);
         }
-        PopupState::SwitchBrowser => {
+        PopupState::SelectBrowser => {
             render_switch_browser_popup(frame, app, frame.area(), config);
         }
     }
@@ -666,11 +669,53 @@ fn render_save_song_to_playlist_popup(
     frame.render_stateful_widget(list_widget, layout[2], &mut app.cus_playlists_liststate);
 }
 
+// GECKO CONTAINER
+fn render_select_gecko_container_popup(
+    frame: &mut Frame,
+    app: &mut App,
+    area: Rect,
+    config: &Config,
+) {
+    let PopupState::SelectGeckoContainer {
+        containers,
+        containers_liststate,
+    } = &mut app.popup_state
+    else {
+        return;
+    };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick)
+        .border_style(config.theme.active_border_style())
+        .title(" Select Gecko container ");
+
+    let center_area = area.centered(Constraint::Percentage(50), Constraint::Length(20));
+    let inner_area = block.inner(center_area);
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(0)])
+        .split(inner_area);
+
+    frame.render_widget(Clear, center_area);
+    if config.background {
+        render_background(frame, center_area, config.theme.bg_popup);
+    }
+    frame.render_widget(block, center_area);
+    let items: Vec<ListItem> = containers
+        .iter()
+        .map(|c| ListItem::new(c.name.clone()))
+        .collect();
+
+    let list_widget = List::new(items).highlight_style(config.theme.selected_item());
+    frame.render_stateful_widget(list_widget, layout[1], containers_liststate);
+}
+
 // PROFILE
-fn render_switch_profile_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
-    let PopupState::SwitchBrowserProfile {
+fn render_select_profile_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
+    let PopupState::SelectBrowserProfile {
         profiles,
         profiles_liststate,
+        browser,
     } = &mut app.popup_state
     else {
         return;

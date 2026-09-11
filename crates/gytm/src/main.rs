@@ -63,9 +63,10 @@ async fn main() -> YResult<()> {
     let is_logged_out = dao.sapisid.is_none();
     let bus = YTBus::new(dao);
     spawn_api_worker(api_cmd_rx, api_res_tx, bus);
-    app.api_cmd_tx.send(ApiCmd::FetchLibraryData).ok();
-    app.api_loading_kind = Some(api::protocol::ApiLoadingKind::FetchLibraryData);
-
+    if !is_logged_out {
+        app.api_cmd_tx.send(ApiCmd::FetchLibraryData).ok();
+        app.api_loading_kind = Some(api::protocol::ApiLoadingKind::FetchLibraryData);
+    }
     // Setup MPV player
     let (tx_event, mut rx) = mpsc::channel::<MpvEvent>(32);
 

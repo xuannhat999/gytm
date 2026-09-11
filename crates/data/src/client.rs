@@ -45,3 +45,9 @@ pub static ALL_BROWSERS: &[Browser] = &[
     Browser::LibreWolf,
     Browser::Zen,
 ];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeckoContainer {
+    pub name: String,
+    pub id: Option<i32>,
+}
