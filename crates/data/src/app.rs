@@ -91,7 +91,6 @@ pub enum PopupState {
     },
     SelectGeckoContainer {
         browser: Browser,
-        profile: BrowserProfile,
         containers: Vec<GeckoContainer>,
         containers_liststate: ListState,
     },

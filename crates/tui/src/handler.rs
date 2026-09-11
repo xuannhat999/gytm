@@ -23,10 +23,9 @@ use data::{
 use error::{YError, YResult, log_to_file};
 use player::Player;
 use ratatui::widgets::ListState;
-use state::{self, client_state::ClientState, player_state::PlayerState};
 use std::fs;
 
-pub fn handle_mpv_event(app: &mut App, player_state: &mut PlayerState, event: MpvEvent) {
+pub fn handle_mpv_event(app: &mut App, event: MpvEvent) {
     match event {
         MpvEvent::ListChange(list) => {
             let ids = helper::list_vid_id_from_list_url(list);
@@ -44,9 +43,8 @@ pub fn handle_mpv_event(app: &mut App, player_state: &mut PlayerState, event: Mp
             app.playing_song = idx;
         }
         MpvEvent::VolumeChange(vol) => {
-            app.volume = vol;
-            player_state.volume = vol;
-            if let Err(e) = player_state.save() {
+            app.player_state.volume = vol;
+            if let Err(e) = app.player_state.save() {
                 log_to_file(&e);
             }
         }
@@ -64,14 +62,7 @@ pub fn handle_mpv_event(app: &mut App, player_state: &mut PlayerState, event: Mp
         }
     }
 }
-pub fn handle_key_events(
-    key_event: KeyEvent,
-    app: &mut App,
-    player: &mut Player,
-    player_state: &mut PlayerState,
-    client_state: &mut ClientState,
-    config: &Config,
-) {
+pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player, config: &Config) {
     if (!app.is_popup_active() && !app.is_insert)
         || matches!(app.popup_state, PopupState::SaveSong { .. })
         || matches!(app.popup_state, PopupState::SelectBrowser)
@@ -131,7 +122,7 @@ pub fn handle_key_events(
                 }
                 _ => {}
             }
-            handle_player_event(key_event, app, player, player_state, config);
+            handle_player_event(key_event, app, player, config);
         }
 
         match app.page {
@@ -401,7 +392,7 @@ fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
     match key_event.code {
         KeyCode::Char('d') => {
             if let Some(i) = app.queue_liststate.selected() {
-                if app.play_mode == PlayMode::DefaultMode {
+                if app.player_state.play_mode == PlayMode::DefaultMode {
                     remove_song_from_queue(app, player, i, i);
                 } else {
                     let video_id = &app.queue[i].video_id;
@@ -413,7 +404,7 @@ fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
         }
         KeyCode::Enter => {
             if let Some(i) = app.queue_liststate.selected() {
-                if app.play_mode == PlayMode::DefaultMode {
+                if app.player_state.play_mode == PlayMode::DefaultMode {
                     if let Err(e) = player.send_mpv_command(MpvCommand::PlayPos(i)) {
                         log_to_file(&e);
                     }
@@ -449,13 +440,7 @@ fn handle_page_event(app: &mut App) {
         }
     }
 }
-fn handle_player_event(
-    key_event: KeyEvent,
-    app: &mut App,
-    player: &mut Player,
-    state: &mut PlayerState,
-    config: &Config,
-) {
+fn handle_player_event(key_event: KeyEvent, app: &mut App, player: &mut Player, config: &Config) {
     match key_event.code {
         KeyCode::Char(' ') if app.playing_song.is_some() => {
             if let Err(e) = player.send_mpv_command(MpvCommand::TogglePause) {
@@ -463,23 +448,20 @@ fn handle_player_event(
             }
         }
         KeyCode::Char('m') => {
-            let res = match app.play_mode {
+            let res = match app.player_state.play_mode {
                 PlayMode::DefaultMode => {
-                    app.play_mode = PlayMode::ShuffleMode;
+                    app.player_state.play_mode = PlayMode::ShuffleMode;
                     player.send_mpv_command(MpvCommand::Shuffle)
                 }
                 PlayMode::ShuffleMode => {
-                    app.play_mode = PlayMode::DefaultMode;
+                    app.player_state.play_mode = PlayMode::DefaultMode;
                     player.send_mpv_command(MpvCommand::Unshuffle)
                 }
             };
             if let Err(e) = res {
                 log_to_file(&e);
-            } else {
-                state.play_mode = app.play_mode.clone();
-                if let Err(e) = state.save() {
-                    log_to_file(&e);
-                }
+            } else if let Err(e) = app.player_state.save() {
+                log_to_file(&e);
             }
         }
         KeyCode::Char('n') => {
@@ -697,6 +679,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
                 if let Some(index) = app.browser_liststate.selected() {
                     let browser = &ALL_BROWSERS[index];
+                    app.client_state.browser = Some(*browser);
                     match client::get_profiles_from_browser(browser) {
                         Ok(profiles) => {
                             let mut profiles_liststate = ListState::default();
@@ -725,8 +708,9 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             KeyCode::Esc => app.popup_state = PopupState::None,
             KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
                 if let Some(index) = profiles_liststate.selected() {
+                    let profile = &profiles[index];
+                    app.client_state.profile = Some(profile.clone());
                     if browser.engine() == BrowserEngine::Gecko {
-                        let profile = &profiles[index];
                         if let Ok(containers) = get_geckgo_containers_from_profile(&profile.path) {
                             let mut containers_liststate = ListState::default();
                             containers_liststate.select(Some(0));
@@ -734,23 +718,57 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                                 containers,
                                 containers_liststate,
                                 browser: *browser,
-                                profile: profile.clone(),
                             };
                         }
+                    } else {
+                        if let Err(e) = app.client_state.save() {
+                            log_to_file(e);
+                        }
+                        app.popup_state = PopupState::None;
                     }
                 }
             }
-            KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::SelectBrowser,
+            KeyCode::Char('h') | KeyCode::Left => {
+                app.client_state.profile = None;
+                app.popup_state = PopupState::SelectBrowser
+            }
             _ => {}
         },
         PopupState::SelectGeckoContainer {
             containers,
             containers_liststate,
             browser,
-            profile,
         } => match key_event.code {
             KeyCode::Esc => app.popup_state = PopupState::None,
-            KeyCode::Char('h') | KeyCode::Left => {}
+            KeyCode::Char('h') | KeyCode::Left => {
+                app.client_state.gecko_container = None;
+                match client::get_profiles_from_browser(browser) {
+                    Ok(profiles) => {
+                        let mut profiles_liststate = ListState::default();
+                        if !profiles.is_empty() {
+                            profiles_liststate.select(Some(0));
+                        }
+                        app.popup_state = PopupState::SelectBrowserProfile {
+                            profiles,
+                            profiles_liststate,
+                            browser: *browser,
+                        }
+                    }
+                    Err(e) => {
+                        log_to_file(e);
+                    }
+                }
+            }
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                if let Some(index) = containers_liststate.selected() {
+                    let container = &containers[index];
+                    app.client_state.gecko_container = Some(container.clone());
+                    if let Err(e) = app.client_state.save() {
+                        log_to_file(e);
+                    }
+                    app.popup_state = PopupState::None;
+                }
+            }
             _ => {}
         },
         _ => {}
@@ -767,7 +785,7 @@ fn append_song_to_queue(app: &mut App, player: &Player, song: Song) -> YResult<(
     }
     let url = get_url_from_vid_id(&song.video_id);
     player.send_mpv_command(MpvCommand::AppendSong(url))?;
-    if app.play_mode == PlayMode::ShuffleMode && app.queue.len() == 3 {
+    if app.player_state.play_mode == PlayMode::ShuffleMode && app.queue.len() == 3 {
         player.send_mpv_command(MpvCommand::Shuffle)?;
     }
     app.noti.notify(
@@ -825,7 +843,7 @@ fn load_list(
         if start_index > 0 {
             player.send_mpv_command(MpvCommand::PlayPos(start_index))?;
         }
-        if app.play_mode == PlayMode::ShuffleMode {
+        if app.player_state.play_mode == PlayMode::ShuffleMode {
             player.send_mpv_command(MpvCommand::Shuffle)?;
         }
         app.queue = songs;

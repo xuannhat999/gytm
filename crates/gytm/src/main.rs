@@ -34,22 +34,16 @@ async fn main() -> YResult<()> {
         std::process::exit(0);
     }
     // Setup Player State
-    let mut player_state = match PlayerState::load() {
-        Ok(c) => c,
-        Err(e) => {
-            println!("{}", e);
-            std::process::exit(1);
-        }
-    };
+    let player_state = PlayerState::load()?;
 
     // Setup CLient State
-    let mut client_state = ClientState::load()?;
+    let client_state = ClientState::load()?;
 
     let config = Config::load();
     // Setup API client
     let (api_cmd_tx, api_cmd_rx) = mpsc::unbounded_channel::<ApiCmd>();
     let (api_res_tx, mut api_res_rx) = mpsc::unbounded_channel::<ApiResponse>();
-    let mut app = App::new(&player_state, &config, api_cmd_tx);
+    let mut app = App::new(player_state, client_state, &config, api_cmd_tx);
 
     println!("󱘖 Connecting to YouTube Music...");
     let dao = match YTDao::new().await {
@@ -80,7 +74,7 @@ async fn main() -> YResult<()> {
         player.spawn_mpv()?;
         let stream = player.connect_mpv().await?;
         player.observe_mpv(stream, tx_event).await?;
-        player.send_mpv_command(MpvCommand::SetVol(app.volume))?;
+        player.send_mpv_command(MpvCommand::SetVol(app.player_state.volume))?;
     }
 
     // Setup terminal
@@ -105,7 +99,7 @@ async fn main() -> YResult<()> {
         last_tick = std::time::Instant::now();
         app.noti.tick(elapsed);
         while let Ok(event) = rx.try_recv() {
-            handler::handle_mpv_event(&mut app, &mut player_state, event);
+            handler::handle_mpv_event(&mut app, event);
             render = true;
         }
         while let Ok(response) = api_res_rx.try_recv() {
@@ -115,14 +109,7 @@ async fn main() -> YResult<()> {
         if event::poll(Duration::from_millis(50))? {
             match event::read()? {
                 Event::Key(key) => {
-                    handler::handle_key_events(
-                        key,
-                        &mut app,
-                        &mut player,
-                        &mut player_state,
-                        &mut client_state,
-                        &config,
-                    );
+                    handler::handle_key_events(key, &mut app, &mut player, &config);
                     render = true;
                 }
                 Event::Resize(_, _) => {

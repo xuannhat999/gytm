@@ -4,13 +4,14 @@ use crate::{
 };
 use api::protocol::{ApiCmd, ApiLoadingKind};
 use config::Config;
-use data::app::{
-    AppPage, FocusArea, PlayMode, PlayerStatus, Playlist, PopupState, QueueData, Song,
-};
+use data::app::{AppPage, FocusArea, PlayerStatus, Playlist, PopupState, QueueData, Song};
 use error::YResult;
 use player::Player;
 use ratatui::widgets::ListState;
-use state::player_state::PlayerState;
+use state::{
+    client_state::{self, ClientState},
+    player_state::PlayerState,
+};
 use tokio::sync::mpsc;
 
 pub struct App {
@@ -50,8 +51,8 @@ pub struct App {
 
     // OTHER
     pub player_status: PlayerStatus,
-    pub volume: u8,
-    pub play_mode: PlayMode,
+    pub player_state: PlayerState,
+    pub client_state: ClientState,
 
     pub noti: NotificationManager,
     pub page: AppPage,
@@ -64,7 +65,8 @@ pub struct App {
 
 impl App {
     pub fn new(
-        player_state: &PlayerState,
+        player_state: PlayerState,
+        client_state: ClientState,
         config: &Config,
         api_cmd_tx: mpsc::UnboundedSender<ApiCmd>,
     ) -> Self {
@@ -99,8 +101,8 @@ impl App {
 
             // PLAYER
             player_status: PlayerStatus::Idle,
-            volume: player_state.volume,
-            play_mode: player_state.play_mode.clone(),
+            player_state,
+            client_state,
 
             //POPUP
             cus_playlists: Vec::new(),

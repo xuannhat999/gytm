@@ -408,13 +408,13 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
             }
         }
     };
-    let mode_text = match app.play_mode {
+    let mode_text = match app.player_state.play_mode {
         PlayMode::DefaultMode => "Play mode:   Default ",
         PlayMode::ShuffleMode => "Play mode:   Shuffle ",
     };
     let right_content = vec![
         Line::from(mode_text),
-        Line::from(format!("  {}% ", app.volume)),
+        Line::from(format!("  {}% ", app.player_state.volume)),
     ];
     let key_map = Line::from(vec![
         Span::styled("[ ⏸ / : ", theme.text_style()),
