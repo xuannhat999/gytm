@@ -679,6 +679,7 @@ fn render_select_gecko_container_popup(
     let PopupState::SelectGeckoContainer {
         containers,
         containers_liststate,
+        ..
     } = &mut app.popup_state
     else {
         return;

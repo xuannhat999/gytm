@@ -4,9 +4,8 @@ use crate::{
 };
 use api::protocol::{ApiCmd, ApiLoadingKind};
 use config::Config;
-use data::{
-    app::{AppPage, FocusArea, PlayMode, PlayerStatus, Playlist, PopupState, QueueData, Song},
-    client::Browser,
+use data::app::{
+    AppPage, FocusArea, PlayMode, PlayerStatus, Playlist, PopupState, QueueData, Song,
 };
 use error::YResult;
 use player::Player;
@@ -180,7 +179,7 @@ impl App {
     }
 
     pub fn save_queue_file(&self) -> YResult<()> {
-        let path = helper::get_queue_file()?;
+        let path = get_queue_file()?;
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
         }

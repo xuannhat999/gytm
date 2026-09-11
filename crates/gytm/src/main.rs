@@ -12,7 +12,7 @@ use data::mpv::{MpvCommand, MpvEvent};
 use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
-use state::player_state::PlayerState;
+use state::{client_state::ClientState, player_state::PlayerState};
 use std::{env, io, time::Duration};
 use tokio::sync::mpsc::{self};
 use tui::{
@@ -43,7 +43,7 @@ async fn main() -> YResult<()> {
     };
 
     // Setup CLient State
-    // let mut client_state = ClientState::load()?;
+    let mut client_state = ClientState::load()?;
 
     let config = Config::load();
     // Setup API client
@@ -120,6 +120,7 @@ async fn main() -> YResult<()> {
                         &mut app,
                         &mut player,
                         &mut player_state,
+                        &mut client_state,
                         &config,
                     );
                     render = true;

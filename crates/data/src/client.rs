@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BrowserEngine {
     Gecko,
     Chromium,
@@ -21,10 +21,18 @@ pub enum Browser {
     LibreWolf,
     Zen,
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserProfile {
     pub name: String,
     pub path: PathBuf,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeckoContainer {
+    pub name: String,
+    pub id: Option<i32>,
+}
+
 impl Browser {
     pub const fn engine(&self) -> BrowserEngine {
         match self {
@@ -45,9 +53,3 @@ pub static ALL_BROWSERS: &[Browser] = &[
     Browser::LibreWolf,
     Browser::Zen,
 ];
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GeckoContainer {
-    pub name: String,
-    pub id: Option<i32>,
-}

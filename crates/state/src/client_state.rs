@@ -1,5 +1,5 @@
 use crate::CLIENT_STATE_FILE_NAME;
-use data::client::Browser;
+use data::client::{Browser, BrowserProfile, GeckoContainer};
 use error::{YError, YResult, log_to_file};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Write, path::Path};
@@ -7,7 +7,10 @@ use std::{fs, io::Write, path::Path};
 #[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct ClientState {
     pub browser: Option<Browser>,
+    pub profile: Option<BrowserProfile>,
+    pub gecko_container: Option<GeckoContainer>,
 }
+
 impl ClientState {
     pub fn load() -> YResult<Self> {
         let conf_file = Self::get_path()?;

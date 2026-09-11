@@ -22,11 +22,11 @@ use data::{
 };
 use error::{YError, YResult, log_to_file};
 use player::Player;
-use ratatui::{symbols::braille, widgets::ListState};
-use state::{self, player_state::PlayerState};
+use ratatui::widgets::ListState;
+use state::{self, client_state::ClientState, player_state::PlayerState};
 use std::fs;
 
-pub fn handle_mpv_event(app: &mut App, state: &mut PlayerState, event: MpvEvent) {
+pub fn handle_mpv_event(app: &mut App, player_state: &mut PlayerState, event: MpvEvent) {
     match event {
         MpvEvent::ListChange(list) => {
             let ids = helper::list_vid_id_from_list_url(list);
@@ -45,8 +45,8 @@ pub fn handle_mpv_event(app: &mut App, state: &mut PlayerState, event: MpvEvent)
         }
         MpvEvent::VolumeChange(vol) => {
             app.volume = vol;
-            state.volume = vol;
-            if let Err(e) = state.save() {
+            player_state.volume = vol;
+            if let Err(e) = player_state.save() {
                 log_to_file(&e);
             }
         }
@@ -68,7 +68,8 @@ pub fn handle_key_events(
     key_event: KeyEvent,
     app: &mut App,
     player: &mut Player,
-    state: &mut PlayerState,
+    player_state: &mut PlayerState,
+    client_state: &mut ClientState,
     config: &Config,
 ) {
     if (!app.is_popup_active() && !app.is_insert)
@@ -130,7 +131,7 @@ pub fn handle_key_events(
                 }
                 _ => {}
             }
-            handle_player_event(key_event, app, player, state, config);
+            handle_player_event(key_event, app, player, player_state, config);
         }
 
         match app.page {
@@ -376,6 +377,7 @@ fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
     } else if let PopupState::SelectGeckoContainer {
         containers,
         containers_liststate,
+        ..
     } = &mut app.popup_state
     {
         (containers_liststate, containers.len())
@@ -704,7 +706,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                             app.popup_state = PopupState::SelectBrowserProfile {
                                 profiles,
                                 profiles_liststate,
-                                browser: browser.clone(),
+                                browser: *browser,
                             }
                         }
                         Err(e) => {
@@ -731,6 +733,8 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                             app.popup_state = PopupState::SelectGeckoContainer {
                                 containers,
                                 containers_liststate,
+                                browser: *browser,
+                                profile: profile.clone(),
                             };
                         }
                     }
@@ -742,6 +746,8 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
         PopupState::SelectGeckoContainer {
             containers,
             containers_liststate,
+            browser,
+            profile,
         } => match key_event.code {
             KeyCode::Esc => app.popup_state = PopupState::None,
             KeyCode::Char('h') | KeyCode::Left => {}
