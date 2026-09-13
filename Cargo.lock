@@ -93,6 +93,7 @@ dependencies = [
  "rust-ini",
  "serde",
  "sha1_smol",
+ "state",
 ]
 
 [[package]]

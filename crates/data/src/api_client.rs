@@ -21,17 +21,6 @@ pub enum Browser {
     LibreWolf,
     Zen,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BrowserProfile {
-    pub name: String,
-    pub path: PathBuf,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GeckoContainer {
-    pub name: String,
-    pub id: Option<i32>,
-}
 
 impl Browser {
     pub const fn engine(&self) -> BrowserEngine {
@@ -53,3 +42,21 @@ pub static ALL_BROWSERS: &[Browser] = &[
     Browser::LibreWolf,
     Browser::Zen,
 ];
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BrowserProfile {
+    pub name: String,
+    pub path: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeckoContainer {
+    pub name: String,
+    pub id: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Account {
+    pub email: String,
+    pub auth_user: usize,
+}

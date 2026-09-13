@@ -12,7 +12,7 @@ use data::mpv::{MpvCommand, MpvEvent};
 use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
-use state::{client_state::ClientState, player_state::PlayerState};
+use state::{Persist, client_state::ClientState, player_state::PlayerState};
 use std::{env, io, time::Duration};
 use tokio::sync::mpsc::{self};
 use tui::{
@@ -46,7 +46,7 @@ async fn main() -> YResult<()> {
     let mut app = App::new(player_state, client_state, &config, api_cmd_tx);
 
     println!("󱘖 Connecting to YouTube Music...");
-    let dao = match YTDao::new().await {
+    let dao = match YTDao::new(&app.client_state).await {
         Ok(d) => d,
         Err(e) => {
             log_to_file(&e);
@@ -55,6 +55,7 @@ async fn main() -> YResult<()> {
         }
     };
     let is_logged_out = dao.sapisid.is_none();
+
     let bus = YTBus::new(dao);
     spawn_api_worker(api_cmd_rx, api_res_tx, bus);
     if !is_logged_out {
@@ -83,12 +84,6 @@ async fn main() -> YResult<()> {
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-    if is_logged_out {
-        app.noti.notify(
-            tui::notification::NotifyType::Error,
-            "Running in logged-out mode — some features are unavailable".to_string(),
-        );
-    }
 
     let mut render = true;
     let mut last_tick = std::time::Instant::now();

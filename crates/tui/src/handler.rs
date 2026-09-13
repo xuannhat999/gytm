@@ -4,25 +4,29 @@ use crate::{
     notification::NotifyType,
 };
 use api::{
-    client::{self, get_geckgo_containers_from_profile},
+    client::{self, gecko::get_geckgo_containers_from_profile, get_profiles_from_browser},
     protocol::{ApiCmd, ApiLoadingKind, ApiResponse},
 };
 use config::Config;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::{
+    api_client::{ALL_BROWSERS, Browser, BrowserEngine},
     app::{
-        AppPage, CreatePlaylistFocus,
+        self, AppPage, CreatePlaylistFocus,
         FocusArea::{self},
         PlayListPrivacy, PlayMode,
         PlayerStatus::{self},
         PopupState, Song,
     },
-    client::{ALL_BROWSERS, BrowserEngine},
     mpv::{MpvCommand, MpvEvent},
 };
 use error::{YError, YResult, log_to_file};
 use player::Player;
-use ratatui::widgets::ListState;
+use ratatui::widgets::{List, ListState};
+use state::{
+    Persist,
+    client_state::{self, ClientState},
+};
 use std::fs;
 
 pub fn handle_mpv_event(app: &mut App, event: MpvEvent) {
@@ -68,6 +72,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
         || matches!(app.popup_state, PopupState::SelectBrowser)
         || matches!(app.popup_state, PopupState::SelectBrowserProfile { .. })
         || matches!(app.popup_state, PopupState::SelectGeckoContainer { .. })
+        || matches!(app.popup_state, PopupState::SelectAccount { .. })
     {
         handle_lists_event(key_event, app);
     }
@@ -359,9 +364,9 @@ fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
     } else if matches!(app.popup_state, PopupState::SelectBrowser) {
         (&mut app.browser_liststate, ALL_BROWSERS.len())
     } else if let PopupState::SelectBrowserProfile {
+        browser,
         profiles,
         profiles_liststate,
-        browser,
     } = &mut app.popup_state
     {
         (profiles_liststate, profiles.len())
@@ -372,6 +377,15 @@ fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
     } = &mut app.popup_state
     {
         (containers_liststate, containers.len())
+    } else if let PopupState::SelectAccount {
+        browser,
+        profile,
+        container,
+        accounts,
+        accounts_liststate,
+    } = &mut app.popup_state
+    {
+        (accounts_liststate, accounts.len())
     } else {
         match app.focus_area {
             FocusArea::Albums => (&mut app.albums_liststate, app.albums.len()),
@@ -388,6 +402,7 @@ fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
         _ => {}
     }
 }
+
 fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
     match key_event.code {
         KeyCode::Char('d') => {
@@ -679,7 +694,6 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
                 if let Some(index) = app.browser_liststate.selected() {
                     let browser = &ALL_BROWSERS[index];
-                    app.client_state.browser = Some(*browser);
                     match client::get_profiles_from_browser(browser) {
                         Ok(profiles) => {
                             let mut profiles_liststate = ListState::default();
@@ -709,49 +723,60 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
                 if let Some(index) = profiles_liststate.selected() {
                     let profile = &profiles[index];
-                    app.client_state.profile = Some(profile.clone());
-                    if browser.engine() == BrowserEngine::Gecko {
-                        if let Ok(containers) = get_geckgo_containers_from_profile(&profile.path) {
-                            let mut containers_liststate = ListState::default();
-                            containers_liststate.select(Some(0));
-                            app.popup_state = PopupState::SelectGeckoContainer {
-                                containers,
-                                containers_liststate,
-                                browser: *browser,
+                    match browser.engine() {
+                        BrowserEngine::Gecko => {
+                            if let Ok(containers) =
+                                get_geckgo_containers_from_profile(&profile.path)
+                            {
+                                let mut containers_liststate = ListState::default();
+                                containers_liststate.select(Some(0));
+                                app.popup_state = PopupState::SelectGeckoContainer {
+                                    browser: *browser,
+                                    profile: profile.clone(),
+                                    containers,
+                                    containers_liststate,
+                                };
+                            }
+                        }
+                        BrowserEngine::Chromium => {
+                            // app.client_state.gecko_container = None;
+                            // if let Err(e) = app.client_state.save() {
+                            //     log_to_file(e);
+                            // }
+                            // reaload_api_client(app);
+                            // app.popup_state = PopupState::None;
+                            let client = ClientState {
+                                browser: Some(*browser),
+                                profile: Some(profile.clone()),
+                                gecko_container: None,
+                                account: None,
                             };
+                            app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
                         }
-                    } else {
-                        if let Err(e) = app.client_state.save() {
-                            log_to_file(e);
-                        }
-                        app.popup_state = PopupState::None;
                     }
                 }
             }
-            KeyCode::Char('h') | KeyCode::Left => {
-                app.client_state.profile = None;
-                app.popup_state = PopupState::SelectBrowser
-            }
+            KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::SelectBrowser,
             _ => {}
         },
         PopupState::SelectGeckoContainer {
             containers,
             containers_liststate,
             browser,
+            profile,
         } => match key_event.code {
             KeyCode::Esc => app.popup_state = PopupState::None,
             KeyCode::Char('h') | KeyCode::Left => {
-                app.client_state.gecko_container = None;
-                match client::get_profiles_from_browser(browser) {
+                match client::get_profiles_from_browser(&app.client_state.browser.unwrap()) {
                     Ok(profiles) => {
                         let mut profiles_liststate = ListState::default();
                         if !profiles.is_empty() {
                             profiles_liststate.select(Some(0));
                         }
                         app.popup_state = PopupState::SelectBrowserProfile {
+                            browser: *browser,
                             profiles,
                             profiles_liststate,
-                            browser: *browser,
                         }
                     }
                     Err(e) => {
@@ -762,7 +787,82 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
                 if let Some(index) = containers_liststate.selected() {
                     let container = &containers[index];
-                    app.client_state.gecko_container = Some(container.clone());
+                    let client = ClientState {
+                        browser: Some(*browser),
+                        profile: Some(profile.clone()),
+                        gecko_container: Some(container.clone()),
+                        account: None,
+                    };
+                    // if let Err(e) = app.client_state.save() {
+                    //     log_to_file(e);
+                    // }
+                    // reaload_api_client(app);
+                    // app.popup_state = PopupState::None;
+
+                    app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
+                }
+            }
+            _ => {}
+        },
+        PopupState::SelectAccount {
+            browser,
+            profile,
+            container,
+            accounts,
+            accounts_liststate,
+        } => match key_event.code {
+            KeyCode::Esc => app.popup_state = PopupState::None,
+            KeyCode::Char('h') | KeyCode::Left => {
+                if container.is_some() {
+                    match get_geckgo_containers_from_profile(&profile.path) {
+                        Ok(containers) => {
+                            let mut liststate = ListState::default();
+                            if !containers.is_empty() {
+                                liststate.select(Some(0));
+                            }
+                            app.popup_state = PopupState::SelectGeckoContainer {
+                                browser: *browser,
+                                profile: profile.clone(),
+                                containers,
+                                containers_liststate: liststate,
+                            };
+                        }
+                        Err(e) => {
+                            log_to_file(e);
+                        }
+                    }
+                } else {
+                    match get_profiles_from_browser(browser) {
+                        Ok(profiles) => {
+                            let mut liststate = ListState::default();
+                            if !profiles.is_empty() {
+                                liststate.select(Some(0));
+                            }
+                            app.popup_state = PopupState::SelectBrowserProfile {
+                                browser: *browser,
+                                profiles,
+                                profiles_liststate: liststate,
+                            };
+                        }
+                        Err(e) => {
+                            log_to_file(&e);
+                        }
+                    }
+                }
+            }
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                if let Some(index) = accounts_liststate.selected() {
+                    let selected_acc = &accounts[index];
+                    let client_state = ClientState {
+                        browser: Some(*browser),
+                        profile: Some(profile.clone()),
+                        gecko_container: container.clone(),
+                        account: Some(selected_acc.clone()),
+                    };
+                    app.api_cmd_tx
+                        .send(ApiCmd::ReloadApiClient(client_state))
+                        .ok();
+
                     if let Err(e) = app.client_state.save() {
                         log_to_file(e);
                     }
@@ -1077,6 +1177,45 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 app.noti.notify(
                     NotifyType::Error,
                     format!("Failed to fetch Library data: {e}"),
+                );
+            }
+        },
+
+        ApiResponse::FetchAccountsList(res) => match res {
+            Ok((accounts, browser, profile, container)) => {
+                let mut liststate = ListState::default();
+                if !accounts.is_empty() {
+                    liststate.select(Some(0));
+                }
+                app.popup_state = PopupState::SelectAccount {
+                    accounts,
+                    accounts_liststate: liststate,
+                    browser,
+                    profile,
+                    container,
+                }
+            }
+            Err(e) => {
+                log_to_file(e);
+            }
+        },
+
+        ApiResponse::ReloadApiCLient(result) => match result {
+            Ok(client_state) => {
+                app.noti.notify(
+                    NotifyType::Success,
+                    "Reloaded Api Client successfully".to_string(),
+                );
+                app.client_state = client_state;
+                app.client_state.save().ok();
+                app.api_cmd_tx.send(ApiCmd::FetchLibraryData).ok();
+                app.api_loading_kind = Some(ApiLoadingKind::FetchLibraryData);
+            }
+            Err(e) => {
+                log_to_file(&e);
+                app.noti.notify(
+                    NotifyType::Error,
+                    format!("Failed to reload api client: {e}"),
                 );
             }
         },

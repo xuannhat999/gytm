@@ -1,10 +1,13 @@
-use data::app::{PlayListPrivacy, Playlist, Song};
+use crate::{client::load_cookies, dao::YTDao, parser};
+use data::{
+    api_client::Account,
+    app::{PlayListPrivacy, Playlist, Song},
+};
 use error::{
     YError::{self},
     YResult, log_to_file,
 };
-
-use crate::{dao::YTDao, parser};
+use state::client_state::ClientState;
 
 pub struct YTBus {
     dao: YTDao,
@@ -14,8 +17,11 @@ impl YTBus {
     pub fn new(dao: YTDao) -> Self {
         Self { dao }
     }
-    pub fn reload_dao(&mut self, dao: YTDao) {
-        self.dao = dao;
+    pub async fn reload_dao(&mut self, client_state: &ClientState) -> YResult<()> {
+        let (browser, profile, container, account) = &client_state.get_validated_fields()?;
+        let (jar, sapisid) = load_cookies(&browser, &profile, container.as_ref())?
+            .ok_or(YError::UnavailableFeature)?;
+        self.dao.reload(jar, sapisid, account.auth_user).await
     }
 
     pub async fn create_playlist(
@@ -56,6 +62,28 @@ impl YTBus {
             }
         }
         Ok((all_albums, all_playlists, all_cus_playlists))
+    }
+
+    pub async fn get_accounts_list(&mut self, client_state: &ClientState) -> YResult<Vec<Account>> {
+        let dao = YTDao::new(client_state).await?;
+        let mut emails = Vec::new();
+        let mut id = 0;
+        while let Ok(res) = dao.get_account_email(id).await {
+            match parser::parse_account(&res) {
+                Ok(email) => {
+                    emails.push(Account {
+                        email,
+                        auth_user: id as usize,
+                    });
+                    id += 1;
+                }
+                Err(e) => {
+                    log_to_file(e);
+                    break;
+                }
+            }
+        }
+        Ok(emails)
     }
 
     pub async fn get_songs(&self, browse_id: &str) -> YResult<Vec<Song>> {

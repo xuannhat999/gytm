@@ -2,10 +2,10 @@ use crate::app::App;
 use crate::helper;
 use api::protocol::ApiLoadingKind;
 use config::Config;
+use data::api_client::ALL_BROWSERS;
 use data::app::{
     AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus, PopupState,
 };
-use data::client::ALL_BROWSERS;
 use data::theme::Theme;
 use ratatui::layout::Flex;
 use ratatui::style::Color;
@@ -16,6 +16,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs},
 };
+use state::client_state::ClientState;
 
 pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std::time::Instant) {
     if config.background {
@@ -44,16 +45,17 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
     let top_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
+            Constraint::Percentage(25),
             Constraint::Percentage(50),
-            Constraint::Percentage(50),
-            Constraint::Length(2),
+            Constraint::Percentage(25),
         ])
         .split(main_layout[0]);
 
     render_tabs(frame, top_layout[0], &config.theme, app.page as usize);
+    render_api_client(frame, top_layout[1], &config.theme, &app.client_state);
     render_help_line(
         frame,
-        top_layout[1],
+        top_layout[2],
         &config.theme,
         vec![("Next tab", "Tab"), ("Minimize", "q"), ("Quit", "Q")],
     );
@@ -113,6 +115,38 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
         PopupState::SelectBrowser => {
             render_switch_browser_popup(frame, app, frame.area(), config);
         }
+        PopupState::SelectAccount { .. } => {
+            render_select_account_popup(frame, app, frame.area(), config);
+        }
+    }
+}
+fn render_api_client(frame: &mut Frame, area: Rect, theme: &Theme, client_state: &ClientState) {
+    if let Ok((browser, profile, gecko_container, account)) = client_state.get_validated_fields() {
+        let mut spans = vec![
+            Span::styled("[B]", theme.key_style()),
+            Span::styled(format!(" Browser: {:?}", browser), theme.text_style()),
+            Span::styled(" | ", theme.text_style()),
+            Span::styled("[P]", theme.key_style()),
+            Span::styled(format!(" Profile: {}", profile.name), theme.text_style()),
+        ];
+        if let Some(gecko_container) = gecko_container {
+            spans.push(Span::styled(" | ", theme.text_style()));
+            spans.push(Span::styled("[P] ", theme.key_style()));
+            spans.push(Span::styled(
+                format!(" Container: {}", gecko_container.name),
+                theme.text_style(),
+            ));
+        }
+
+        spans.push(Span::styled(" | ", theme.text_style()));
+        spans.push(Span::styled("[P] ", theme.key_style()));
+        spans.push(Span::styled(
+            format!(" Email: {}", account.email),
+            theme.text_style(),
+        ));
+
+        let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Left);
+        frame.render_widget(p, area);
     }
 }
 
@@ -714,9 +748,9 @@ fn render_select_gecko_container_popup(
 // PROFILE
 fn render_select_profile_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
     let PopupState::SelectBrowserProfile {
+        browser,
         profiles,
         profiles_liststate,
-        browser,
     } = &mut app.popup_state
     else {
         return;
@@ -771,6 +805,44 @@ fn render_switch_browser_popup(frame: &mut Frame, app: &mut App, area: Rect, con
         .collect();
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
     frame.render_stateful_widget(list_widget, layout[1], &mut app.browser_liststate);
+}
+
+// ACCOUNT
+fn render_select_account_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
+    let PopupState::SelectAccount {
+        browser,
+        profile,
+        container,
+        accounts,
+        accounts_liststate,
+    } = &mut app.popup_state
+    else {
+        return;
+    };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick)
+        .border_style(config.theme.active_border_style())
+        .title(" Select Account ");
+    let center_area = area.centered(Constraint::Percentage(50), Constraint::Length(20));
+    let inner_area = block.inner(center_area);
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(0)])
+        .split(inner_area);
+
+    frame.render_widget(Clear, center_area);
+    if config.background {
+        render_background(frame, center_area, config.theme.bg_popup);
+    }
+    frame.render_widget(block, center_area);
+    let items: Vec<ListItem> = accounts
+        .iter()
+        .map(|a| ListItem::new(a.email.clone()))
+        .collect();
+
+    let list_widget = List::new(items).highlight_style(config.theme.selected_item());
+    frame.render_stateful_widget(list_widget, layout[1], accounts_liststate);
 }
 
 // CREATE PLAYLIST

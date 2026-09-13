@@ -11,7 +11,7 @@ use time::{OffsetDateTime, format_description};
 
 #[derive(Debug, Error)]
 pub enum YError {
-    #[error("Invalid File Path: {0}")]
+    #[error("Path doesn't exist: {0}")]
     InvalidPath(String),
 
     #[error("Invalid Response from: {0}")]
@@ -37,6 +37,9 @@ pub enum YError {
 
     #[error("Unavailable feature for logged out mode")]
     UnavailableFeature,
+
+    #[error("Miss API client context: {0}")]
+    MissApiClientContext(String),
 
     #[error("Sqlite Error: {0}")]
     SqliteError(#[from] rusqlite::Error),

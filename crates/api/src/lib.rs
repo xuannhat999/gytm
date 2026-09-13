@@ -4,6 +4,5 @@ pub mod dao;
 pub mod parser;
 pub mod protocol;
 pub mod request;
-
 pub use bus::YTBus;
 pub use dao::YTDao;

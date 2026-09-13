@@ -8,10 +8,7 @@ use data::app::{AppPage, FocusArea, PlayerStatus, Playlist, PopupState, QueueDat
 use error::YResult;
 use player::Player;
 use ratatui::widgets::ListState;
-use state::{
-    client_state::{self, ClientState},
-    player_state::PlayerState,
-};
+use state::{client_state::ClientState, player_state::PlayerState};
 use tokio::sync::mpsc;
 
 pub struct App {
@@ -51,6 +48,8 @@ pub struct App {
 
     // OTHER
     pub player_status: PlayerStatus,
+
+    // STATE
     pub player_state: PlayerState,
     pub client_state: ClientState,
 
@@ -158,6 +157,7 @@ impl App {
         };
         state.select(Some(i));
     }
+
     pub fn get_mpv_idx(&self, id: &str) -> Option<usize> {
         for (pos, mpv_id) in self.mpv_list.iter().enumerate() {
             if id == mpv_id {

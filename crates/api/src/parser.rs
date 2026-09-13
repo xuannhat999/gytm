@@ -1,5 +1,5 @@
 use data::app::{Playlist, Song};
-use error::{YError, YResult};
+use error::{YError, YResult, log_to_file};
 
 pub fn parse_lists(data: &str) -> YResult<(Vec<Playlist>, Vec<Playlist>, Option<String>)> {
     let mut albums: Vec<Playlist> = Vec::new();
@@ -373,4 +373,15 @@ pub fn parse_related_songs(data: &str) -> YResult<Vec<Song>> {
         true
     });
     Ok(songs)
+}
+
+pub fn parse_account(data: &str) -> YResult<String> {
+    let email = gjson::get(
+        data,
+        "actions.0.getMultiPageMenuAction.menu.multiPageMenuRenderer.sections.0.accountSectionListRenderer.header.googleAccountHeaderRenderer.email.runs.0.text",
+    );
+    if !email.exists() {
+        return Err(YError::InvalidResponse("Get account".to_string()));
+    }
+    Ok(email.str().to_string())
 }

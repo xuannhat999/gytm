@@ -89,6 +89,22 @@ pub fn spawn_api_worker(
                     Err(e) => ApiResponse::GetRelatedSongsToPlay(Err(e)),
                 },
                 ApiCmd::FetchLibraryData => ApiResponse::FetchLibraryData(bus.get_lists().await),
+                ApiCmd::FetchAccountsList(client_state) => {
+                    let accounts = bus
+                        .get_accounts_list(&client_state)
+                        .await
+                        .unwrap_or_default();
+                    ApiResponse::FetchAccountsList(Ok((
+                        accounts,
+                        client_state.browser.unwrap(),
+                        client_state.profile.unwrap(),
+                        client_state.gecko_container,
+                    )))
+                }
+                ApiCmd::ReloadApiClient(client) => match bus.reload_dao(&client).await {
+                    Ok(_) => ApiResponse::ReloadApiCLient(Ok(client)),
+                    Err(e) => ApiResponse::ReloadApiCLient(Err(e)),
+                },
             };
             if api_res_tx.send(res).is_err() {
                 break;

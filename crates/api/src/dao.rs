@@ -1,21 +1,21 @@
-use data::{
-    app::{PlayListPrivacy, Song},
-    client::{Browser, BrowserProfile},
-};
+use data::app::{PlayListPrivacy, Song};
 use error::{YError, YResult};
 use reqwest::{
-    Client, Url,
+    Client,
     cookie::Jar,
     header::{HeaderMap, HeaderValue},
 };
-use rookie::{any_browser, common::enums::Cookie, load};
-use std::{path::PathBuf, sync::Arc};
+use state::client_state::ClientState;
+use std::sync::Arc;
 
-use crate::request::{
-    ActionsContent, BrowseIdRequest, CreatePlaylistRequest, GetContinuationRequest,
-    GetRelatedSongsRequest, PlaylistIdRequest, QueryRequest, QueryWithParamsRequest, RequestClient,
-    RequestContext, SaveAlbumRequest, SaveUnsaveListRequest, TargetContent, TargetRequest,
-    VideoIdRequest,
+use crate::{
+    client,
+    request::{
+        ActionsContent, BrowseIdRequest, CreatePlaylistRequest, EmptyRequest,
+        GetContinuationRequest, GetRelatedSongsRequest, PlaylistIdRequest, QueryRequest,
+        QueryWithParamsRequest, RequestClient, RequestContext, SaveAlbumRequest,
+        SaveUnsaveListRequest, TargetContent, TargetRequest, VideoIdRequest,
+    },
 };
 
 pub struct YTDao {
@@ -23,41 +23,57 @@ pub struct YTDao {
     pub sapisid: Option<String>,
     pub innertube_api_key: String,
     pub client_version: String,
+    pub auth_user: usize,
 }
 
-const YTM_DOMAIN: &str = "https://music.youtube.com";
+pub static YTM_DOMAIN: &str = "https://music.youtube.com";
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 impl YTDao {
-    pub async fn new_from_browser(browser: &Browser, profile: &BrowserProfile) -> YResult<()> {
-        let domains = vec![".youtube.com".to_string()];
-        match browser {
-            Browser::Brave => {
-                let cookies = rookie::brave(Some(domains));
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-    pub async fn new() -> YResult<Self> {
-        let (jar, sapisid) = load_cookies()?;
-        let http = Client::builder()
-            .cookie_provider(Arc::new(jar))
-            .user_agent(USER_AGENT)
-            .build()?;
-
-        let response_text = http.get(YTM_DOMAIN).send().await?.text().await?;
-        let innertube_api_key = extract_between(&response_text, "INNERTUBE_API_KEY\":\"", "\"")
-            .ok_or_else(|| YError::InvalidCookie)?;
-
-        let client_version = extract_between(&response_text, "INNERTUBE_CLIENT_VERSION\":\"", "\"")
-            .ok_or_else(|| YError::InvalidCookie)?;
+    pub async fn default() -> YResult<Self> {
+        let (http, innertube_api_key, client_version) = build_client_fields(Jar::default()).await?;
         Ok(Self {
             http,
-            sapisid,
+            sapisid: None,
             innertube_api_key,
             client_version,
+            auth_user: 0,
         })
+    }
+
+    pub async fn reload(&mut self, jar: Jar, sapisid: String, auth_user: usize) -> YResult<()> {
+        let (http, innertube_api_key, client_version) = build_client_fields(jar).await?;
+        self.http = http;
+        self.sapisid = Some(sapisid);
+        self.innertube_api_key = innertube_api_key;
+        self.client_version = client_version;
+        self.auth_user = auth_user;
+        Ok(())
+    }
+
+    pub async fn new(client_state: &ClientState) -> YResult<Self> {
+        if let Ok((browser, profile, gecko_container, account)) =
+            client_state.get_validated_fields()
+        {
+            let result = client::load_cookies(&browser, &profile, gecko_container.as_ref());
+            match result {
+                Ok(Some((jar, sapisid))) => {
+                    let (http, innertube_api_key, client_version) =
+                        build_client_fields(jar).await?;
+
+                    return Ok(Self {
+                        http,
+                        sapisid: Some(sapisid),
+                        innertube_api_key,
+                        client_version,
+                        auth_user: account.auth_user,
+                    });
+                }
+                Ok(None) => return Self::default().await,
+                Err(_) => return Self::default().await,
+            }
+        }
+        Self::default().await
     }
 
     // This function is adapted from: https://github.com/ccgauche/ytermusic.git
@@ -82,7 +98,11 @@ impl YTDao {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
         headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
-        headers.insert("X-Goog-AuthUser", HeaderValue::from_static("0"));
+        // headers.insert("X-Goog-AuthUser", HeaderValue::from_static("0"));
+        headers.insert(
+            "X-Goog-AuthUser",
+            HeaderValue::from_str(&self.auth_user.to_string()).unwrap(),
+        );
         if let Some(ref sapisid) = self.sapisid {
             let auth_val = format!("SAPISIDHASH {}", self.compute_sapi_hash(sapisid));
             headers.insert("Authorization", HeaderValue::from_str(&auth_val).unwrap());
@@ -90,6 +110,20 @@ impl YTDao {
         headers
     }
 
+    pub fn get_api_headers_with_id(&self, auth_user: i32) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert("Content-Type", HeaderValue::from_static("application/json"));
+        headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
+        headers.insert(
+            "X-Goog-AuthUser",
+            HeaderValue::from_str(&auth_user.to_string()).unwrap(),
+        );
+        if let Some(ref sapisid) = self.sapisid {
+            let auth_val = format!("SAPISIDHASH {}", self.compute_sapi_hash(sapisid));
+            headers.insert("Authorization", HeaderValue::from_str(&auth_val).unwrap());
+        }
+        headers
+    }
     fn api_url(&self, endpoint: &str) -> String {
         format!(
             "{}/youtubei/v1/{}?key={}&alt=json",
@@ -117,6 +151,23 @@ impl YTDao {
             .http
             .post(&url)
             .headers(self.get_api_headers())
+            .json(&body)
+            .send()
+            .await?
+            .text()
+            .await?;
+        Ok(response)
+    }
+
+    pub async fn get_account_email(&self, id: i32) -> YResult<String> {
+        let url = self.api_url("account/accounts_list");
+        let body = EmptyRequest {
+            context: self.get_context(),
+        };
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers_with_id(id))
             .json(&body)
             .send()
             .await?
@@ -472,6 +523,20 @@ impl YTDao {
         }
     }
 }
+async fn build_client_fields(jar: Jar) -> YResult<(Client, String, String)> {
+    let http = Client::builder()
+        .cookie_provider(Arc::new(jar))
+        .user_agent(USER_AGENT)
+        .build()?;
+
+    let response_text = http.get(YTM_DOMAIN).send().await?.text().await?;
+    let innertube_api_key = extract_between(&response_text, "INNERTUBE_API_KEY\":\"", "\"")
+        .ok_or_else(|| YError::InvalidCookie)?;
+
+    let client_version = extract_between(&response_text, "INNERTUBE_CLIENT_VERSION\":\"", "\"")
+        .ok_or_else(|| YError::InvalidCookie)?;
+    Ok((http, innertube_api_key, client_version))
+}
 
 fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
     source.find(start).and_then(|start_idx| {
@@ -480,93 +545,4 @@ fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
             .find(end)
             .map(|end_idx| source[start_pos..start_pos + end_idx].to_string())
     })
-}
-// ONLY WORKS WITH CHROMIUM BASED BROWSER ( No idea )
-pub fn load_cookies() -> YResult<(Jar, Option<String>)> {
-    let jar = Jar::default();
-    let url = YTM_DOMAIN.parse::<Url>()?;
-    let domains = vec![".youtube.com".to_string()];
-    let mut sapisid_extracted = String::new();
-    let mut cookies = load(Some(domains)).unwrap_or_else(|_| Vec::new());
-    if cookies.is_empty() {
-        cookies = load_cookies_other_browsers();
-    }
-
-    for cookie in cookies {
-        if cookie.name == "SAPISID" {
-            sapisid_extracted = cookie.value.clone();
-        }
-        let cookie_str = format!(
-            "{}={}; Path={}; Secure; HttpOnly",
-            cookie.name, cookie.value, cookie.path
-        );
-        jar.add_cookie_str(&cookie_str, &url);
-    }
-
-    let sapisid = if sapisid_extracted.is_empty() {
-        None
-    } else {
-        Some(sapisid_extracted)
-    };
-
-    Ok((jar, sapisid))
-}
-pub fn load_cookies_other_browsers() -> Vec<Cookie> {
-    let domains = vec![".youtube.com".to_string()];
-    let browser_dirs = vec![
-        "BraveSoftware/Brave-Origin",
-        "mozilla/firefox",
-        "librewolf/librewolf",
-        "zen",
-    ];
-    let target_filename = vec!["cookies.sqlite", "Cookies"];
-    let config_dir = match dirs::config_dir() {
-        Some(d) => d,
-        None => return Vec::new(),
-    };
-    let mut target_db_path: Option<PathBuf> = None;
-    'outer: for browser in browser_dirs {
-        let base_path = config_dir.join(browser);
-        if !base_path.exists() {
-            continue;
-        }
-        if let Ok(entries) = std::fs::read_dir(base_path) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    for file_name in &target_filename {
-                        let db_path = path.join(file_name);
-                        if db_path.exists() {
-                            target_db_path = Some(db_path);
-                            break 'outer;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    let cookies_path = match target_db_path {
-        Some(p) => p.to_string_lossy().into_owned(),
-        None => return Vec::new(),
-    };
-
-    any_browser(&cookies_path, Some(domains), None).unwrap_or_default()
-}
-
-fn build_jar_sapisid_from_chromium_cookies(cookies: Vec<Cookie>) -> YResult<(Jar, Option<String>)> {
-    let url = YTM_DOMAIN.parse::<Url>()?;
-    let jar = Jar::default();
-    let mut sapisid: Option<String> = None;
-    for cookie in cookies {
-        if cookie.name == "SAPISID" {
-            sapisid = Some(cookie.value.clone());
-        }
-        let cookie_str = format!(
-            "{}={}; Path={}; Secure; HttpOnly",
-            cookie.name, cookie.value, cookie.path
-        );
-        jar.add_cookie_str(&cookie_str, &url);
-    }
-    Ok((jar, sapisid))
 }
