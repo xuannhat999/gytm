@@ -101,10 +101,10 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
     match &app.popup_state {
         PopupState::None => {}
         PopupState::SelectGeckoContainer { .. } => {
-            render_select_gecko_container_popup(frame, app, frame.area(), config);
+            render_select_gecko_container_popup(frame, app, frame.area(), config, start_time);
         }
         PopupState::SelectBrowserProfile { .. } => {
-            render_select_profile_popup(frame, app, frame.area(), config)
+            render_select_profile_popup(frame, app, frame.area(), config, start_time)
         }
         PopupState::SaveSong { .. } => {
             render_save_song_to_playlist_popup(frame, app, frame.area(), config, start_time);
@@ -144,7 +144,6 @@ fn render_api_client(frame: &mut Frame, area: Rect, theme: &Theme, client_state:
             format!(" Email: {}", account.email),
             theme.text_style(),
         ));
-
         let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Left);
         frame.render_widget(p, area);
     }
@@ -709,6 +708,7 @@ fn render_select_gecko_container_popup(
     app: &mut App,
     area: Rect,
     config: &Config,
+    start_time: std::time::Instant,
 ) {
     let PopupState::SelectGeckoContainer {
         containers,
@@ -742,15 +742,24 @@ fn render_select_gecko_container_popup(
         .collect();
 
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
+    if app.api_loading_kind == Some(ApiLoadingKind::FetchAccountsList) {
+        render_spinner(frame, layout[0], &config.theme, start_time);
+    }
     frame.render_stateful_widget(list_widget, layout[1], containers_liststate);
 }
 
 // PROFILE
-fn render_select_profile_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
+fn render_select_profile_popup(
+    frame: &mut Frame,
+    app: &mut App,
+    area: Rect,
+    config: &Config,
+    start_time: std::time::Instant,
+) {
     let PopupState::SelectBrowserProfile {
-        browser,
         profiles,
         profiles_liststate,
+        ..
     } = &mut app.popup_state
     else {
         return;
@@ -772,11 +781,21 @@ fn render_select_profile_popup(frame: &mut Frame, app: &mut App, area: Rect, con
         render_background(frame, center_area, config.theme.bg_popup);
     }
     frame.render_widget(block, center_area);
+    if profiles.is_empty() {
+        let msg = Paragraph::new("No profiles found")
+            .style(config.theme.text_style())
+            .alignment(Alignment::Center);
+        frame.render_widget(msg, layout[1]);
+        return;
+    }
     let items: Vec<ListItem> = profiles
         .iter()
         .map(|p| ListItem::new(p.name.clone()))
         .collect();
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
+    if app.api_loading_kind == Some(ApiLoadingKind::FetchAccountsList) {
+        render_spinner(frame, layout[0], &config.theme, start_time);
+    }
     frame.render_stateful_widget(list_widget, layout[1], profiles_liststate);
 }
 
@@ -810,11 +829,9 @@ fn render_switch_browser_popup(frame: &mut Frame, app: &mut App, area: Rect, con
 // ACCOUNT
 fn render_select_account_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
     let PopupState::SelectAccount {
-        browser,
-        profile,
-        container,
         accounts,
         accounts_liststate,
+        ..
     } = &mut app.popup_state
     else {
         return;
@@ -836,12 +853,20 @@ fn render_select_account_popup(frame: &mut Frame, app: &mut App, area: Rect, con
         render_background(frame, center_area, config.theme.bg_popup);
     }
     frame.render_widget(block, center_area);
+    if accounts.is_empty() {
+        let msg = Paragraph::new("No accounts found")
+            .style(config.theme.text_style())
+            .alignment(Alignment::Center);
+        frame.render_widget(msg, layout[1]);
+        return;
+    }
     let items: Vec<ListItem> = accounts
         .iter()
         .map(|a| ListItem::new(a.email.clone()))
         .collect();
 
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
+
     frame.render_stateful_widget(list_widget, layout[1], accounts_liststate);
 }
 

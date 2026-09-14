@@ -19,7 +19,7 @@ impl YTBus {
     }
     pub async fn reload_dao(&mut self, client_state: &ClientState) -> YResult<()> {
         let (browser, profile, container, account) = &client_state.get_validated_fields()?;
-        let (jar, sapisid) = load_cookies(&browser, &profile, container.as_ref())?
+        let (jar, sapisid) = load_cookies(browser, profile, container.as_ref())?
             .ok_or(YError::UnavailableFeature)?;
         self.dao.reload(jar, sapisid, account.auth_user).await
     }

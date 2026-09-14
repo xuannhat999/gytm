@@ -10,9 +10,9 @@ use api::{
 use config::Config;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::{
-    api_client::{ALL_BROWSERS, Browser, BrowserEngine},
+    api_client::{ALL_BROWSERS, BrowserEngine},
     app::{
-        self, AppPage, CreatePlaylistFocus,
+        AppPage, CreatePlaylistFocus,
         FocusArea::{self},
         PlayListPrivacy, PlayMode,
         PlayerStatus::{self},
@@ -22,11 +22,8 @@ use data::{
 };
 use error::{YError, YResult, log_to_file};
 use player::Player;
-use ratatui::widgets::{List, ListState};
-use state::{
-    Persist,
-    client_state::{self, ClientState},
-};
+use ratatui::widgets::ListState;
+use state::{Persist, client_state::ClientState};
 use std::fs;
 
 pub fn handle_mpv_event(app: &mut App, event: MpvEvent) {
@@ -364,9 +361,9 @@ fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
     } else if matches!(app.popup_state, PopupState::SelectBrowser) {
         (&mut app.browser_liststate, ALL_BROWSERS.len())
     } else if let PopupState::SelectBrowserProfile {
-        browser,
         profiles,
         profiles_liststate,
+        ..
     } = &mut app.popup_state
     {
         (profiles_liststate, profiles.len())
@@ -378,11 +375,9 @@ fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
     {
         (containers_liststate, containers.len())
     } else if let PopupState::SelectAccount {
-        browser,
-        profile,
-        container,
         accounts,
         accounts_liststate,
+        ..
     } = &mut app.popup_state
     {
         (accounts_liststate, accounts.len())
@@ -751,6 +746,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                                 gecko_container: None,
                                 account: None,
                             };
+                            app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
                             app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
                         }
                     }
@@ -767,7 +763,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
         } => match key_event.code {
             KeyCode::Esc => app.popup_state = PopupState::None,
             KeyCode::Char('h') | KeyCode::Left => {
-                match client::get_profiles_from_browser(&app.client_state.browser.unwrap()) {
+                match client::get_profiles_from_browser(browser) {
                     Ok(profiles) => {
                         let mut profiles_liststate = ListState::default();
                         if !profiles.is_empty() {
@@ -798,7 +794,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                     // }
                     // reaload_api_client(app);
                     // app.popup_state = PopupState::None;
-
+                    app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
                     app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
                 }
             }
@@ -862,10 +858,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                     app.api_cmd_tx
                         .send(ApiCmd::ReloadApiClient(client_state))
                         .ok();
-
-                    if let Err(e) = app.client_state.save() {
-                        log_to_file(e);
-                    }
+                    app.api_loading_kind = Some(ApiLoadingKind::FetchLibraryData);
                     app.popup_state = PopupState::None;
                 }
             }
@@ -1181,25 +1174,27 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             }
         },
 
-        ApiResponse::FetchAccountsList(res) => match res {
-            Ok((accounts, browser, profile, container)) => {
-                let mut liststate = ListState::default();
-                if !accounts.is_empty() {
-                    liststate.select(Some(0));
+        ApiResponse::FetchAccountsList(res) => {
+            match res {
+                Ok((accounts, browser, profile, container)) => {
+                    let mut liststate = ListState::default();
+                    if !accounts.is_empty() {
+                        liststate.select(Some(0));
+                    }
+                    app.popup_state = PopupState::SelectAccount {
+                        accounts,
+                        accounts_liststate: liststate,
+                        browser,
+                        profile,
+                        container,
+                    }
                 }
-                app.popup_state = PopupState::SelectAccount {
-                    accounts,
-                    accounts_liststate: liststate,
-                    browser,
-                    profile,
-                    container,
+                Err(e) => {
+                    log_to_file(e);
                 }
             }
-            Err(e) => {
-                log_to_file(e);
-            }
-        },
-
+            app.api_loading_kind = None;
+        }
         ApiResponse::ReloadApiCLient(result) => match result {
             Ok(client_state) => {
                 app.noti.notify(
@@ -1209,7 +1204,6 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 app.client_state = client_state;
                 app.client_state.save().ok();
                 app.api_cmd_tx.send(ApiCmd::FetchLibraryData).ok();
-                app.api_loading_kind = Some(ApiLoadingKind::FetchLibraryData);
             }
             Err(e) => {
                 log_to_file(&e);

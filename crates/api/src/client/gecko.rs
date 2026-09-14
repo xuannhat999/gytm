@@ -209,12 +209,12 @@ fn get_gecko_containers_from_json(json_path: &Path) -> YResult<Vec<GeckoContaine
         let is_public = val.get("public").bool();
         if is_public {
             let name = val.get("name");
-            let l10nId = val.get("l10nId");
+            let l10n_id = val.get("l10nId");
             let id = val.get("userContextId").i32();
             let container_name = if name.exists() {
                 name.str().to_string()
             } else {
-                l10nId.str().to_string()
+                l10n_id.str().to_string()
             };
             containers.push(GeckoContainer {
                 id: Some(id),

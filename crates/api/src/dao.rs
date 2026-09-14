@@ -98,7 +98,6 @@ impl YTDao {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
         headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
-        // headers.insert("X-Goog-AuthUser", HeaderValue::from_static("0"));
         headers.insert(
             "X-Goog-AuthUser",
             HeaderValue::from_str(&self.auth_user.to_string()).unwrap(),
@@ -110,13 +109,13 @@ impl YTDao {
         headers
     }
 
-    pub fn get_api_headers_with_id(&self, auth_user: i32) -> HeaderMap {
+    pub fn get_api_headers_with_user_auth(&self, usr_auth: usize) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
         headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
         headers.insert(
             "X-Goog-AuthUser",
-            HeaderValue::from_str(&auth_user.to_string()).unwrap(),
+            HeaderValue::from_str(&usr_auth.to_string()).unwrap(),
         );
         if let Some(ref sapisid) = self.sapisid {
             let auth_val = format!("SAPISIDHASH {}", self.compute_sapi_hash(sapisid));
@@ -159,7 +158,7 @@ impl YTDao {
         Ok(response)
     }
 
-    pub async fn get_account_email(&self, id: i32) -> YResult<String> {
+    pub async fn get_account_email(&self, user_auth: usize) -> YResult<String> {
         let url = self.api_url("account/accounts_list");
         let body = EmptyRequest {
             context: self.get_context(),
@@ -167,7 +166,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers_with_id(id))
+            .headers(self.get_api_headers_with_user_auth(user_auth))
             .json(&body)
             .send()
             .await?

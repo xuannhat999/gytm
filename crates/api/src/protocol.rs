@@ -75,4 +75,5 @@ pub enum ApiLoadingKind {
     FetchLibraryData,
     GetSongsToView,
     GetSongsToPlay,
+    FetchAccountsList,
 }

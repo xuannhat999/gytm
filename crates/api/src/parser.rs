@@ -1,5 +1,5 @@
 use data::app::{Playlist, Song};
-use error::{YError, YResult, log_to_file};
+use error::{YError, YResult};
 
 pub fn parse_lists(data: &str) -> YResult<(Vec<Playlist>, Vec<Playlist>, Option<String>)> {
     let mut albums: Vec<Playlist> = Vec::new();

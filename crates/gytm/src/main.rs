@@ -84,6 +84,12 @@ async fn main() -> YResult<()> {
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+    if is_logged_out {
+        app.noti.notify(
+            tui::notification::NotifyType::Error,
+            "Running in logged-out mode — some features are unavailable".to_string(),
+        );
+    }
 
     let mut render = true;
     let mut last_tick = std::time::Instant::now();

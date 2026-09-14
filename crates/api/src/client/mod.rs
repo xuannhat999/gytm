@@ -9,8 +9,8 @@ use crate::client::{
         get_chromium_profiles_from_root, read_chromium_cookies,
     },
     gecko::{
-        GeckoCookie, build_jar_from_gecko_cookies, filter_exp_gecko_cookies,
-        get_gecko_profiles_from_ini, get_gecko_profiles_from_sqlite, read_gecko_cookies,
+        build_jar_from_gecko_cookies, filter_exp_gecko_cookies, get_gecko_profiles_from_ini,
+        get_gecko_profiles_from_sqlite, read_gecko_cookies,
     },
 };
 mod chromium;
