@@ -19,8 +19,8 @@ impl YTBus {
     }
     pub async fn reload_dao(&mut self, client_state: &ClientState) -> YResult<()> {
         let (browser, profile, container, account) = &client_state.get_validated_fields()?;
-        let (jar, sapisid) = load_cookies(browser, profile, container.as_ref())?
-            .ok_or(YError::UnavailableFeature)?;
+        let (jar, sapisid) =
+            load_cookies(browser, profile, container.as_ref())?.ok_or(YError::InvalidCookie)?;
         self.dao.reload(jar, sapisid, account.auth_user).await
     }
 
@@ -67,18 +67,14 @@ impl YTBus {
     pub async fn get_accounts_list(&mut self, client_state: &ClientState) -> YResult<Vec<Account>> {
         let dao = YTDao::new(client_state).await?;
         let mut emails = Vec::new();
-        let mut id = 0;
-        while let Ok(res) = dao.get_account_email(id).await {
+        let mut auth_user = 0;
+        while let Ok(res) = dao.get_account_email(auth_user).await {
             match parser::parse_account(&res) {
                 Ok(email) => {
-                    emails.push(Account {
-                        email,
-                        auth_user: id as usize,
-                    });
-                    id += 1;
+                    emails.push(Account { email, auth_user });
+                    auth_user += 1;
                 }
-                Err(e) => {
-                    log_to_file(e);
+                Err(_) => {
                     break;
                 }
             }

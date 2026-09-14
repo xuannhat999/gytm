@@ -93,7 +93,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
                 .split(hor_layout[0]);
-            render_search_input(frame, app, main_layout[1], &config.theme, start_time);
+            render_search_bar(frame, app, main_layout[1], &config.theme, start_time);
             render_search_albums(frame, app, result_layout[0], &config.theme);
             render_search_songs(frame, app, result_layout[1], &config.theme);
         }
@@ -120,6 +120,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
         }
     }
 }
+// API CLIENT INFO
 fn render_api_client(frame: &mut Frame, area: Rect, theme: &Theme, client_state: &ClientState) {
     if let Ok((browser, profile, gecko_container, account)) = client_state.get_validated_fields() {
         let mut spans = vec![
@@ -271,6 +272,7 @@ fn render_list(
     }
 }
 
+// VIEW SONGS
 fn render_songs(
     frame: &mut Frame,
     app: &mut App,
@@ -413,6 +415,7 @@ fn render_queue(
     frame.render_stateful_widget(list_widget, area, &mut app.queue_liststate);
 }
 
+// MPV PLAYER
 fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let song_info = match app.player_status {
         PlayerStatus::Idle => vec![Line::from("   No song is playing ".to_string())],
@@ -492,7 +495,8 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     frame.render_widget(right_area, inner_chunks[1]);
 }
 
-fn render_search_input(
+// SEARCH BAR
+fn render_search_bar(
     frame: &mut Frame,
     app: &mut App,
     area: Rect,
@@ -535,6 +539,7 @@ fn render_search_input(
     }
 }
 
+// SEARCH ALBUM RESULTS
 fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let items: Vec<ListItem> = app
         .search_albums
@@ -624,6 +629,8 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
 
     frame.render_stateful_widget(list_widget, area, &mut app.search_songs_liststate);
 }
+
+// SAVE SONG TO PLAYLIST
 fn render_save_song_to_playlist_popup(
     frame: &mut Frame,
     app: &mut App,
