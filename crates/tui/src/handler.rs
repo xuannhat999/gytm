@@ -113,6 +113,57 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                     app.popup_state = PopupState::SelectBrowser;
                     app.browser_liststate.select(Some(0));
                 }
+                KeyCode::Char('P') => match app.client_state.get_validated_fields() {
+                    Ok((browser, _, _, _)) => match get_profiles_from_browser(&browser) {
+                        Ok(profiles) => {
+                            let mut profiles_liststate = ListState::default();
+                            if !profiles.is_empty() {
+                                profiles_liststate.select(Some(0));
+                            }
+                            app.popup_state = PopupState::SelectBrowserProfile {
+                                browser,
+                                profiles,
+                                profiles_liststate,
+                            };
+                        }
+                        Err(e) => log_to_file(e),
+                    },
+                    Err(_) => {
+                        app.popup_state = PopupState::SelectBrowser;
+                        app.browser_liststate.select(Some(0));
+                    }
+                },
+                KeyCode::Char('A') => match app.client_state.get_validated_fields() {
+                    Ok((browser, profile, container, _)) => {
+                        let client = ClientState {
+                            browser: Some(browser),
+                            profile: Some(profile),
+                            gecko_container: container,
+                            account: None,
+                        };
+                        app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
+                        app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
+                    }
+                    Err(_) => {
+                        app.popup_state = PopupState::SelectBrowser;
+                        app.browser_liststate.select(Some(0));
+                    }
+                },
+                KeyCode::Char('C') => {
+                    if let Ok((browser, profile, _, _)) = app.client_state.get_validated_fields()
+                        && browser.engine() == BrowserEngine::Gecko
+                        && let Ok(containers) = get_geckgo_containers_from_profile(&profile.path)
+                    {
+                        let mut containers_liststate = ListState::default();
+                        containers_liststate.select(Some(0));
+                        app.popup_state = PopupState::SelectGeckoContainer {
+                            browser,
+                            profile,
+                            containers,
+                            containers_liststate,
+                        };
+                    }
+                }
                 _ => {}
             }
             match app.focus_area {
@@ -855,6 +906,8 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                         gecko_container: container.clone(),
                         account: Some(selected_acc.clone()),
                     };
+                    app.albums = Vec::new();
+                    app.playlists = Vec::new();
                     app.api_cmd_tx
                         .send(ApiCmd::ReloadApiClient(client_state))
                         .ok();
@@ -950,6 +1003,7 @@ fn load_list(
 }
 
 pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player) {
+    let mut skip_clear = false;
     match response {
         ApiResponse::CreatePlaylist(res) => match res {
             Ok(playlist) => {
@@ -1204,6 +1258,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 app.client_state = client_state;
                 app.client_state.save().ok();
                 app.api_cmd_tx.send(ApiCmd::FetchLibraryData).ok();
+                skip_clear = true;
             }
             Err(e) => {
                 log_to_file(&e);
@@ -1214,5 +1269,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             }
         },
     }
-    app.api_loading_kind = None;
+    if !skip_clear {
+        app.api_loading_kind = None;
+    }
 }

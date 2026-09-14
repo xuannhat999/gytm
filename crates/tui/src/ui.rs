@@ -45,7 +45,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
     let top_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(15),
+            Constraint::Length(28),
             Constraint::Min(0),
             Constraint::Percentage(25),
         ])
@@ -145,6 +145,13 @@ fn render_api_client(frame: &mut Frame, area: Rect, theme: &Theme, client_state:
             format!("Account: {}", account.email),
             theme.text_style(),
         ));
+        let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Left);
+        frame.render_widget(p, area);
+    } else {
+        let spans = vec![
+            Span::styled("[B] ", theme.key_style()),
+            Span::styled("Setup API client", theme.text_style()),
+        ];
         let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Left);
         frame.render_widget(p, area);
     }
@@ -712,9 +719,9 @@ fn render_save_song_to_playlist_popup(
 fn select_keymap(theme: &Theme) -> Line<'_> {
     Line::from(vec![
         Span::styled("[ Select: ", theme.text_style()),
-        Span::styled("Enter / l /  ", theme.key_style()),
+        Span::styled("Enter/l/ ", theme.key_style()),
         Span::styled("| Back: ", theme.text_style()),
-        Span::styled("h /  ", theme.key_style()),
+        Span::styled("h/ ", theme.key_style()),
         Span::styled("| Close: ", theme.text_style()),
         Span::styled("Esc ", theme.key_style()),
         Span::styled("]", theme.text_style()),
