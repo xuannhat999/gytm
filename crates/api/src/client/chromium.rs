@@ -69,7 +69,7 @@ pub(crate) fn filter_exp_chromium_cookies(cookies: Vec<Cookie>) -> Vec<Cookie> {
 
 pub(crate) fn build_jar_sapisid_from_chromium_cookies(
     cookies: Vec<Cookie>,
-) -> YResult<Option<(Jar, String)>> {
+) -> YResult<(Jar, String)> {
     let url = YTM_DOMAIN.parse::<Url>()?;
     let jar = Jar::default();
     let mut sapisid: Option<String> = None;
@@ -83,8 +83,7 @@ pub(crate) fn build_jar_sapisid_from_chromium_cookies(
         );
         jar.add_cookie_str(&cookie_str, &url);
     }
-    if sapisid.is_some() {
-        return Ok(Some((jar, sapisid.unwrap())));
-    }
-    Ok(None)
+    sapisid
+        .map(|sapisid| (jar, sapisid))
+        .ok_or(YError::InvalidCookie)
 }

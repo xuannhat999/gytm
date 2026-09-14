@@ -36,7 +36,7 @@ pub fn load_cookies(
     browser: &Browser,
     profile: &BrowserProfile,
     container: Option<&GeckoContainer>,
-) -> YResult<Option<(Jar, String)>> {
+) -> YResult<(Jar, String)> {
     let engine = browser.engine();
     let db_path = get_db_path_from_profile_path(&profile.path, &engine)
         .ok_or_else(|| error::YError::InvalidPath("Selected browser's db file path".to_string()))?;
@@ -65,7 +65,7 @@ pub fn load_cookies(
         }
     };
     log_to_file(format!(
-        "Loaded cookies from : BROWSER: {:?} | PROFILE: {:?} | CONTAINER: {:?}",
+        "Loaded cookies from:\nBROWSER: {:?}\nPROFILE: {:?}\nCONTAINER: {:?}",
         browser, profile, container
     ));
     res

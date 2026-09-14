@@ -55,22 +55,18 @@ impl YTDao {
         if let Ok((browser, profile, gecko_container, account)) =
             client_state.get_validated_fields()
         {
-            let result = client::load_cookies(&browser, &profile, gecko_container.as_ref());
-            match result {
-                Ok(Some((jar, sapisid))) => {
-                    let (http, innertube_api_key, client_version) =
-                        build_client_fields(jar).await?;
+            if let Ok((jar, sapisid)) =
+                client::load_cookies(&browser, &profile, gecko_container.as_ref())
+            {
+                let (http, innertube_api_key, client_version) = build_client_fields(jar).await?;
 
-                    return Ok(Self {
-                        http,
-                        sapisid: Some(sapisid),
-                        innertube_api_key,
-                        client_version,
-                        auth_user: account.auth_user,
-                    });
-                }
-                Ok(None) => return Self::default().await,
-                Err(_) => return Self::default().await,
+                return Ok(Self {
+                    http,
+                    sapisid: Some(sapisid),
+                    innertube_api_key,
+                    client_version,
+                    auth_user: account.auth_user,
+                });
             }
         }
         Self::default().await

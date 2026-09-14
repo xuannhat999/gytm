@@ -100,9 +100,7 @@ pub(crate) fn filter_exp_gecko_cookies(cookies: Vec<GeckoCookie>) -> Vec<GeckoCo
         .collect()
 }
 
-pub(crate) fn build_jar_from_gecko_cookies(
-    cookies: Vec<GeckoCookie>,
-) -> YResult<Option<(Jar, String)>> {
+pub(crate) fn build_jar_from_gecko_cookies(cookies: Vec<GeckoCookie>) -> YResult<(Jar, String)> {
     let url = YTM_DOMAIN.parse::<Url>()?;
     let jar = Jar::default();
     let mut sapisid: Option<String> = None;
@@ -116,10 +114,9 @@ pub(crate) fn build_jar_from_gecko_cookies(
         );
         jar.add_cookie_str(&cookie_str, &url);
     }
-    if sapisid.is_some() {
-        return Ok(Some((jar, sapisid.unwrap())));
-    }
-    Ok(None)
+    sapisid
+        .map(|sapisid| (jar, sapisid))
+        .ok_or(YError::InvalidCookie)
 }
 
 pub(crate) fn get_gecko_profiles_from_sqlite(root_path: &Path) -> YResult<Vec<BrowserProfile>> {
@@ -203,7 +200,7 @@ fn get_gecko_containers_from_json(json_path: &Path) -> YResult<Vec<GeckoContaine
     let json = gjson::get(&content, "identities");
     let mut containers = vec![GeckoContainer {
         id: None,
-        name: "No container".to_string(),
+        name: "None".to_string(),
     }];
     json.each(|_, val| {
         let is_public = val.get("public").bool();

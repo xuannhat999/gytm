@@ -14,7 +14,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs},
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
 };
 use state::client_state::ClientState;
 
@@ -45,8 +45,8 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
     let top_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(25),
-            Constraint::Percentage(50),
+            Constraint::Percentage(15),
+            Constraint::Min(0),
             Constraint::Percentage(25),
         ])
         .split(main_layout[0]);
@@ -113,7 +113,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
             render_create_playlist_popup(frame, app, frame.area(), config, start_time);
         }
         PopupState::SelectBrowser => {
-            render_switch_browser_popup(frame, app, frame.area(), config);
+            render_select_browser_popup(frame, app, frame.area(), config);
         }
         PopupState::SelectAccount { .. } => {
             render_select_account_popup(frame, app, frame.area(), config);
@@ -124,25 +124,25 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
 fn render_api_client(frame: &mut Frame, area: Rect, theme: &Theme, client_state: &ClientState) {
     if let Ok((browser, profile, gecko_container, account)) = client_state.get_validated_fields() {
         let mut spans = vec![
-            Span::styled("[B]", theme.key_style()),
-            Span::styled(format!(" Browser: {:?}", browser), theme.text_style()),
+            Span::styled("[B] ", theme.key_style()),
+            Span::styled(format!("Browser: {:?}", browser), theme.text_style()),
             Span::styled(" | ", theme.text_style()),
-            Span::styled("[P]", theme.key_style()),
-            Span::styled(format!(" Profile: {}", profile.name), theme.text_style()),
+            Span::styled("[P] ", theme.key_style()),
+            Span::styled(format!("Profile: {}", profile.name), theme.text_style()),
         ];
         if let Some(gecko_container) = gecko_container {
             spans.push(Span::styled(" | ", theme.text_style()));
-            spans.push(Span::styled("[P] ", theme.key_style()));
+            spans.push(Span::styled("[C] ", theme.key_style()));
             spans.push(Span::styled(
-                format!(" Container: {}", gecko_container.name),
+                format!("Container: {}", gecko_container.name),
                 theme.text_style(),
             ));
         }
 
         spans.push(Span::styled(" | ", theme.text_style()));
-        spans.push(Span::styled("[P] ", theme.key_style()));
+        spans.push(Span::styled("[A] ", theme.key_style()));
         spans.push(Span::styled(
-            format!(" Email: {}", account.email),
+            format!("Account: {}", account.email),
             theme.text_style(),
         ));
         let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Left);
@@ -310,12 +310,14 @@ fn render_songs(
         .title(format!("[4]-󰠶 Content ({})", app.songs.len()))
         .title_bottom(keymap.centered())
         .border_style(border_style);
+
     if app.api_loading_kind == Some(ApiLoadingKind::GetSongsToView) {
         let inner_area = block.inner(area);
         render_spinner(frame, inner_area, theme, start_time);
         frame.render_widget(block, area);
         return;
     }
+
     let inner_area = block.inner(area);
     let layout = Layout::default()
         .direction(Direction::Vertical)
@@ -330,9 +332,6 @@ fn render_songs(
     } else {
         Line::default()
     };
-    let line = Block::default()
-        .borders(Borders::TOP)
-        .border_style(border_style);
     let highlight_style = if is_focused {
         theme.selected_item()
     } else {
@@ -343,7 +342,7 @@ fn render_songs(
     frame.render_widget(block, area);
     frame.render_widget(list_title, layout[0]);
     if app.viewing_list.is_some() {
-        frame.render_widget(line, layout[1]);
+        render_v_divider(frame, layout[1], Borders::BOTTOM, border_style);
     }
     frame.render_stateful_widget(list_widget, layout[2], &mut app.songs_liststate);
 }
@@ -709,6 +708,34 @@ fn render_save_song_to_playlist_popup(
     frame.render_stateful_widget(list_widget, layout[2], &mut app.cus_playlists_liststate);
 }
 
+// API CLIENT SELECT
+fn select_keymap(theme: &Theme) -> Line<'_> {
+    Line::from(vec![
+        Span::styled("[ Select: ", theme.text_style()),
+        Span::styled("Enter / l /  ", theme.key_style()),
+        Span::styled("| Back: ", theme.text_style()),
+        Span::styled("h /  ", theme.key_style()),
+        Span::styled("| Close: ", theme.text_style()),
+        Span::styled("Esc ", theme.key_style()),
+        Span::styled("]", theme.text_style()),
+    ])
+}
+
+fn render_side_info(frame: &mut Frame, area: Rect, lines: Vec<String>) {
+    frame.render_widget(
+        Paragraph::new(lines.into_iter().map(Line::from).collect::<Vec<Line>>())
+            .wrap(Wrap { trim: true }),
+        area,
+    );
+}
+
+fn render_v_divider(frame: &mut Frame, area: Rect, border: Borders, border_style: Style) {
+    frame.render_widget(
+        Block::default().borders(border).border_style(border_style),
+        area,
+    );
+}
+
 // GECKO CONTAINER
 fn render_select_gecko_container_popup(
     frame: &mut Frame,
@@ -720,7 +747,8 @@ fn render_select_gecko_container_popup(
     let PopupState::SelectGeckoContainer {
         containers,
         containers_liststate,
-        ..
+        browser,
+        profile,
     } = &mut app.popup_state
     else {
         return;
@@ -729,14 +757,24 @@ fn render_select_gecko_container_popup(
         .borders(Borders::ALL)
         .border_type(BorderType::Thick)
         .border_style(config.theme.active_border_style())
-        .title(" Select Gecko container ");
+        .title(" Container  ")
+        .title_bottom(select_keymap(&config.theme).centered());
 
     let center_area = area.centered(Constraint::Percentage(50), Constraint::Length(20));
     let inner_area = block.inner(center_area);
+    let hor_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(70),
+            Constraint::Length(1),
+            Constraint::Percentage(30),
+        ])
+        .split(inner_area);
+
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Min(0)])
-        .split(inner_area);
+        .split(hor_layout[0]);
 
     frame.render_widget(Clear, center_area);
     if config.background {
@@ -745,13 +783,27 @@ fn render_select_gecko_container_popup(
     frame.render_widget(block, center_area);
     let items: Vec<ListItem> = containers
         .iter()
-        .map(|c| ListItem::new(c.name.clone()))
+        .map(|c| ListItem::new(format!(" {}", c.name)))
         .collect();
 
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
     if app.api_loading_kind == Some(ApiLoadingKind::FetchAccountsList) {
         render_spinner(frame, layout[0], &config.theme, start_time);
     }
+    render_side_info(
+        frame,
+        hor_layout[2],
+        vec![
+            format!("  : {:?}", *browser),
+            format!("  : {}", profile.name),
+        ],
+    );
+    render_v_divider(
+        frame,
+        hor_layout[1],
+        Borders::LEFT,
+        config.theme.active_border_style(),
+    );
     frame.render_stateful_widget(list_widget, layout[1], containers_liststate);
 }
 
@@ -766,7 +818,7 @@ fn render_select_profile_popup(
     let PopupState::SelectBrowserProfile {
         profiles,
         profiles_liststate,
-        ..
+        browser,
     } = &mut app.popup_state
     else {
         return;
@@ -775,19 +827,42 @@ fn render_select_profile_popup(
         .borders(Borders::ALL)
         .border_type(BorderType::Thick)
         .border_style(config.theme.active_border_style())
-        .title(" Select Profile ");
+        .title(" Profile  ")
+        .title_bottom(select_keymap(&config.theme).centered());
+
     let center_area = area.centered(Constraint::Percentage(50), Constraint::Length(20));
     let inner_area = block.inner(center_area);
+    let hor_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(70),
+            Constraint::Length(1),
+            Constraint::Percentage(30),
+        ])
+        .split(inner_area);
+
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Min(0)])
-        .split(inner_area);
+        .split(hor_layout[0]);
 
     frame.render_widget(Clear, center_area);
     if config.background {
         render_background(frame, center_area, config.theme.bg_popup);
     }
     frame.render_widget(block, center_area);
+
+    if app.api_loading_kind == Some(ApiLoadingKind::FetchAccountsList) {
+        render_spinner(frame, layout[0], &config.theme, start_time);
+    }
+    render_side_info(frame, hor_layout[2], vec![format!("  : {:?}", *browser)]);
+    render_v_divider(
+        frame,
+        hor_layout[1],
+        Borders::LEFT,
+        config.theme.active_border_style(),
+    );
+
     if profiles.is_empty() {
         let msg = Paragraph::new("No profiles found")
             .style(config.theme.text_style())
@@ -797,22 +872,21 @@ fn render_select_profile_popup(
     }
     let items: Vec<ListItem> = profiles
         .iter()
-        .map(|p| ListItem::new(p.name.clone()))
+        .map(|p| ListItem::new(format!(" {}", p.name)))
         .collect();
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
-    if app.api_loading_kind == Some(ApiLoadingKind::FetchAccountsList) {
-        render_spinner(frame, layout[0], &config.theme, start_time);
-    }
+
     frame.render_stateful_widget(list_widget, layout[1], profiles_liststate);
 }
 
 // BROWSER
-fn render_switch_browser_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
+fn render_select_browser_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Thick)
         .border_style(config.theme.active_border_style())
-        .title(" Select Browser ");
+        .title_bottom(select_keymap(&config.theme).centered())
+        .title(" Browser  ");
     let center_area = area.centered(Constraint::Percentage(50), Constraint::Length(20));
     let inner_area = block.inner(center_area);
     let layout = Layout::default()
@@ -827,7 +901,7 @@ fn render_switch_browser_popup(frame: &mut Frame, app: &mut App, area: Rect, con
     frame.render_widget(block, center_area);
     let items: Vec<ListItem> = ALL_BROWSERS
         .iter()
-        .map(|b| ListItem::new(format!("{:?}", b)))
+        .map(|b| ListItem::new(format!(" {:?}", b)))
         .collect();
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
     frame.render_stateful_widget(list_widget, layout[1], &mut app.browser_liststate);
@@ -838,7 +912,9 @@ fn render_select_account_popup(frame: &mut Frame, app: &mut App, area: Rect, con
     let PopupState::SelectAccount {
         accounts,
         accounts_liststate,
-        ..
+        browser,
+        profile,
+        container,
     } = &mut app.popup_state
     else {
         return;
@@ -847,19 +923,51 @@ fn render_select_account_popup(frame: &mut Frame, app: &mut App, area: Rect, con
         .borders(Borders::ALL)
         .border_type(BorderType::Thick)
         .border_style(config.theme.active_border_style())
-        .title(" Select Account ");
+        .title(" Account 󰀄 ")
+        .title_bottom(select_keymap(&config.theme).centered());
+
     let center_area = area.centered(Constraint::Percentage(50), Constraint::Length(20));
     let inner_area = block.inner(center_area);
+    let hor_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(70),
+            Constraint::Length(1),
+            Constraint::Percentage(30),
+        ])
+        .split(inner_area);
+
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Min(0)])
-        .split(inner_area);
+        .split(hor_layout[0]);
 
     frame.render_widget(Clear, center_area);
     if config.background {
         render_background(frame, center_area, config.theme.bg_popup);
     }
     frame.render_widget(block, center_area);
+    render_side_info(
+        frame,
+        hor_layout[2],
+        vec![
+            format!("  : {:?}", *browser),
+            format!("  : {}", profile.name),
+            format!(
+                "  : {}",
+                container
+                    .as_ref()
+                    .map(|c| c.name.as_str())
+                    .unwrap_or("None")
+            ),
+        ],
+    );
+    render_v_divider(
+        frame,
+        hor_layout[1],
+        Borders::LEFT,
+        config.theme.active_border_style(),
+    );
     if accounts.is_empty() {
         let msg = Paragraph::new("No accounts found")
             .style(config.theme.text_style())
@@ -869,7 +977,7 @@ fn render_select_account_popup(frame: &mut Frame, app: &mut App, area: Rect, con
     }
     let items: Vec<ListItem> = accounts
         .iter()
-        .map(|a| ListItem::new(a.email.clone()))
+        .map(|a| ListItem::new(format!(" {}", a.email)))
         .collect();
 
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
