@@ -57,7 +57,12 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
         frame,
         top_layout[2],
         &config.theme,
-        vec![("Next tab", "Tab"), ("Minimize", "q"), ("Quit", "Q")],
+        vec![
+            ("Next tab", "Tab"),
+            ("Log out", "L"),
+            ("Minimize", "q"),
+            ("Quit", "Q"),
+        ],
     );
     render_queue(frame, app, main_layout[3], &config.theme, start_time);
     render_player(frame, app, main_layout[4], &config.theme);
@@ -98,6 +103,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
             render_search_songs(frame, app, result_layout[1], &config.theme);
         }
     }
+
     match &app.popup_state {
         PopupState::None => {}
         PopupState::SelectGeckoContainer { .. } => {
@@ -142,7 +148,7 @@ fn render_api_client(frame: &mut Frame, area: Rect, theme: &Theme, client_state:
         spans.push(Span::styled(" | ", theme.text_style()));
         spans.push(Span::styled("[A] ", theme.key_style()));
         spans.push(Span::styled(
-            format!("Account: {}", account.email),
+            format!("Account: {}", account.map_or("None", |a| a.email.as_str())),
             theme.text_style(),
         ));
         let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Left);
@@ -233,10 +239,27 @@ fn render_list(
         block = block.title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
     }
 
+    let inner_area = block.inner(area);
+    frame.render_widget(block, area);
+
     if app.api_loading_kind == Some(ApiLoadingKind::FetchLibraryData) {
-        let inner_area = block.inner(area);
-        frame.render_widget(block, area);
         render_spinner(frame, inner_area, theme, start_time);
+        return;
+    }
+    if app.albums.is_empty() && app.playlists.is_empty() {
+        let msg = Paragraph::new(vec![
+            Line::from(Span::styled(
+                "API client not configured.",
+                theme.text_style(),
+            )),
+            Line::from(vec![
+                Span::styled("Press ", theme.text_style()),
+                Span::styled("[B]", theme.key_style()),
+                Span::styled(" to setup", theme.text_style()),
+            ]),
+        ])
+        .alignment(Alignment::Center);
+        frame.render_widget(msg, inner_area);
         return;
     }
     let result = match area_type {
@@ -271,11 +294,8 @@ fn render_list(
             Style::default()
         };
 
-        let list_widget = List::new(items)
-            .block(block)
-            .highlight_style(highlight_style);
-
-        frame.render_stateful_widget(list_widget, area, list);
+        let list_widget = List::new(items).highlight_style(highlight_style);
+        frame.render_stateful_widget(list_widget, inner_area, list);
     }
 }
 
@@ -722,7 +742,7 @@ fn select_keymap(theme: &Theme) -> Line<'_> {
         Span::styled("Enter/l/ ", theme.key_style()),
         Span::styled("| Back: ", theme.text_style()),
         Span::styled("h/ ", theme.key_style()),
-        Span::styled("| Close: ", theme.text_style()),
+        Span::styled("| Cancel: ", theme.text_style()),
         Span::styled("Esc ", theme.key_style()),
         Span::styled("]", theme.text_style()),
     ])

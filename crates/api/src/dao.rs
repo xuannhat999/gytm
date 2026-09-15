@@ -1,5 +1,5 @@
 use data::app::{PlayListPrivacy, Song};
-use error::{YError, YResult};
+use error::{YError, YResult, log_to_file};
 use reqwest::{
     Client,
     cookie::Jar,
@@ -63,7 +63,7 @@ impl YTDao {
                     sapisid: Some(sapisid),
                     innertube_api_key,
                     client_version,
-                    auth_user: account.auth_user,
+                    auth_user: account.map_or(0, |a| a.auth_user),
                 });
             }
         }
@@ -152,7 +152,7 @@ impl YTDao {
         Ok(response)
     }
 
-    pub async fn get_account_email(&self, user_auth: usize) -> YResult<String> {
+    pub async fn get_account_email_from_idx(&self, user_auth: usize) -> YResult<String> {
         let url = self.api_url("account/accounts_list");
         let body = EmptyRequest {
             context: self.get_context(),
@@ -166,6 +166,7 @@ impl YTDao {
             .await?
             .text()
             .await?;
+        log_to_file(&response);
         Ok(response)
     }
 

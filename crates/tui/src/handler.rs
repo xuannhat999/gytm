@@ -133,6 +133,9 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                         app.browser_liststate.select(Some(0));
                     }
                 },
+                KeyCode::Char('L') => {
+                    app.api_cmd_tx.send(ApiCmd::LogoutClient()).ok();
+                }
                 KeyCode::Char('A') => match app.client_state.get_validated_fields() {
                     Ok((browser, profile, container, _)) => {
                         let client = ClientState {
@@ -895,8 +898,6 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                         gecko_container: container.clone(),
                         account: Some(selected_acc.clone()),
                     };
-                    app.albums = Vec::new();
-                    app.playlists = Vec::new();
                     app.api_cmd_tx
                         .send(ApiCmd::ReloadApiClient(client_state))
                         .ok();
@@ -959,7 +960,7 @@ fn clear_queue(app: &mut App, player: &Player) -> YResult<()> {
     app.player_status = PlayerStatus::Idle;
     app.playing_song_idx = None;
     app.time_pos = None;
-    app.queue = Vec::new();
+    app.queue.clear();
     app.playing_playlist_id = None;
 
     Ok(())
@@ -1255,6 +1256,17 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                     NotifyType::Error,
                     format!("Failed to reload api client: {e}"),
                 );
+            }
+        },
+        ApiResponse::LogoutClient(res) => match res {
+            Ok(_) => {
+                app.client_state = ClientState::default();
+                app.client_state.save().ok();
+                app.albums.clear();
+                app.playlists.clear();
+            }
+            Err(e) => {
+                log_to_file(e);
             }
         },
     }

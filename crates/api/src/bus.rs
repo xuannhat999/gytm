@@ -20,7 +20,13 @@ impl YTBus {
     pub async fn reload_dao(&mut self, client_state: &ClientState) -> YResult<()> {
         let (browser, profile, container, account) = &client_state.get_validated_fields()?;
         let (jar, sapisid) = load_cookies(browser, profile, *container)?;
-        self.dao.reload(jar, sapisid, account.auth_user).await
+        self.dao
+            .reload(jar, sapisid, account.map_or(0, |a| a.auth_user))
+            .await
+    }
+    pub async fn logout(&mut self) -> YResult<()> {
+        self.dao = YTDao::default().await?;
+        Ok(())
     }
 
     pub async fn create_playlist(
@@ -67,7 +73,7 @@ impl YTBus {
         let dao = YTDao::new(client_state).await?;
         let mut emails = Vec::new();
         let mut auth_user = 0;
-        while let Ok(res) = dao.get_account_email(auth_user).await {
+        while let Ok(res) = dao.get_account_email_from_idx(auth_user).await {
             match parser::parse_account(&res) {
                 Ok(email) => {
                     emails.push(Account { email, auth_user });

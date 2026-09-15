@@ -37,38 +37,48 @@ pub fn load_cookies(
     profile: &BrowserProfile,
     container: Option<&GeckoContainer>,
 ) -> YResult<(Jar, String)> {
-    let engine = browser.engine();
-    let db_path = get_db_path_from_profile_path(&profile.path, &engine)
-        .ok_or_else(|| error::YError::InvalidPath("Selected browser's db file path".to_string()))?;
-    let res = match engine {
-        BrowserEngine::Gecko => {
-            let cookies = read_gecko_cookies(
-                &db_path,
-                container
-                    .ok_or(YError::MissApiClientContext("Container".to_string()))?
-                    .id,
-            )?;
-            let exp_filtered_cookies = filter_exp_gecko_cookies(cookies);
-            build_jar_from_gecko_cookies(exp_filtered_cookies)
-        }
-        BrowserEngine::Chromium => {
-            let root_path = profile.path.parent().ok_or_else(|| {
-                error::YError::InvalidPath("Selected browser's root dir".to_string())
-            })?;
-            let local_state = get_file_path_from_root_and_filename(root_path, "Local State")
-                .ok_or_else(|| {
-                    error::YError::InvalidPath("Selected browsser's Local State".to_string())
+    let result = (|| -> YResult<(Jar, String)> {
+        let engine = browser.engine();
+        let db_path = get_db_path_from_profile_path(&profile.path, &engine).ok_or_else(|| {
+            error::YError::InvalidPath("Selected browser's db file path".to_string())
+        })?;
+        let res = match engine {
+            BrowserEngine::Gecko => {
+                let cookies = read_gecko_cookies(
+                    &db_path,
+                    container
+                        .ok_or(YError::MissApiClientContext("Container".to_string()))?
+                        .id,
+                )?;
+                let exp_filtered_cookies = filter_exp_gecko_cookies(cookies);
+                build_jar_from_gecko_cookies(exp_filtered_cookies)
+            }
+            BrowserEngine::Chromium => {
+                let root_path = profile.path.parent().ok_or_else(|| {
+                    error::YError::InvalidPath("Selected browser's root dir".to_string())
                 })?;
-            let cookies = read_chromium_cookies(&db_path, &local_state)?;
-            let exp_filtered_cookies = filter_exp_chromium_cookies(cookies);
-            build_jar_sapisid_from_chromium_cookies(exp_filtered_cookies)
-        }
-    };
-    log_to_file(format!(
-        "Loaded cookies from:\nBROWSER: {:?}\nPROFILE: {:?}\nCONTAINER: {:?}",
-        browser, profile, container
-    ));
-    res
+                let local_state = get_file_path_from_root_and_filename(root_path, "Local State")
+                    .ok_or_else(|| {
+                        error::YError::InvalidPath("Selected browsser's Local State".to_string())
+                    })?;
+                let cookies = read_chromium_cookies(&db_path, &local_state)?;
+                let exp_filtered_cookies = filter_exp_chromium_cookies(cookies);
+                build_jar_sapisid_from_chromium_cookies(exp_filtered_cookies)
+            }
+        };
+        log_to_file(format!(
+            "Loaded cookies from:\nBROWSER: {:?}\nPROFILE: {:?}\nCONTAINER: {:?}",
+            browser, profile, container
+        ));
+        res
+    })();
+    if let Err(e) = &result {
+        log_to_file(format!(
+            "Failed to load cookies:\nBROWSER: {:?}\nPROFILE: {:?}\nCONTAINER: {:?}\nError: {e}",
+            browser, profile, container
+        ));
+    }
+    result
 }
 
 pub(super) fn get_db_path_from_profile_path(
