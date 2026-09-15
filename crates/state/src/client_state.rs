@@ -18,7 +18,7 @@ impl Persist for ClientState {
 impl ClientState {
     pub fn get_validated_fields(
         &self,
-    ) -> YResult<(Browser, BrowserProfile, Option<GeckoContainer>, Account)> {
+    ) -> YResult<(&Browser, &BrowserProfile, Option<&GeckoContainer>, &Account)> {
         let browser = self
             .browser
             .as_ref()
@@ -28,13 +28,10 @@ impl ClientState {
             .as_ref()
             .ok_or_else(|| YError::MissApiClientContext("Profile".to_string()))?;
 
-        let account = self.account.clone().unwrap_or_default();
-
-        Ok((
-            *browser,
-            profile.clone(),
-            self.gecko_container.clone(),
-            account,
-        ))
+        let account = self
+            .account
+            .as_ref()
+            .ok_or_else(|| YError::MissApiClientContext("Account".to_string()))?;
+        Ok((browser, profile, self.gecko_container.as_ref(), account))
     }
 }

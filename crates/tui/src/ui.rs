@@ -399,7 +399,7 @@ fn render_queue(
         .iter()
         .enumerate()
         .map(|(i, song)| {
-            if app.playing_song.is_some_and(|playing| playing == i) {
+            if app.playing_song_idx.is_some_and(|playing| playing == i) {
                 let content = format!("{:>3}. {} - {}", i + 1, song.title, song.artist);
                 ListItem::new(content).style(Style::default().fg(theme.primary))
             } else {
@@ -431,8 +431,8 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
             } else {
                 ""
             };
-            if let (Some(idx), Some(time_pos)) = (app.playing_song, app.time_pos)
-                && idx <= app.queue.len()
+            if let (Some(idx), Some(time_pos)) = (app.playing_song_idx, app.time_pos)
+                && idx < app.queue.len()
             {
                 let time_pos_text = helper::format_time(time_pos);
                 vec![

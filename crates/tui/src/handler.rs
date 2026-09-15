@@ -37,11 +37,11 @@ pub fn handle_mpv_event(app: &mut App, event: MpvEvent) {
         MpvEvent::StartPlaying(url) => {
             let video_id = helper::get_vid_id_from_url(&url);
             let idx = app.queue.iter().position(|song| song.video_id == video_id);
-            if idx != app.playing_song {
+            if idx != app.playing_song_idx {
                 app.player_status = PlayerStatus::Playing;
                 app.time_pos = Some(0.0);
             }
-            app.playing_song = idx;
+            app.playing_song_idx = idx;
         }
         MpvEvent::VolumeChange(vol) => {
             app.player_state.volume = vol;
@@ -53,7 +53,7 @@ pub fn handle_mpv_event(app: &mut App, event: MpvEvent) {
             app.time_pos = Some(pos);
         }
         MpvEvent::PauseChange(is_pause) => {
-            if app.playing_song.is_some() {
+            if app.playing_song_idx.is_some() {
                 if is_pause {
                     app.player_status = PlayerStatus::Paused
                 } else {
@@ -114,14 +114,14 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                     app.browser_liststate.select(Some(0));
                 }
                 KeyCode::Char('P') => match app.client_state.get_validated_fields() {
-                    Ok((browser, _, _, _)) => match get_profiles_from_browser(&browser) {
+                    Ok((browser, _, _, _)) => match get_profiles_from_browser(browser) {
                         Ok(profiles) => {
                             let mut profiles_liststate = ListState::default();
                             if !profiles.is_empty() {
                                 profiles_liststate.select(Some(0));
                             }
                             app.popup_state = PopupState::SelectBrowserProfile {
-                                browser,
+                                browser: *browser,
                                 profiles,
                                 profiles_liststate,
                             };
@@ -136,9 +136,9 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                 KeyCode::Char('A') => match app.client_state.get_validated_fields() {
                     Ok((browser, profile, container, _)) => {
                         let client = ClientState {
-                            browser: Some(browser),
-                            profile: Some(profile),
-                            gecko_container: container,
+                            browser: Some(*browser),
+                            profile: Some(profile.clone()),
+                            gecko_container: container.cloned(),
                             account: None,
                         };
                         app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
@@ -157,8 +157,8 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                         let mut containers_liststate = ListState::default();
                         containers_liststate.select(Some(0));
                         app.popup_state = PopupState::SelectGeckoContainer {
-                            browser,
-                            profile,
+                            browser: *browser,
+                            profile: profile.clone(),
                             containers,
                             containers_liststate,
                         };
@@ -503,7 +503,7 @@ fn handle_page_event(app: &mut App) {
 }
 fn handle_player_event(key_event: KeyEvent, app: &mut App, player: &mut Player, config: &Config) {
     match key_event.code {
-        KeyCode::Char(' ') if app.playing_song.is_some() => {
+        KeyCode::Char(' ') if app.playing_song_idx.is_some() => {
             if let Err(e) = player.send_mpv_command(MpvCommand::TogglePause) {
                 log_to_file(&e);
             }
@@ -785,12 +785,6 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                             }
                         }
                         BrowserEngine::Chromium => {
-                            // app.client_state.gecko_container = None;
-                            // if let Err(e) = app.client_state.save() {
-                            //     log_to_file(e);
-                            // }
-                            // reaload_api_client(app);
-                            // app.popup_state = PopupState::None;
                             let client = ClientState {
                                 browser: Some(*browser),
                                 profile: Some(profile.clone()),
@@ -840,11 +834,6 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                         gecko_container: Some(container.clone()),
                         account: None,
                     };
-                    // if let Err(e) = app.client_state.save() {
-                    //     log_to_file(e);
-                    // }
-                    // reaload_api_client(app);
-                    // app.popup_state = PopupState::None;
                     app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
                     app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
                 }
@@ -947,11 +936,11 @@ fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_id
     if let Err(e) = player.send_mpv_command(MpvCommand::RemovePos(mpv_idx)) {
         log_to_file(&e);
     } else {
-        if let Some(playing_idx) = app.playing_song {
+        if let Some(playing_idx) = app.playing_song_idx {
             if playing_idx > idx {
-                app.playing_song = Some(playing_idx - 1);
+                app.playing_song_idx = Some(playing_idx - 1);
             } else if playing_idx == idx {
-                app.playing_song = None;
+                app.playing_song_idx = None;
             }
         }
         app.queue.remove(idx);
@@ -968,7 +957,7 @@ fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_id
 fn clear_queue(app: &mut App, player: &Player) -> YResult<()> {
     player.send_mpv_command(MpvCommand::Clear)?;
     app.player_status = PlayerStatus::Idle;
-    app.playing_song = None;
+    app.playing_song_idx = None;
     app.time_pos = None;
     app.queue = Vec::new();
     app.playing_playlist_id = None;
@@ -995,7 +984,7 @@ fn load_list(
         app.queue = songs;
         app.queue_liststate.select(Some(start_index));
         app.playing_playlist_id = playlist_id;
-        app.playing_song = None;
+        app.playing_song_idx = None;
     } else {
         clear_queue(app, player).ok();
     }

@@ -55,9 +55,7 @@ impl YTDao {
         if let Ok((browser, profile, gecko_container, account)) =
             client_state.get_validated_fields()
         {
-            if let Ok((jar, sapisid)) =
-                client::load_cookies(&browser, &profile, gecko_container.as_ref())
-            {
+            if let Ok((jar, sapisid)) = client::load_cookies(browser, profile, gecko_container) {
                 let (http, innertube_api_key, client_version) = build_client_fields(jar).await?;
 
                 return Ok(Self {

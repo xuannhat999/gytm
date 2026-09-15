@@ -215,7 +215,7 @@ fn get_gecko_containers_from_json(json_path: &Path) -> YResult<Vec<GeckoContaine
             };
             containers.push(GeckoContainer {
                 id: Some(id),
-                name: container_name.to_string(),
+                name: container_name,
             });
         }
         true
@@ -234,7 +234,7 @@ fn copy_sqlite_with_wal(db_path: &Path) -> YResult<PathBuf> {
         let src = PathBuf::from(format!("{}{}", db_path.display(), ext));
         if src.exists() {
             let dst = PathBuf::from(format!("{}{}", tmp_path.display(), ext));
-            let _ = fs::copy(&src, &dst); // best-effort
+            let _ = fs::copy(&src, &dst);
         }
     }
     Ok(tmp_path)

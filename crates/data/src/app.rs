@@ -12,7 +12,7 @@ pub struct Playlist {
     pub is_saved: bool,
     pub is_custom: bool,
 }
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Song {
     pub title: String,
     #[serde(default)]

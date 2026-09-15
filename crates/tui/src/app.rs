@@ -23,7 +23,7 @@ pub struct App {
     pub queue_liststate: ListState,
 
     pub time_pos: Option<f64>,
-    pub playing_song: Option<usize>,
+    pub playing_song_idx: Option<usize>,
     pub mpv_list: Vec<String>,
 
     pub playing_playlist_id: Option<String>,
@@ -82,7 +82,7 @@ impl App {
             focus_area: FocusArea::Albums,
 
             time_pos: None,
-            playing_song: None,
+            playing_song_idx: None,
             songs: Vec::new(),
             songs_liststate: ListState::default(),
             mpv_list: Vec::new(),
