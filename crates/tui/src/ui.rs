@@ -2,7 +2,7 @@ use crate::app::App;
 use crate::helper;
 use api::protocol::ApiLoadingKind;
 use config::Config;
-use data::api_client::ALL_BROWSERS;
+use data::api_client::{ALL_BROWSERS, BrowserEngine};
 use data::app::{
     AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus, PopupState,
 };
@@ -16,7 +16,6 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
 };
-use state::client_state::ClientState;
 
 pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std::time::Instant) {
     if config.background {
@@ -47,19 +46,19 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
         .constraints([
             Constraint::Length(28),
             Constraint::Min(0),
-            Constraint::Percentage(25),
+            Constraint::Percentage(30),
         ])
         .split(main_layout[0]);
 
     render_tabs(frame, top_layout[0], &config.theme, app.page as usize);
-    render_api_client(frame, top_layout[1], &config.theme, &app.client_state);
     render_help_line(
         frame,
         top_layout[2],
         &config.theme,
         vec![
+            ("YTM client info", "i"),
+            ("Toggle guest", "g"),
             ("Next tab", "Tab"),
-            ("Log out", "L"),
             ("Minimize", "q"),
             ("Quit", "Q"),
         ],
@@ -124,42 +123,9 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
         PopupState::SelectAccount { .. } => {
             render_select_account_popup(frame, app, frame.area(), config);
         }
-    }
-}
-// API CLIENT INFO
-fn render_api_client(frame: &mut Frame, area: Rect, theme: &Theme, client_state: &ClientState) {
-    if let Ok((browser, profile, gecko_container, account)) = client_state.get_validated_fields() {
-        let mut spans = vec![
-            Span::styled("[B] ", theme.key_style()),
-            Span::styled(format!("Browser: {:?}", browser), theme.text_style()),
-            Span::styled(" | ", theme.text_style()),
-            Span::styled("[P] ", theme.key_style()),
-            Span::styled(format!("Profile: {}", profile.name), theme.text_style()),
-        ];
-        if let Some(gecko_container) = gecko_container {
-            spans.push(Span::styled(" | ", theme.text_style()));
-            spans.push(Span::styled("[C] ", theme.key_style()));
-            spans.push(Span::styled(
-                format!("Container: {}", gecko_container.name),
-                theme.text_style(),
-            ));
+        PopupState::ApiCLient => {
+            render_api_client_popup(frame, frame.area(), config, app, start_time);
         }
-
-        spans.push(Span::styled(" | ", theme.text_style()));
-        spans.push(Span::styled("[A] ", theme.key_style()));
-        spans.push(Span::styled(
-            format!("Account: {}", account.map_or("None", |a| a.email.as_str())),
-            theme.text_style(),
-        ));
-        let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Left);
-        frame.render_widget(p, area);
-    } else {
-        let spans = vec![
-            Span::styled("[B] ", theme.key_style()),
-            Span::styled("Setup API client", theme.text_style()),
-        ];
-        let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Left);
-        frame.render_widget(p, area);
     }
 }
 
@@ -249,13 +215,13 @@ fn render_list(
     if app.albums.is_empty() && app.playlists.is_empty() {
         let msg = Paragraph::new(vec![
             Line::from(Span::styled(
-                "API client not configured.",
+                "Currently in Guest mode, library features are unavailable",
                 theme.text_style(),
             )),
             Line::from(vec![
                 Span::styled("Press ", theme.text_style()),
-                Span::styled("[B]", theme.key_style()),
-                Span::styled(" to setup", theme.text_style()),
+                Span::styled("[i]", theme.key_style()),
+                Span::styled(" to check YTM client configuration", theme.text_style()),
             ]),
         ])
         .alignment(Alignment::Center);
@@ -744,7 +710,7 @@ fn select_keymap(theme: &Theme) -> Line<'_> {
         Span::styled("h/ ", theme.key_style()),
         Span::styled("| Cancel: ", theme.text_style()),
         Span::styled("Esc ", theme.key_style()),
-        Span::styled("]", theme.text_style()),
+        Span::styled(" ]", theme.text_style()),
     ])
 }
 
@@ -762,7 +728,91 @@ fn render_v_divider(frame: &mut Frame, area: Rect, border: Borders, border_style
         area,
     );
 }
+fn render_api_client_popup(
+    frame: &mut Frame,
+    area: Rect,
+    config: &Config,
+    app: &App,
+    start_time: std::time::Instant,
+) {
+    let keymap = vec![
+        Span::styled("[ Close: ", config.theme.text_style()),
+        Span::styled("Esc ", config.theme.key_style()),
+        Span::styled("]", config.theme.text_style()),
+    ];
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick)
+        .border_style(config.theme.active_border_style())
+        .title(" YTM client 󱛜 ")
+        .title_bottom(Line::from(keymap).centered());
 
+    let center_area = area.centered(Constraint::Percentage(30), Constraint::Length(20));
+    let inner_area = block.inner(center_area);
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vec![Constraint::Max(4), Constraint::Min(0)])
+        .split(inner_area);
+
+    frame.render_widget(Clear, center_area);
+    if config.background {
+        render_background(frame, center_area, config.theme.bg_popup);
+    }
+    frame.render_widget(block, center_area);
+    if let Ok((browser, profile, gecko_container, account)) =
+        app.client_state.get_validated_fields()
+    {
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled("[b] ", config.theme.key_style()),
+                Span::styled(format!("Browser: {:?}", browser), config.theme.text_style()),
+            ]),
+            Line::from(vec![
+                Span::styled("[p] ", config.theme.key_style()),
+                Span::styled(
+                    format!("Profile: {}", profile.name),
+                    config.theme.text_style(),
+                ),
+            ]),
+        ];
+        if browser.engine() == BrowserEngine::Gecko {
+            lines.push(Line::from(vec![
+                Span::styled("[c] ", config.theme.key_style()),
+                Span::styled(
+                    format!(
+                        "Container: {}",
+                        gecko_container.map_or("None", |c| c.name.as_str())
+                    ),
+                    config.theme.text_style(),
+                ),
+            ]));
+        }
+        lines.push(Line::from(vec![
+            Span::styled("[a] ", config.theme.key_style()),
+            Span::styled(
+                format!("Account: {}", account.map_or("None", |a| a.email.as_str())),
+                config.theme.text_style(),
+            ),
+        ]));
+        let p = Paragraph::new(lines).alignment(Alignment::Left);
+        frame.render_widget(p, layout[0]);
+        if app.api_loading_kind == Some(ApiLoadingKind::FetchAccountsList) {
+            render_spinner(frame, layout[1], &config.theme, start_time);
+        }
+    } else {
+        let lines = vec![
+            Line::from(Span::styled(
+                "Currently running in Guest mode",
+                config.theme.text_style(),
+            )),
+            Line::from(vec![
+                Span::styled("[b] ", config.theme.key_style()),
+                Span::styled("Setup YTM client", config.theme.text_style()),
+            ]),
+        ];
+        frame.render_widget(Paragraph::new(lines).centered(), inner_area);
+    }
+}
 // GECKO CONTAINER
 fn render_select_gecko_container_popup(
     frame: &mut Frame,

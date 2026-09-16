@@ -35,7 +35,7 @@ pub enum YError {
     #[error("Invalid Cookie")]
     InvalidCookie,
 
-    #[error("Unavailable feature for logged out mode")]
+    #[error("Unavailable feature for guest mode")]
     UnavailableFeature,
 
     #[error("Miss API client context: {0}")]

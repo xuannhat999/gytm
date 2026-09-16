@@ -24,7 +24,7 @@ impl YTBus {
             .reload(jar, sapisid, account.map_or(0, |a| a.auth_user))
             .await
     }
-    pub async fn logout(&mut self) -> YResult<()> {
+    pub async fn toggle_guest(&mut self) -> YResult<()> {
         self.dao = YTDao::default().await?;
         Ok(())
     }

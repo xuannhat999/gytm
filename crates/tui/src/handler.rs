@@ -109,63 +109,15 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                             .notify(NotifyType::Success, String::from("Cleared Queue"));
                     }
                 }
-                KeyCode::Char('B') => {
-                    app.popup_state = PopupState::SelectBrowser;
-                    app.browser_liststate.select(Some(0));
+                KeyCode::Char('i') => {
+                    app.popup_state = PopupState::ApiCLient;
                 }
-                KeyCode::Char('P') => match app.client_state.get_validated_fields() {
-                    Ok((browser, _, _, _)) => match get_profiles_from_browser(browser) {
-                        Ok(profiles) => {
-                            let mut profiles_liststate = ListState::default();
-                            if !profiles.is_empty() {
-                                profiles_liststate.select(Some(0));
-                            }
-                            app.popup_state = PopupState::SelectBrowserProfile {
-                                browser: *browser,
-                                profiles,
-                                profiles_liststate,
-                            };
-                        }
-                        Err(e) => log_to_file(e),
-                    },
-                    Err(_) => {
-                        app.popup_state = PopupState::SelectBrowser;
-                        app.browser_liststate.select(Some(0));
-                    }
-                },
-                KeyCode::Char('L') => {
-                    app.api_cmd_tx.send(ApiCmd::LogoutClient()).ok();
-                }
-                KeyCode::Char('A') => match app.client_state.get_validated_fields() {
-                    Ok((browser, profile, container, _)) => {
-                        let client = ClientState {
-                            browser: Some(*browser),
-                            profile: Some(profile.clone()),
-                            gecko_container: container.cloned(),
-                            account: None,
-                        };
-                        app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
-                        app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
-                    }
-                    Err(_) => {
-                        app.popup_state = PopupState::SelectBrowser;
-                        app.browser_liststate.select(Some(0));
-                    }
-                },
-                KeyCode::Char('C') => {
-                    if let Ok((browser, profile, _, _)) = app.client_state.get_validated_fields()
-                        && browser.engine() == BrowserEngine::Gecko
-                        && let Ok(containers) = get_geckgo_containers_from_profile(&profile.path)
-                    {
-                        let mut containers_liststate = ListState::default();
-                        containers_liststate.select(Some(0));
-                        app.popup_state = PopupState::SelectGeckoContainer {
-                            browser: *browser,
-                            profile: profile.clone(),
-                            containers,
-                            containers_liststate,
-                        };
-                    }
+                KeyCode::Char('g') => {
+                    app.api_cmd_tx.send(ApiCmd::ToggleGuest()).ok();
+                    app.client_state = ClientState::default();
+                    app.client_state.save().ok();
+                    app.albums.clear();
+                    app.playlists.clear();
                 }
                 _ => {}
             }
@@ -735,11 +687,12 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                     description.pop();
                 }
             }
+
             _ => {}
         },
         PopupState::SelectBrowser => match key_event.code {
-            KeyCode::Esc => app.popup_state = PopupState::None,
-            KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::None,
+            KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
+            KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::ApiCLient,
             KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
                 if let Some(index) = app.browser_liststate.selected() {
                     let browser = &ALL_BROWSERS[index];
@@ -768,7 +721,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             profiles_liststate,
             browser,
         } => match key_event.code {
-            KeyCode::Esc => app.popup_state = PopupState::None,
+            KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
             KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
                 if let Some(index) = profiles_liststate.selected() {
                     let profile = &profiles[index];
@@ -809,7 +762,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             browser,
             profile,
         } => match key_event.code {
-            KeyCode::Esc => app.popup_state = PopupState::None,
+            KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
             KeyCode::Char('h') | KeyCode::Left => {
                 match client::get_profiles_from_browser(browser) {
                     Ok(profiles) => {
@@ -850,7 +803,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             accounts,
             accounts_liststate,
         } => match key_event.code {
-            KeyCode::Esc => app.popup_state = PopupState::None,
+            KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
             KeyCode::Char('h') | KeyCode::Left => {
                 if container.is_some() {
                     match get_geckgo_containers_from_profile(&profile.path) {
@@ -902,9 +855,68 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                         .send(ApiCmd::ReloadApiClient(client_state))
                         .ok();
                     app.api_loading_kind = Some(ApiLoadingKind::FetchLibraryData);
-                    app.popup_state = PopupState::None;
+                    app.popup_state = PopupState::ApiCLient;
                 }
             }
+            _ => {}
+        },
+        PopupState::ApiCLient => match key_event.code {
+            KeyCode::Esc => {
+                app.popup_state = PopupState::None;
+            }
+            KeyCode::Char('b') => {
+                app.popup_state = PopupState::SelectBrowser;
+                app.browser_liststate.select(Some(0));
+            }
+            KeyCode::Char('p') => {
+                if let Ok((browser, _, _, _)) = app.client_state.get_validated_fields() {
+                    match get_profiles_from_browser(browser) {
+                        Ok(profiles) => {
+                            let mut profiles_liststate = ListState::default();
+                            if !profiles.is_empty() {
+                                profiles_liststate.select(Some(0));
+                            }
+                            app.popup_state = PopupState::SelectBrowserProfile {
+                                browser: *browser,
+                                profiles,
+                                profiles_liststate,
+                            };
+                        }
+                        Err(e) => log_to_file(e),
+                    }
+                }
+            }
+            KeyCode::Char('c') => {
+                if let Ok((browser, profile, _, _)) = app.client_state.get_validated_fields()
+                    && browser.engine() == BrowserEngine::Gecko
+                    && let Ok(containers) = get_geckgo_containers_from_profile(&profile.path)
+                {
+                    let mut containers_liststate = ListState::default();
+                    containers_liststate.select(Some(0));
+                    app.popup_state = PopupState::SelectGeckoContainer {
+                        browser: *browser,
+                        profile: profile.clone(),
+                        containers,
+                        containers_liststate,
+                    };
+                }
+            }
+            KeyCode::Char('a') => match app.client_state.get_validated_fields() {
+                Ok((browser, profile, container, _)) => {
+                    let client = ClientState {
+                        browser: Some(*browser),
+                        profile: Some(profile.clone()),
+                        gecko_container: container.cloned(),
+                        account: None,
+                    };
+                    app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
+                    app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
+                }
+                Err(_) => {
+                    app.popup_state = PopupState::ApiCLient;
+                }
+            },
+
             _ => {}
         },
         _ => {}
@@ -1258,12 +1270,12 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 );
             }
         },
-        ApiResponse::LogoutClient(res) => match res {
+        ApiResponse::ToggleGuest(res) => match res {
             Ok(_) => {
-                app.client_state = ClientState::default();
-                app.client_state.save().ok();
-                app.albums.clear();
-                app.playlists.clear();
+                app.noti.notify(
+                    NotifyType::Success,
+                    "Toggled Guest mode, library feature is unavailable".to_string(),
+                );
             }
             Err(e) => {
                 log_to_file(e);

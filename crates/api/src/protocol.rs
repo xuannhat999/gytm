@@ -31,7 +31,7 @@ pub enum ApiCmd {
     FetchLibraryData,
     FetchAccountsList(ClientState),
     ReloadApiClient(ClientState),
-    LogoutClient(),
+    ToggleGuest(),
 }
 
 pub enum ApiResponse {
@@ -66,7 +66,7 @@ pub enum ApiResponse {
         )>,
     ),
     ReloadApiCLient(YResult<ClientState>),
-    LogoutClient(YResult<()>),
+    ToggleGuest(YResult<()>),
 }
 
 #[derive(PartialEq)]

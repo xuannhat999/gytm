@@ -105,7 +105,7 @@ pub fn spawn_api_worker(
                     Ok(_) => ApiResponse::ReloadApiCLient(Ok(client)),
                     Err(e) => ApiResponse::ReloadApiCLient(Err(e)),
                 },
-                ApiCmd::LogoutClient() => ApiResponse::LogoutClient(bus.logout().await),
+                ApiCmd::ToggleGuest() => ApiResponse::ToggleGuest(bus.toggle_guest().await),
             };
             if api_res_tx.send(res).is_err() {
                 break;

@@ -83,6 +83,7 @@ pub enum PopupState {
         privacy: PlayListPrivacy,
         focused_field: CreatePlaylistFocus,
     },
+    ApiCLient,
     SelectBrowser,
     SelectBrowserProfile {
         browser: Browser,
