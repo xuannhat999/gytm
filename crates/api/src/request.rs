@@ -14,6 +14,11 @@ pub struct RequestClient<'a> {
 }
 
 #[derive(Serialize)]
+pub struct EmptyRequest<'a> {
+    pub context: RequestContext<'a>,
+}
+
+#[derive(Serialize)]
 pub struct CreatePlaylistRequest<'a> {
     pub context: RequestContext<'a>,
     pub title: &'a str,

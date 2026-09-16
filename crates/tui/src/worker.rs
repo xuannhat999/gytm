@@ -10,6 +10,7 @@ pub fn spawn_api_worker(
     bus: YTBus,
 ) {
     tokio::spawn(async move {
+        let mut bus = bus;
         while let Some(cmd) = api_cmd_rx.recv().await {
             let res = match cmd {
                 ApiCmd::CreatePlaylist {
@@ -88,6 +89,22 @@ pub fn spawn_api_worker(
                     Err(e) => ApiResponse::GetRelatedSongsToPlay(Err(e)),
                 },
                 ApiCmd::FetchLibraryData => ApiResponse::FetchLibraryData(bus.get_lists().await),
+                ApiCmd::FetchAccountsList(client_state) => {
+                    match bus.get_accounts_list(&client_state).await {
+                        Ok(accounts) => ApiResponse::FetchAccountsList(Ok((
+                            accounts,
+                            client_state.browser.unwrap(),
+                            client_state.profile.unwrap(),
+                            client_state.gecko_container,
+                        ))),
+                        Err(e) => ApiResponse::FetchAccountsList(Err(e)),
+                    }
+                }
+                ApiCmd::ReloadApiClient(client) => match bus.reload_dao(&client).await {
+                    Ok(_) => ApiResponse::ReloadApiCLient(Ok(client)),
+                    Err(e) => ApiResponse::ReloadApiCLient(Err(e)),
+                },
+                ApiCmd::ToggleGuest() => ApiResponse::ToggleGuest(bus.toggle_guest().await),
             };
             if api_res_tx.send(res).is_err() {
                 break;

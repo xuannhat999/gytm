@@ -1,10 +1,13 @@
-use data::app::{PlayListPrivacy, Playlist, Song};
+use crate::{client::load_cookies, dao::YTDao, parser};
+use data::{
+    api_client::Account,
+    app::{PlayListPrivacy, Playlist, Song},
+};
 use error::{
     YError::{self},
     YResult,
 };
-
-use crate::{dao::YTDao, parser};
+use state::client_state::ClientState;
 
 pub struct YTBus {
     dao: YTDao,
@@ -13,6 +16,17 @@ pub struct YTBus {
 impl YTBus {
     pub fn new(dao: YTDao) -> Self {
         Self { dao }
+    }
+    pub async fn reload_dao(&mut self, client_state: &ClientState) -> YResult<()> {
+        let (browser, profile, container, account) = &client_state.get_validated_fields()?;
+        let (jar, sapisid) = load_cookies(browser, profile, *container)?;
+        self.dao
+            .reload(jar, sapisid, account.map_or(0, |a| a.auth_user))
+            .await
+    }
+    pub async fn toggle_guest(&mut self) -> YResult<()> {
+        self.dao = YTDao::default().await?;
+        Ok(())
     }
 
     pub async fn create_playlist(
@@ -54,6 +68,24 @@ impl YTBus {
             }
         }
         Ok((all_albums, all_playlists, all_cus_playlists))
+    }
+
+    pub async fn get_accounts_list(&self, client_state: &ClientState) -> YResult<Vec<Account>> {
+        let dao = YTDao::new(client_state).await?;
+        let mut emails = Vec::new();
+        let mut auth_user = 0;
+        while let Ok(res) = dao.get_account_email_from_idx(auth_user).await {
+            match parser::parse_account(&res) {
+                Ok(email) => {
+                    emails.push(Account { email, auth_user });
+                    auth_user += 1;
+                }
+                Err(_) => {
+                    break;
+                }
+            }
+        }
+        Ok(emails)
     }
 
     pub async fn get_songs(&self, browse_id: &str) -> YResult<Vec<Song>> {
@@ -130,6 +162,7 @@ impl YTBus {
         self.check_auth()?;
         self.dao.unsave_cus_playlist_raw(playlist_id).await
     }
+
     fn check_auth(&self) -> YResult<()> {
         if self.dao.sapisid.is_none() {
             return Err(YError::UnavailableFeature);

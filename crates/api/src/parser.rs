@@ -76,16 +76,18 @@ pub fn parse_lists(data: &str) -> YResult<(Vec<Playlist>, Vec<Playlist>, Option<
 }
 
 fn extract_artist(runs: &gjson::Value) -> String {
-    let mut parts: Vec<String> = Vec::new();
+    let mut parts = String::new();
     runs.each(|_, run| {
-        let t = run.get("text").str().trim().to_string();
+        let binding = run.get("text");
+        let t = binding.str().trim();
         if t == "•" || t == "|" {
             return false;
         }
-        parts.push(run.get("text").str().to_string());
+        parts.push_str(t);
+        parts.push(' ');
         true
     });
-    parts.join("")
+    parts
 }
 
 pub fn parse_songs(data: &str) -> YResult<Vec<Song>> {
@@ -373,4 +375,15 @@ pub fn parse_related_songs(data: &str) -> YResult<Vec<Song>> {
         true
     });
     Ok(songs)
+}
+
+pub fn parse_account(data: &str) -> YResult<String> {
+    let email = gjson::get(
+        data,
+        "actions.0.getMultiPageMenuAction.menu.multiPageMenuRenderer.sections.0.accountSectionListRenderer.header.googleAccountHeaderRenderer.email.runs.0.text",
+    );
+    if !email.exists() {
+        return Err(YError::InvalidResponse("Get account".to_string()));
+    }
+    Ok(email.str().to_string())
 }

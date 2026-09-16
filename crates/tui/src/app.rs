@@ -4,13 +4,11 @@ use crate::{
 };
 use api::protocol::{ApiCmd, ApiLoadingKind};
 use config::Config;
-use data::app::{
-    AppPage, FocusArea, PlayMode, PlayerStatus, Playlist, PopupState, QueueData, Song,
-};
+use data::app::{AppPage, FocusArea, PlayerStatus, Playlist, PopupState, QueueData, Song};
 use error::YResult;
 use player::Player;
 use ratatui::widgets::ListState;
-use state::PlayerState;
+use state::{client_state::ClientState, player_state::PlayerState};
 use tokio::sync::mpsc;
 
 pub struct App {
@@ -25,7 +23,7 @@ pub struct App {
     pub queue_liststate: ListState,
 
     pub time_pos: Option<f64>,
-    pub playing_song: Option<usize>,
+    pub playing_song_idx: Option<usize>,
     pub mpv_list: Vec<String>,
 
     pub playing_playlist_id: Option<String>,
@@ -46,11 +44,14 @@ pub struct App {
     pub cus_playlists: Vec<usize>,
     pub cus_playlists_liststate: ListState,
     pub popup_state: PopupState,
+    pub browser_liststate: ListState,
 
     // OTHER
-    pub status: PlayerStatus,
-    pub volume: u8,
-    pub play_mode: PlayMode,
+    pub player_status: PlayerStatus,
+
+    // STATE
+    pub player_state: PlayerState,
+    pub client_state: ClientState,
 
     pub noti: NotificationManager,
     pub page: AppPage,
@@ -63,7 +64,8 @@ pub struct App {
 
 impl App {
     pub fn new(
-        player_state: &PlayerState,
+        player_state: PlayerState,
+        client_state: ClientState,
         config: &Config,
         api_cmd_tx: mpsc::UnboundedSender<ApiCmd>,
     ) -> Self {
@@ -80,7 +82,7 @@ impl App {
             focus_area: FocusArea::Albums,
 
             time_pos: None,
-            playing_song: None,
+            playing_song_idx: None,
             songs: Vec::new(),
             songs_liststate: ListState::default(),
             mpv_list: Vec::new(),
@@ -97,14 +99,17 @@ impl App {
             is_insert: false,
 
             // PLAYER
-            status: PlayerStatus::Idle,
-            volume: player_state.volume,
-            play_mode: player_state.play_mode.clone(),
+            player_status: PlayerStatus::Idle,
+            player_state,
+            client_state,
 
             //POPUP
             cus_playlists: Vec::new(),
             cus_playlists_liststate: ListState::default(),
             popup_state: PopupState::None,
+
+            browser_liststate: ListState::default(),
+
             //OTHER
             noti: NotificationManager::new(config),
             is_exit: false,
@@ -152,6 +157,7 @@ impl App {
         };
         state.select(Some(i));
     }
+
     pub fn get_mpv_idx(&self, id: &str) -> Option<usize> {
         for (pos, mpv_id) in self.mpv_list.iter().enumerate() {
             if id == mpv_id {
@@ -175,7 +181,7 @@ impl App {
     }
 
     pub fn save_queue_file(&self) -> YResult<()> {
-        let path = helper::get_queue_file()?;
+        let path = get_queue_file()?;
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
         }

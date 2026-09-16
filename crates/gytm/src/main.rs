@@ -9,10 +9,10 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use data::mpv::{MpvCommand, MpvEvent};
-use error::{YResult, log_to_file, startup_error_message};
+use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
-use state::PlayerState;
+use state::{Persist, client_state::ClientState, player_state::PlayerState};
 use std::{env, io, time::Duration};
 use tokio::sync::mpsc::{self};
 use tui::{
@@ -33,34 +33,31 @@ async fn main() -> YResult<()> {
         println!("Exited gytm");
         std::process::exit(0);
     }
-    // Setup App State
-    let mut state = match PlayerState::load() {
-        Ok(c) => c,
-        Err(e) => {
-            println!("{}", e);
-            std::process::exit(1);
-        }
-    };
+    // Setup Player State
+    let player_state = PlayerState::load()?;
+
+    // Setup CLient State
+    let client_state = ClientState::load()?;
 
     let config = Config::load();
     // Setup API client
     let (api_cmd_tx, api_cmd_rx) = mpsc::unbounded_channel::<ApiCmd>();
     let (api_res_tx, mut api_res_rx) = mpsc::unbounded_channel::<ApiResponse>();
-    let mut app = App::new(&state, &config, api_cmd_tx);
+    let mut app = App::new(player_state, client_state, &config, api_cmd_tx);
 
     println!("󱘖 Connecting to YouTube Music...");
-    let dao = match YTDao::new().await {
+    let dao = match YTDao::new(&app.client_state).await {
         Ok(d) => d,
         Err(e) => {
             log_to_file(&e);
-            eprintln!("{}", startup_error_message(&e));
             std::process::exit(1);
         }
     };
-    let is_authed = dao.sapisid.is_some();
+    let is_logged_out = dao.sapisid.is_none();
+
     let bus = YTBus::new(dao);
     spawn_api_worker(api_cmd_rx, api_res_tx, bus);
-    if is_authed {
+    if !is_logged_out {
         app.api_cmd_tx.send(ApiCmd::FetchLibraryData).ok();
         app.api_loading_kind = Some(api::protocol::ApiLoadingKind::FetchLibraryData);
     }
@@ -77,7 +74,7 @@ async fn main() -> YResult<()> {
         player.spawn_mpv()?;
         let stream = player.connect_mpv().await?;
         player.observe_mpv(stream, tx_event).await?;
-        player.send_mpv_command(MpvCommand::SetVol(app.volume))?;
+        player.send_mpv_command(MpvCommand::SetVol(app.player_state.volume))?;
     }
 
     // Setup terminal
@@ -86,10 +83,10 @@ async fn main() -> YResult<()> {
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-    if !is_authed {
+    if is_logged_out {
         app.noti.notify(
             tui::notification::NotifyType::Error,
-            "Running in logged-out mode. Library features are unavailable".to_string(),
+            "Running in guest mode. Library features are unavailable".to_string(),
         );
     }
 
@@ -102,7 +99,7 @@ async fn main() -> YResult<()> {
         last_tick = std::time::Instant::now();
         app.noti.tick(elapsed);
         while let Ok(event) = rx.try_recv() {
-            handler::handle_mpv_event(&mut app, &mut state, event);
+            handler::handle_mpv_event(&mut app, event);
             render = true;
         }
         while let Ok(response) = api_res_rx.try_recv() {
@@ -112,7 +109,7 @@ async fn main() -> YResult<()> {
         if event::poll(Duration::from_millis(50))? {
             match event::read()? {
                 Event::Key(key) => {
-                    handler::handle_key_events(key, &mut app, &mut player, &mut state, &config);
+                    handler::handle_key_events(key, &mut app, &mut player, &config);
                     render = true;
                 }
                 Event::Resize(_, _) => {

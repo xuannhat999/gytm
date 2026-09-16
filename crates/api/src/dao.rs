@@ -1,23 +1,20 @@
 use data::app::{PlayListPrivacy, Song};
-use error::{YError, YResult, log_to_file};
+use error::{YError, YResult};
 use reqwest::{
-    Client, Url,
+    Client,
     cookie::Jar,
     header::{HeaderMap, HeaderValue},
 };
-use rookie::common::enums::Cookie;
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use state::client_state::ClientState;
+use std::sync::Arc;
 
 use crate::{
-    gecko,
+    client,
     request::{
-        ActionsContent, BrowseIdRequest, CreatePlaylistRequest, GetContinuationRequest,
-        GetRelatedSongsRequest, PlaylistIdRequest, QueryRequest, QueryWithParamsRequest,
-        RequestClient, RequestContext, SaveAlbumRequest, SaveUnsaveListRequest, TargetContent,
-        TargetRequest, VideoIdRequest,
+        ActionsContent, BrowseIdRequest, CreatePlaylistRequest, EmptyRequest,
+        GetContinuationRequest, GetRelatedSongsRequest, PlaylistIdRequest, QueryRequest,
+        QueryWithParamsRequest, RequestClient, RequestContext, SaveAlbumRequest,
+        SaveUnsaveListRequest, TargetContent, TargetRequest, VideoIdRequest,
     },
 };
 
@@ -26,117 +23,51 @@ pub struct YTDao {
     pub sapisid: Option<String>,
     pub innertube_api_key: String,
     pub client_version: String,
+    pub auth_user: usize,
 }
 
-pub(crate) const YTM_HOST: &str = "music.youtube.com";
-pub(crate) const YTM_DOMAIN: &str = "https://music.youtube.com";
-
-pub(crate) fn cookie_domain_applies_to_host(cookie_domain: &str, host: &str) -> bool {
-    if let Some(domain) = cookie_domain.strip_prefix('.') {
-        if domain.is_empty() {
-            return false;
-        }
-        host.eq_ignore_ascii_case(domain)
-            || host
-                .to_ascii_lowercase()
-                .strip_suffix(&domain.to_ascii_lowercase())
-                .is_some_and(|prefix| prefix.ends_with('.'))
-    } else {
-        host.eq_ignore_ascii_case(cookie_domain)
-    }
-}
-
-pub(crate) fn origin_url_for_cookie(host: &str, default_url: &Url) -> Url {
-    let origin_host = host.trim_start_matches('.');
-    if !origin_host.is_empty() {
-        Url::parse(&format!("https://{origin_host}/")).unwrap_or_else(|_| default_url.clone())
-    } else {
-        default_url.clone()
-    }
-}
-
-pub(crate) fn sapisid_from_jar(jar: &Jar, url: &Url) -> Option<String> {
-    use reqwest::cookie::CookieStore;
-    let header = jar.cookies(url)?;
-    let header_str = header.to_str().ok()?;
-    for pair in header_str.split(';') {
-        let trimmed = pair.trim();
-        if let Some((name, val)) = trimmed.split_once('=') {
-            let value = val.trim();
-            if name.trim() == "SAPISID" && !value.is_empty() {
-                return Some(value.to_string());
-            }
-        }
-    }
-    None
-}
+pub static YTM_DOMAIN: &str = "https://music.youtube.com";
+const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 impl YTDao {
-    pub async fn new() -> YResult<Self> {
-        let (jar, sapisid) = load_cookies()?;
-        let dao = Self::new_with_session_internal(jar, sapisid).await?;
-        Ok(dao)
-    }
-
-    pub(crate) async fn new_with_session_internal(
-        jar: Jar,
-        sapisid: Option<String>,
-    ) -> YResult<Self> {
-        let http = Client::builder()
-            .cookie_provider(Arc::new(jar))
-            .user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-            .build()?;
-
-        let response = http.get(YTM_DOMAIN).send().await?;
-        log_to_file(format!(
-            "Init client response status: {}",
-            response.status()
-        ));
-        let response_text = response.text().await?;
-        let has_auth = sapisid.is_some();
-        let innertube_api_key = extract_between(&response_text, "INNERTUBE_API_KEY\":\"", "\"")
-            .ok_or_else(|| {
-                if has_auth {
-                    YError::InvalidCookie
-                } else {
-                    YError::InvalidResponse(
-                        "YouTube Music bootstrap data (INNERTUBE_API_KEY)".to_string(),
-                    )
-                }
-            })?;
-
-        let client_version = extract_between(&response_text, "INNERTUBE_CLIENT_VERSION\":\"", "\"")
-            .ok_or_else(|| {
-                if has_auth {
-                    YError::InvalidCookie
-                } else {
-                    YError::InvalidResponse(
-                        "YouTube Music bootstrap data (INNERTUBE_CLIENT_VERSION)".to_string(),
-                    )
-                }
-            })?;
-
-        let has_logged_in_marker = response_text.contains("\"LOGGED_IN\":true");
-        log_to_file(format!("Has auth: {}", has_auth));
-        log_to_file(format!("Has logged_in marker: {}", has_logged_in_marker));
-
-        if !has_logged_in_marker {
-            return Ok(Self {
-                http,
-                sapisid: None,
-                innertube_api_key,
-                client_version,
-            });
-        }
-
-        let dao = Self {
+    pub async fn default() -> YResult<Self> {
+        let (http, innertube_api_key, client_version) = build_client_fields(Jar::default()).await?;
+        Ok(Self {
             http,
-            sapisid,
+            sapisid: None,
             innertube_api_key,
             client_version,
-        };
+            auth_user: 0,
+        })
+    }
 
-        Ok(dao)
+    pub async fn reload(&mut self, jar: Jar, sapisid: String, auth_user: usize) -> YResult<()> {
+        let (http, innertube_api_key, client_version) = build_client_fields(jar).await?;
+        self.http = http;
+        self.sapisid = Some(sapisid);
+        self.innertube_api_key = innertube_api_key;
+        self.client_version = client_version;
+        self.auth_user = auth_user;
+        Ok(())
+    }
+
+    pub async fn new(client_state: &ClientState) -> YResult<Self> {
+        if let Ok((browser, profile, gecko_container, account)) =
+            client_state.get_validated_fields()
+        {
+            if let Ok((jar, sapisid)) = client::load_cookies(browser, profile, gecko_container) {
+                let (http, innertube_api_key, client_version) = build_client_fields(jar).await?;
+
+                return Ok(Self {
+                    http,
+                    sapisid: Some(sapisid),
+                    innertube_api_key,
+                    client_version,
+                    auth_user: account.map_or(0, |a| a.auth_user),
+                });
+            }
+        }
+        Self::default().await
     }
 
     // This function is adapted from: https://github.com/ccgauche/ytermusic.git
@@ -161,7 +92,10 @@ impl YTDao {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
         headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
-        headers.insert("X-Goog-AuthUser", HeaderValue::from_static("0"));
+        headers.insert(
+            "X-Goog-AuthUser",
+            HeaderValue::from_str(&self.auth_user.to_string()).unwrap(),
+        );
         if let Some(ref sapisid) = self.sapisid {
             let auth_val = format!("SAPISIDHASH {}", self.compute_sapi_hash(sapisid));
             headers.insert("Authorization", HeaderValue::from_str(&auth_val).unwrap());
@@ -169,6 +103,20 @@ impl YTDao {
         headers
     }
 
+    pub fn get_api_headers_with_user_auth(&self, usr_auth: usize) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert("Content-Type", HeaderValue::from_static("application/json"));
+        headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
+        headers.insert(
+            "X-Goog-AuthUser",
+            HeaderValue::from_str(&usr_auth.to_string()).unwrap(),
+        );
+        if let Some(ref sapisid) = self.sapisid {
+            let auth_val = format!("SAPISIDHASH {}", self.compute_sapi_hash(sapisid));
+            headers.insert("Authorization", HeaderValue::from_str(&auth_val).unwrap());
+        }
+        headers
+    }
     fn api_url(&self, endpoint: &str) -> String {
         format!(
             "{}/youtubei/v1/{}?key={}&alt=json",
@@ -196,6 +144,23 @@ impl YTDao {
             .http
             .post(&url)
             .headers(self.get_api_headers())
+            .json(&body)
+            .send()
+            .await?
+            .text()
+            .await?;
+        Ok(response)
+    }
+
+    pub async fn get_account_email_from_idx(&self, user_auth: usize) -> YResult<String> {
+        let url = self.api_url("account/accounts_list");
+        let body = EmptyRequest {
+            context: self.get_context(),
+        };
+        let response = self
+            .http
+            .post(&url)
+            .headers(self.get_api_headers_with_user_auth(user_auth))
             .json(&body)
             .send()
             .await?
@@ -551,266 +516,19 @@ impl YTDao {
         }
     }
 }
+async fn build_client_fields(jar: Jar) -> YResult<(Client, String, String)> {
+    let http = Client::builder()
+        .cookie_provider(Arc::new(jar))
+        .user_agent(USER_AGENT)
+        .build()?;
 
-pub(crate) fn browser_cookie_to_set_cookie(cookie: &Cookie) -> String {
-    gecko::cookie_to_set_cookie(
-        &cookie.name,
-        &cookie.value,
-        &cookie.domain,
-        &cookie.path,
-        cookie.secure,
-        cookie.http_only,
-    )
-}
+    let response_text = http.get(YTM_DOMAIN).send().await?.text().await?;
+    let innertube_api_key = extract_between(&response_text, "INNERTUBE_API_KEY\":\"", "\"")
+        .ok_or_else(|| YError::InvalidCookie)?;
 
-pub(crate) fn filter_chromium_cookies(cookies: Vec<Cookie>, now_secs: i64) -> Vec<Cookie> {
-    cookies
-        .into_iter()
-        .filter(|c| {
-            let domain_match = cookie_domain_applies_to_host(&c.domain, YTM_HOST);
-            let not_expired = match c.expires {
-                None => true, // session cookie
-                Some(exp) => exp > (now_secs.max(0) as u64),
-            };
-            domain_match && not_expired && !c.name.is_empty() && !c.value.is_empty()
-        })
-        .collect()
-}
-
-pub(crate) fn build_jar_from_chromium_cookies(
-    cookies: &[Cookie],
-) -> YResult<(Jar, Option<String>)> {
-    let jar = Jar::default();
-    let ytm_url = Url::parse(YTM_DOMAIN)?;
-
-    for cookie in cookies {
-        let cookie_str = browser_cookie_to_set_cookie(cookie);
-        let origin_url = origin_url_for_cookie(&cookie.domain, &ytm_url);
-        jar.add_cookie_str(&cookie_str, &origin_url);
-    }
-
-    let sapisid = sapisid_from_jar(&jar, &ytm_url);
-    Ok((jar, sapisid))
-}
-
-/// Selects the winning browser session across browser families according to the global precedence policy:
-/// 1. Gecko authenticated candidate (first deterministic match)
-/// 2. Chromium authenticated candidate (first deterministic match)
-/// 3. Gecko anonymous candidate (first deterministic match)
-/// 4. Chromium anonymous candidate (first deterministic match)
-/// 5. Empty anonymous session
-///
-/// Cookie sets across browser families are never merged.
-pub(crate) fn select_cross_family_session(
-    gecko: Option<(Jar, Option<String>)>,
-    chromium: Option<(Jar, Option<String>)>,
-) -> (Jar, Option<String>) {
-    // 1. Gecko authenticated candidate
-    if let Some((jar, Some(sapisid))) = gecko {
-        return (jar, Some(sapisid));
-    }
-    // 2. Chromium authenticated candidate
-    if let Some((jar, Some(sapisid))) = chromium {
-        return (jar, Some(sapisid));
-    }
-    // 3. Gecko anonymous candidate
-    if let Some((jar, None)) = gecko {
-        return (jar, None);
-    }
-    // 4. Chromium anonymous candidate
-    if let Some((jar, None)) = chromium {
-        return (jar, None);
-    }
-    // 5. Empty anonymous session
-    (Jar::default(), None)
-}
-
-pub fn load_cookies() -> YResult<(Jar, Option<String>)> {
-    let config_dir = dirs::config_dir();
-    let home_dir = dirs::home_dir();
-    let gecko_candidate =
-        gecko::load_gecko_cookies_with_roots(config_dir.as_deref(), home_dir.as_deref())?;
-    // Fast-path: If Gecko candidate has authentication, it takes highest global precedence (#1)
-    if let Some((_, Some(_))) = &gecko_candidate {
-        return Ok(gecko_candidate.unwrap());
-    }
-
-    let chromium_candidate = load_chromium_candidate_with_roots(config_dir.as_deref())?;
-    Ok(select_cross_family_session(
-        gecko_candidate,
-        chromium_candidate,
-    ))
-}
-
-pub(crate) type BrowserLoader = fn(Option<Vec<String>>) -> rookie::Result<Vec<Cookie>>;
-
-pub(crate) fn select_authenticated_candidate(
-    candidate: (Jar, Option<String>),
-    first_anonymous: &mut Option<(Jar, Option<String>)>,
-) -> Option<(Jar, Option<String>)> {
-    if candidate.1.is_some() {
-        return Some(candidate);
-    }
-
-    if first_anonymous.is_none() {
-        *first_anonymous = Some(candidate);
-    }
-    None
-}
-
-pub(crate) const DEFAULT_CHROMIUM_LOADERS: [(&str, BrowserLoader); 7] = [
-    ("chrome", rookie::chrome),
-    ("chromium", rookie::chromium),
-    ("brave", rookie::brave),
-    ("edge", rookie::edge),
-    ("opera", rookie::opera),
-    ("vivaldi", rookie::vivaldi),
-    ("arc", rookie::arc),
-];
-
-pub(crate) fn find_brave_origin_cookie_databases_with_root(
-    config_dir: Option<&Path>,
-) -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-    let config = match config_dir {
-        Some(c) => c,
-        None => return candidates,
-    };
-
-    let base_path = config.join("BraveSoftware/Brave-Origin");
-    if !base_path.exists() {
-        return candidates;
-    }
-
-    if let Ok(entries) = std::fs::read_dir(&base_path) {
-        let mut sub_dirs: Vec<PathBuf> = entries
-            .flatten()
-            .map(|e| e.path())
-            .filter(|p| p.is_dir())
-            .collect();
-        sub_dirs.sort();
-
-        for dir in sub_dirs {
-            let network_db = dir.join("Network/Cookies");
-            let direct_cookies = dir.join("Cookies");
-            let sqlite_db = dir.join("cookies.sqlite");
-
-            let db = if network_db.is_file() {
-                Some(network_db)
-            } else if direct_cookies.is_file() {
-                Some(direct_cookies)
-            } else if sqlite_db.is_file() {
-                Some(sqlite_db)
-            } else {
-                None
-            };
-
-            if let Some(db_path) = db
-                && !candidates.contains(&db_path)
-            {
-                candidates.push(db_path);
-            }
-        }
-    }
-
-    for filename in &["Network/Cookies", "Cookies", "cookies.sqlite"] {
-        let direct_db = base_path.join(filename);
-        if direct_db.is_file() && !candidates.contains(&direct_db) {
-            candidates.push(direct_db);
-        }
-    }
-
-    candidates
-}
-
-pub(crate) fn load_brave_origin_cookies_from_paths<I>(
-    paths: I,
-) -> YResult<Option<(Jar, Option<String>)>>
-where
-    I: IntoIterator<Item = PathBuf>,
-{
-    let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
-    let now_secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as i64;
-
-    let mut first_anonymous = None;
-
-    for db_path in paths {
-        let raw = match rookie::any_browser(&db_path.to_string_lossy(), Some(domains.clone()), None)
-        {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
-        let filtered = filter_chromium_cookies(raw, now_secs);
-        if filtered.is_empty() {
-            continue;
-        }
-
-        let candidate = build_jar_from_chromium_cookies(&filtered)?;
-        if let Some(candidate) = select_authenticated_candidate(candidate, &mut first_anonymous) {
-            return Ok(Some(candidate));
-        }
-    }
-
-    Ok(first_anonymous)
-}
-
-pub(crate) fn load_brave_origin_candidate_with_root(
-    config_dir: Option<&Path>,
-) -> YResult<Option<(Jar, Option<String>)>> {
-    load_brave_origin_cookies_from_paths(find_brave_origin_cookie_databases_with_root(config_dir))
-}
-
-pub(crate) fn load_chromium_candidate_with_roots(
-    config_dir: Option<&Path>,
-) -> YResult<Option<(Jar, Option<String>)>> {
-    load_chromium_candidate_with_loaders_and_root(&DEFAULT_CHROMIUM_LOADERS, config_dir)
-}
-
-pub(crate) fn load_chromium_candidate_with_loaders_and_root(
-    loaders: &[(&str, BrowserLoader)],
-    config_dir: Option<&Path>,
-) -> YResult<Option<(Jar, Option<String>)>> {
-    let domains = vec!["youtube.com".to_string(), "music.youtube.com".to_string()];
-    let now_secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as i64;
-
-    let mut first_anonymous_candidate = None;
-
-    for (_name, loader) in loaders {
-        let raw = match loader(Some(domains.clone())) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
-        let filtered = filter_chromium_cookies(raw, now_secs);
-        if filtered.is_empty() {
-            continue;
-        }
-
-        let candidate = build_jar_from_chromium_cookies(&filtered)?;
-        if let Some(candidate) =
-            select_authenticated_candidate(candidate, &mut first_anonymous_candidate)
-        {
-            return Ok(Some(candidate));
-        }
-    }
-
-    // Brave Origin fallback: rookie::brave() does not discover Brave Origin.
-    // Use explicit database-path discovery and pass each discovered database to rookie::any_browser.
-    if let Some(candidate) = load_brave_origin_candidate_with_root(config_dir)?
-        && let Some(candidate) =
-            select_authenticated_candidate(candidate, &mut first_anonymous_candidate)
-    {
-        return Ok(Some(candidate));
-    }
-
-    Ok(first_anonymous_candidate)
+    let client_version = extract_between(&response_text, "INNERTUBE_CLIENT_VERSION\":\"", "\"")
+        .ok_or_else(|| YError::InvalidCookie)?;
+    Ok((http, innertube_api_key, client_version))
 }
 
 fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
@@ -821,6 +539,3 @@ fn extract_between(source: &str, start: &str, end: &str) -> Option<String> {
             .map(|end_idx| source[start_pos..start_pos + end_idx].to_string())
     })
 }
-
-#[cfg(test)]
-mod tests;

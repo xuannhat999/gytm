@@ -137,7 +137,7 @@ impl Player {
                                         Some("property-change") => match msg.name.as_deref() {
                                             Some("playlist") => {
                                                 if let Some(items) =
-                                                    msg.data.and_then(|d| d.as_array().cloned())
+                                                    msg.data.as_ref().and_then(|d| d.as_array())
                                                 {
                                                     let mpv_ids: Vec<String> = items
                                                         .iter()

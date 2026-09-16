@@ -16,7 +16,6 @@ pub enum MpvEvent {
     PauseChange(bool),
 }
 
-#[derive(PartialEq)]
 pub enum MpvCommand {
     Shuffle,
     Unshuffle,

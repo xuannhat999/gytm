@@ -3,10 +3,14 @@ use crate::{
     helper::{self, get_url_from_vid_id},
     notification::NotifyType,
 };
-use api::protocol::{ApiCmd, ApiLoadingKind, ApiResponse};
+use api::{
+    client::{self, gecko::get_gecko_containers_from_profile, get_profiles_from_browser},
+    protocol::{ApiCmd, ApiLoadingKind, ApiResponse},
+};
 use config::Config;
 use crossterm::event::{KeyCode, KeyEvent};
 use data::{
+    api_client::{ALL_BROWSERS, BrowserEngine},
     app::{
         AppPage, CreatePlaylistFocus,
         FocusArea::{self},
@@ -18,10 +22,11 @@ use data::{
 };
 use error::{YError, YResult, log_to_file};
 use player::Player;
-use state::PlayerState;
+use ratatui::widgets::ListState;
+use state::{Persist, client_state::ClientState};
 use std::fs;
 
-pub fn handle_mpv_event(app: &mut App, state: &mut PlayerState, event: MpvEvent) {
+pub fn handle_mpv_event(app: &mut App, event: MpvEvent) {
     match event {
         MpvEvent::ListChange(list) => {
             let ids = helper::list_vid_id_from_list_url(list);
@@ -32,16 +37,15 @@ pub fn handle_mpv_event(app: &mut App, state: &mut PlayerState, event: MpvEvent)
         MpvEvent::StartPlaying(url) => {
             let video_id = helper::get_vid_id_from_url(&url);
             let idx = app.queue.iter().position(|song| song.video_id == video_id);
-            if idx != app.playing_song {
-                app.status = PlayerStatus::Playing;
+            if idx != app.playing_song_idx {
+                app.player_status = PlayerStatus::Playing;
                 app.time_pos = Some(0.0);
             }
-            app.playing_song = idx;
+            app.playing_song_idx = idx;
         }
         MpvEvent::VolumeChange(vol) => {
-            app.volume = vol;
-            state.volume = vol;
-            if let Err(e) = state.save() {
+            app.player_state.volume = vol;
+            if let Err(e) = app.player_state.save() {
                 log_to_file(&e);
             }
         }
@@ -49,25 +53,23 @@ pub fn handle_mpv_event(app: &mut App, state: &mut PlayerState, event: MpvEvent)
             app.time_pos = Some(pos);
         }
         MpvEvent::PauseChange(is_pause) => {
-            if app.playing_song.is_some() {
+            if app.playing_song_idx.is_some() {
                 if is_pause {
-                    app.status = PlayerStatus::Paused
+                    app.player_status = PlayerStatus::Paused
                 } else {
-                    app.status = PlayerStatus::Playing
+                    app.player_status = PlayerStatus::Playing
                 }
             }
         }
     }
 }
-pub fn handle_key_events(
-    key_event: KeyEvent,
-    app: &mut App,
-    player: &mut Player,
-    state: &mut PlayerState,
-    config: &Config,
-) {
+pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player, config: &Config) {
     if (!app.is_popup_active() && !app.is_insert)
         || matches!(app.popup_state, PopupState::SaveSong { .. })
+        || matches!(app.popup_state, PopupState::SelectBrowser)
+        || matches!(app.popup_state, PopupState::SelectBrowserProfile { .. })
+        || matches!(app.popup_state, PopupState::SelectGeckoContainer { .. })
+        || matches!(app.popup_state, PopupState::SelectAccount { .. })
     {
         handle_lists_event(key_event, app);
     }
@@ -107,6 +109,9 @@ pub fn handle_key_events(
                             .notify(NotifyType::Success, String::from("Cleared Queue"));
                     }
                 }
+                KeyCode::Char('i') => {
+                    app.popup_state = PopupState::ApiCLient;
+                }
                 _ => {}
             }
             match app.focus_area {
@@ -118,7 +123,7 @@ pub fn handle_key_events(
                 }
                 _ => {}
             }
-            handle_player_event(key_event, app, player, state, config);
+            handle_player_event(key_event, app, player, config);
         }
 
         match app.page {
@@ -352,6 +357,29 @@ pub fn handle_key_events(
 fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
     let (state, len) = if matches!(app.popup_state, PopupState::SaveSong { .. }) {
         (&mut app.cus_playlists_liststate, app.cus_playlists.len())
+    } else if matches!(app.popup_state, PopupState::SelectBrowser) {
+        (&mut app.browser_liststate, ALL_BROWSERS.len())
+    } else if let PopupState::SelectBrowserProfile {
+        profiles,
+        profiles_liststate,
+        ..
+    } = &mut app.popup_state
+    {
+        (profiles_liststate, profiles.len())
+    } else if let PopupState::SelectGeckoContainer {
+        containers,
+        containers_liststate,
+        ..
+    } = &mut app.popup_state
+    {
+        (containers_liststate, containers.len())
+    } else if let PopupState::SelectAccount {
+        accounts,
+        accounts_liststate,
+        ..
+    } = &mut app.popup_state
+    {
+        (accounts_liststate, accounts.len())
     } else {
         match app.focus_area {
             FocusArea::Albums => (&mut app.albums_liststate, app.albums.len()),
@@ -368,11 +396,12 @@ fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
         _ => {}
     }
 }
+
 fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
     match key_event.code {
         KeyCode::Char('d') => {
             if let Some(i) = app.queue_liststate.selected() {
-                if app.play_mode == PlayMode::DefaultMode {
+                if app.player_state.play_mode == PlayMode::DefaultMode {
                     remove_song_from_queue(app, player, i, i);
                 } else {
                     let video_id = &app.queue[i].video_id;
@@ -384,7 +413,7 @@ fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
         }
         KeyCode::Enter => {
             if let Some(i) = app.queue_liststate.selected() {
-                if app.play_mode == PlayMode::DefaultMode {
+                if app.player_state.play_mode == PlayMode::DefaultMode {
                     if let Err(e) = player.send_mpv_command(MpvCommand::PlayPos(i)) {
                         log_to_file(&e);
                     }
@@ -420,37 +449,28 @@ fn handle_page_event(app: &mut App) {
         }
     }
 }
-fn handle_player_event(
-    key_event: KeyEvent,
-    app: &mut App,
-    player: &mut Player,
-    state: &mut PlayerState,
-    config: &Config,
-) {
+fn handle_player_event(key_event: KeyEvent, app: &mut App, player: &mut Player, config: &Config) {
     match key_event.code {
-        KeyCode::Char(' ') if app.playing_song.is_some() => {
+        KeyCode::Char(' ') if app.playing_song_idx.is_some() => {
             if let Err(e) = player.send_mpv_command(MpvCommand::TogglePause) {
                 log_to_file(&e);
             }
         }
         KeyCode::Char('m') => {
-            let res = match app.play_mode {
+            let res = match app.player_state.play_mode {
                 PlayMode::DefaultMode => {
-                    app.play_mode = PlayMode::ShuffleMode;
+                    app.player_state.play_mode = PlayMode::ShuffleMode;
                     player.send_mpv_command(MpvCommand::Shuffle)
                 }
                 PlayMode::ShuffleMode => {
-                    app.play_mode = PlayMode::DefaultMode;
+                    app.player_state.play_mode = PlayMode::DefaultMode;
                     player.send_mpv_command(MpvCommand::Unshuffle)
                 }
             };
             if let Err(e) = res {
                 log_to_file(&e);
-            } else {
-                state.play_mode = app.play_mode.clone();
-                if let Err(e) = state.save() {
-                    log_to_file(&e);
-                }
+            } else if let Err(e) = app.player_state.save() {
+                log_to_file(&e);
             }
         }
         KeyCode::Char('n') => {
@@ -660,6 +680,257 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                     description.pop();
                 }
             }
+
+            _ => {}
+        },
+        PopupState::SelectBrowser => match key_event.code {
+            KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
+            KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::ApiCLient,
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                if let Some(index) = app.browser_liststate.selected() {
+                    let browser = &ALL_BROWSERS[index];
+                    match client::get_profiles_from_browser(browser) {
+                        Ok(profiles) => {
+                            let mut profiles_liststate = ListState::default();
+                            if !profiles.is_empty() {
+                                profiles_liststate.select(Some(0));
+                            }
+                            app.popup_state = PopupState::SelectBrowserProfile {
+                                profiles,
+                                profiles_liststate,
+                                browser: *browser,
+                            }
+                        }
+                        Err(e) => {
+                            log_to_file(e);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        },
+        PopupState::SelectBrowserProfile {
+            profiles,
+            profiles_liststate,
+            browser,
+        } => match key_event.code {
+            KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                if let Some(index) = profiles_liststate.selected() {
+                    let profile = &profiles[index];
+                    match browser.engine() {
+                        BrowserEngine::Gecko => {
+                            if let Ok(containers) = get_gecko_containers_from_profile(&profile.path)
+                            {
+                                let mut containers_liststate = ListState::default();
+                                containers_liststate.select(Some(0));
+                                app.popup_state = PopupState::SelectGeckoContainer {
+                                    browser: *browser,
+                                    profile: profile.clone(),
+                                    containers,
+                                    containers_liststate,
+                                };
+                            }
+                        }
+                        BrowserEngine::Chromium => {
+                            let client = ClientState {
+                                browser: Some(*browser),
+                                profile: Some(profile.clone()),
+                                gecko_container: None,
+                                account: None,
+                            };
+                            app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
+                            app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
+                        }
+                    }
+                }
+            }
+            KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::SelectBrowser,
+            _ => {}
+        },
+        PopupState::SelectGeckoContainer {
+            containers,
+            containers_liststate,
+            browser,
+            profile,
+        } => match key_event.code {
+            KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
+            KeyCode::Char('h') | KeyCode::Left => {
+                match client::get_profiles_from_browser(browser) {
+                    Ok(profiles) => {
+                        let mut profiles_liststate = ListState::default();
+                        if !profiles.is_empty() {
+                            profiles_liststate.select(Some(0));
+                        }
+                        app.popup_state = PopupState::SelectBrowserProfile {
+                            browser: *browser,
+                            profiles,
+                            profiles_liststate,
+                        }
+                    }
+                    Err(e) => {
+                        log_to_file(e);
+                    }
+                }
+            }
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                if let Some(index) = containers_liststate.selected() {
+                    let container = &containers[index];
+                    let client = ClientState {
+                        browser: Some(*browser),
+                        profile: Some(profile.clone()),
+                        gecko_container: Some(container.clone()),
+                        account: None,
+                    };
+                    app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
+                    app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
+                }
+            }
+            _ => {}
+        },
+        PopupState::SelectAccount {
+            browser,
+            profile,
+            container,
+            accounts,
+            accounts_liststate,
+        } => match key_event.code {
+            KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
+            KeyCode::Char('h') | KeyCode::Left => {
+                if container.is_some() {
+                    match get_gecko_containers_from_profile(&profile.path) {
+                        Ok(containers) => {
+                            let mut liststate = ListState::default();
+                            if !containers.is_empty() {
+                                liststate.select(Some(0));
+                            }
+                            app.popup_state = PopupState::SelectGeckoContainer {
+                                browser: *browser,
+                                profile: profile.clone(),
+                                containers,
+                                containers_liststate: liststate,
+                            };
+                        }
+                        Err(e) => {
+                            log_to_file(e);
+                        }
+                    }
+                } else {
+                    match get_profiles_from_browser(browser) {
+                        Ok(profiles) => {
+                            let mut liststate = ListState::default();
+                            if !profiles.is_empty() {
+                                liststate.select(Some(0));
+                            }
+                            app.popup_state = PopupState::SelectBrowserProfile {
+                                browser: *browser,
+                                profiles,
+                                profiles_liststate: liststate,
+                            };
+                        }
+                        Err(e) => {
+                            log_to_file(&e);
+                        }
+                    }
+                }
+            }
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                if let Some(index) = accounts_liststate.selected() {
+                    let selected_acc = &accounts[index];
+                    let client_state = ClientState {
+                        browser: Some(*browser),
+                        profile: Some(profile.clone()),
+                        gecko_container: container.clone(),
+                        account: Some(selected_acc.clone()),
+                    };
+                    app.api_cmd_tx
+                        .send(ApiCmd::ReloadApiClient(client_state))
+                        .ok();
+                    app.api_loading_kind = Some(ApiLoadingKind::ReloadClient);
+                    if !matches!(app.popup_state, PopupState::None) {
+                        app.popup_state = PopupState::ApiCLient;
+                    }
+                }
+            }
+            _ => {}
+        },
+        PopupState::ApiCLient => match key_event.code {
+            KeyCode::Esc => {
+                app.popup_state = PopupState::None;
+            }
+            KeyCode::Char('b') => {
+                app.popup_state = PopupState::SelectBrowser;
+                app.browser_liststate.select(Some(0));
+            }
+            KeyCode::Char('p') => {
+                if let Ok((browser, _, _, _)) = app.client_state.get_validated_fields() {
+                    match get_profiles_from_browser(browser) {
+                        Ok(profiles) => {
+                            let mut profiles_liststate = ListState::default();
+                            if !profiles.is_empty() {
+                                profiles_liststate.select(Some(0));
+                            }
+                            app.popup_state = PopupState::SelectBrowserProfile {
+                                browser: *browser,
+                                profiles,
+                                profiles_liststate,
+                            };
+                        }
+                        Err(e) => log_to_file(e),
+                    }
+                }
+            }
+            KeyCode::Char('c') => {
+                if let Ok((browser, profile, _, _)) = app.client_state.get_validated_fields()
+                    && browser.engine() == BrowserEngine::Gecko
+                    && let Ok(containers) = get_gecko_containers_from_profile(&profile.path)
+                {
+                    let mut containers_liststate = ListState::default();
+                    containers_liststate.select(Some(0));
+                    app.popup_state = PopupState::SelectGeckoContainer {
+                        browser: *browser,
+                        profile: profile.clone(),
+                        containers,
+                        containers_liststate,
+                    };
+                }
+            }
+            KeyCode::Char('a') => match app.client_state.get_validated_fields() {
+                Ok((browser, profile, container, _)) => {
+                    let client = ClientState {
+                        browser: Some(*browser),
+                        profile: Some(profile.clone()),
+                        gecko_container: container.cloned(),
+                        account: None,
+                    };
+                    app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
+                    app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
+                }
+                Err(_) => {
+                    app.popup_state = PopupState::ApiCLient;
+                }
+            },
+            KeyCode::Char('r') => {
+                if app.client_state.get_validated_fields().is_ok() {
+                    app.api_cmd_tx
+                        .send(ApiCmd::ReloadApiClient(app.client_state.clone()))
+                        .ok();
+                    app.api_loading_kind = Some(ApiLoadingKind::ReloadClient);
+                } else {
+                    app.noti.notify(
+                        NotifyType::Error,
+                        String::from("YTM client not configured, press b to setup"),
+                    );
+                }
+            }
+            KeyCode::Char('g') => {
+                app.api_cmd_tx.send(ApiCmd::ToggleGuest()).ok();
+                app.client_state = ClientState::default();
+                app.client_state.save().ok();
+                app.albums.clear();
+                app.playlists.clear();
+            }
+
             _ => {}
         },
         _ => {}
@@ -676,7 +947,7 @@ fn append_song_to_queue(app: &mut App, player: &Player, song: Song) -> YResult<(
     }
     let url = get_url_from_vid_id(&song.video_id);
     player.send_mpv_command(MpvCommand::AppendSong(url))?;
-    if app.play_mode == PlayMode::ShuffleMode && app.queue.len() == 3 {
+    if app.player_state.play_mode == PlayMode::ShuffleMode && app.queue.len() == 3 {
         player.send_mpv_command(MpvCommand::Shuffle)?;
     }
     app.noti.notify(
@@ -692,16 +963,16 @@ fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_id
     if let Err(e) = player.send_mpv_command(MpvCommand::RemovePos(mpv_idx)) {
         log_to_file(&e);
     } else {
-        if let Some(playing_idx) = app.playing_song {
+        if let Some(playing_idx) = app.playing_song_idx {
             if playing_idx > idx {
-                app.playing_song = Some(playing_idx - 1);
+                app.playing_song_idx = Some(playing_idx - 1);
             } else if playing_idx == idx {
-                app.playing_song = None;
+                app.playing_song_idx = None;
             }
         }
         app.queue.remove(idx);
         if app.queue.is_empty() {
-            app.status = PlayerStatus::Idle;
+            app.player_status = PlayerStatus::Idle;
             app.playing_playlist_id = None;
             app.time_pos = None;
         }
@@ -712,10 +983,10 @@ fn remove_song_from_queue(app: &mut App, player: &mut Player, idx: usize, mpv_id
 
 fn clear_queue(app: &mut App, player: &Player) -> YResult<()> {
     player.send_mpv_command(MpvCommand::Clear)?;
-    app.status = PlayerStatus::Idle;
-    app.playing_song = None;
+    app.player_status = PlayerStatus::Idle;
+    app.playing_song_idx = None;
     app.time_pos = None;
-    app.queue = Vec::new();
+    app.queue.clear();
     app.playing_playlist_id = None;
 
     Ok(())
@@ -734,13 +1005,13 @@ fn load_list(
         if start_index > 0 {
             player.send_mpv_command(MpvCommand::PlayPos(start_index))?;
         }
-        if app.play_mode == PlayMode::ShuffleMode {
+        if app.player_state.play_mode == PlayMode::ShuffleMode {
             player.send_mpv_command(MpvCommand::Shuffle)?;
         }
         app.queue = songs;
         app.queue_liststate.select(Some(start_index));
         app.playing_playlist_id = playlist_id;
-        app.playing_song = None;
+        app.playing_song_idx = None;
     } else {
         clear_queue(app, player).ok();
     }
@@ -748,6 +1019,7 @@ fn load_list(
 }
 
 pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player) {
+    let mut skip_clear = false;
     match response {
         ApiResponse::CreatePlaylist(res) => match res {
             Ok(playlist) => {
@@ -759,10 +1031,8 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             }
             Err(e) => {
                 log_to_file(&e);
-                app.noti.notify(
-                    NotifyType::Error,
-                    format!("Failed to create playlist: {}", e),
-                );
+                app.noti
+                    .notify(NotifyType::Error, format!("Failed to create playlist: {e}"));
             }
         },
         ApiResponse::SaveSong(res) => match res {
@@ -791,7 +1061,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             Err(e) => {
                 log_to_file(&e);
                 app.noti
-                    .notify(NotifyType::Error, format!("Failed to save: {e}"));
+                    .notify(NotifyType::Error, format!("Failed to save song: {e}"));
             }
         },
         ApiResponse::Search { albums, songs } => {
@@ -839,7 +1109,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             Err(e) => {
                 log_to_file(&e);
                 app.noti
-                    .notify(NotifyType::Error, format!("Failed to like: {e}"));
+                    .notify(NotifyType::Error, format!("Failed to like song: {e}"));
             }
         },
         ApiResponse::UnlikeSong((res, title)) => match res {
@@ -973,6 +1243,65 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 );
             }
         },
+
+        ApiResponse::FetchAccountsList(res) => {
+            match res {
+                Ok((accounts, browser, profile, container)) => {
+                    let mut liststate = ListState::default();
+                    if !accounts.is_empty() {
+                        liststate.select(Some(0));
+                    }
+                    app.popup_state = PopupState::SelectAccount {
+                        accounts,
+                        accounts_liststate: liststate,
+                        browser,
+                        profile,
+                        container,
+                    }
+                }
+                Err(e) => {
+                    app.noti.notify(
+                        NotifyType::Error,
+                        format!("Failed to fetch account list: {e}"),
+                    );
+                    log_to_file(e);
+                }
+            }
+            app.api_loading_kind = None;
+        }
+        ApiResponse::ReloadApiCLient(result) => match result {
+            Ok(client_state) => {
+                app.noti.notify(
+                    NotifyType::Success,
+                    "Reloaded YTM client successfully".to_string(),
+                );
+                app.client_state = client_state;
+                app.client_state.save().ok();
+                app.api_cmd_tx.send(ApiCmd::FetchLibraryData).ok();
+                app.api_loading_kind = Some(ApiLoadingKind::FetchLibraryData);
+                skip_clear = true;
+            }
+            Err(e) => {
+                log_to_file(&e);
+                app.noti.notify(
+                    NotifyType::Error,
+                    format!("Failed to reload api client: {e}"),
+                );
+            }
+        },
+        ApiResponse::ToggleGuest(res) => match res {
+            Ok(_) => {
+                app.noti.notify(
+                    NotifyType::Success,
+                    "Toggled Guest mode, library feature is unavailable".to_string(),
+                );
+            }
+            Err(e) => {
+                log_to_file(e);
+            }
+        },
     }
-    app.api_loading_kind = None;
+    if !skip_clear {
+        app.api_loading_kind = None;
+    }
 }

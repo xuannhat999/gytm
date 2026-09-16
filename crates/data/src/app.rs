@@ -1,4 +1,7 @@
+use ratatui::widgets::ListState;
 use serde::{Deserialize, Serialize};
+
+use crate::api_client::{Account, Browser, BrowserProfile, GeckoContainer};
 
 #[derive(Debug, Clone)]
 pub struct Playlist {
@@ -9,7 +12,7 @@ pub struct Playlist {
     pub is_saved: bool,
     pub is_custom: bool,
 }
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Song {
     pub title: String,
     #[serde(default)]
@@ -79,5 +82,25 @@ pub enum PopupState {
         description: String,
         privacy: PlayListPrivacy,
         focused_field: CreatePlaylistFocus,
+    },
+    ApiCLient,
+    SelectBrowser,
+    SelectBrowserProfile {
+        browser: Browser,
+        profiles: Vec<BrowserProfile>,
+        profiles_liststate: ListState,
+    },
+    SelectGeckoContainer {
+        browser: Browser,
+        profile: BrowserProfile,
+        containers: Vec<GeckoContainer>,
+        containers_liststate: ListState,
+    },
+    SelectAccount {
+        browser: Browser,
+        profile: BrowserProfile,
+        container: Option<GeckoContainer>,
+        accounts: Vec<Account>,
+        accounts_liststate: ListState,
     },
 }

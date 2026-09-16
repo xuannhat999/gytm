@@ -90,9 +90,10 @@ dependencies = [
  "reqwest",
  "rookie",
  "rusqlite",
+ "rust-ini",
  "serde",
  "sha1_smol",
- "tokio",
+ "state",
 ]
 
 [[package]]
@@ -906,6 +907,8 @@ dependencies = [
  "data",
  "dirs",
  "reqwest",
+ "rusqlite",
+ "rust-ini",
  "serde_json",
  "thiserror 2.0.18",
  "time",
@@ -1224,7 +1227,7 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
 name = "gytm"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "api",
  "config",

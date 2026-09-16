@@ -1,5 +1,9 @@
-use data::app::{PlayListPrivacy, Playlist, Song};
+use data::{
+    api_client::{Account, Browser, BrowserProfile, GeckoContainer},
+    app::{PlayListPrivacy, Playlist, Song},
+};
 use error::YResult;
+use state::client_state::ClientState;
 
 pub enum ApiCmd {
     CreatePlaylist {
@@ -25,6 +29,9 @@ pub enum ApiCmd {
     SaveAlbum(Playlist),
     GetRelatedSongsToPlay(Song),
     FetchLibraryData,
+    FetchAccountsList(ClientState),
+    ReloadApiClient(ClientState),
+    ToggleGuest(),
 }
 
 pub enum ApiResponse {
@@ -50,6 +57,16 @@ pub enum ApiResponse {
     SaveAlbum((YResult<()>, Playlist)),
     GetRelatedSongsToPlay(YResult<Vec<Song>>),
     FetchLibraryData(YResult<(Vec<Playlist>, Vec<Playlist>, Vec<usize>)>),
+    FetchAccountsList(
+        YResult<(
+            Vec<Account>,
+            Browser,
+            BrowserProfile,
+            Option<GeckoContainer>,
+        )>,
+    ),
+    ReloadApiCLient(YResult<ClientState>),
+    ToggleGuest(YResult<()>),
 }
 
 #[derive(PartialEq)]
@@ -60,4 +77,6 @@ pub enum ApiLoadingKind {
     FetchLibraryData,
     GetSongsToView,
     GetSongsToPlay,
+    FetchAccountsList,
+    ReloadClient,
 }
