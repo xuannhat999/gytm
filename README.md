@@ -12,10 +12,10 @@ Stream Youtube Music from your terminal !
 # Features
 
 - Personalized Content: Fetch your private playlists/album using local cookie authentication.
-- **Interactive YTM Client Setup**: Choose your browser, profile, container, and account directly from the TUI.
-- **Guest Mode**: Use without authentication (limited to search and public content).
-- **Multi-account Support**: Switch between multiple YouTube accounts.
-- **Firefox Container Support**: Works with Firefox Multi-Account Containers (Gecko browsers).
+- Interactive YTM Client Setup: Choose your browser, profile, container, and account directly from the TUI.
+- Guest Mode: Use without authentication (limited to search and public content).
+- Multi-account Support: Switch between multiple YouTube accounts.
+- Firefox Container Support: Works with Firefox Multi-Account Containers (Gecko browsers).
 - Play / Save / Remove albums in your Youtube Music Library
 - Search for Albums & Songs
 - Add / Remove Songs in Queue
@@ -158,12 +158,6 @@ paru -S gytm-git
 - <kbd>g</kbd>: Toggle guest mode
 - <kbd>Esc</kbd>: Close popup
 
-### Select Popups (Browser / Profile / Container / Account)
-
-- <kbd>Enter</kbd> / <kbd>l</kbd> / <kbd>→</kbd>: Confirm selection
-- <kbd>h</kbd> / <kbd>←</kbd>: Go back to previous popup
-- <kbd>Esc</kbd>: Cancel and close
-
 # Configuration  
 **File path:**
 `$XDG_CONFIG_HOME/gytm/config.toml` (defaults to `~/.config/gytm/config.toml`)
@@ -181,6 +175,7 @@ seek_seconds = 5
 Log file path:
 `$XDG_STATE_HOME/gytm/log.txt` or `~/.local/state/gytm/log.txt`  
 
+Check the log file at `$XDG_STATE_HOME/gytm/log.txt` for specific error details.
 If you are using a standalone **Window Manager (Hyprland, i3, Sway, etc.)** and the app freezes on startup, your browser's secure storage is likely locked. Because these environments lack a default graphical interface to prompt for your password, the application hangs waiting for permission.
 
 To fix this, you need to ensure your system's credential store is accessible before running `gytm`:
@@ -188,9 +183,9 @@ To fix this, you need to ensure your system's credential store is accessible bef
 - **Option 1 (Unlock Keyring/Wallet):** Open your terminal and manually force-unlock your system's keyring or wallet daemon using its respective CLI command (e.g., `gnome-keyring-daemon --unlock` or `kwalletd6`) before launching the app.
 - **Option 2 (Launch a Polkit Agent):** Ensure you have a Polkit authentication agent installed and running in your Window Manager configuration to properly handle and display graphical password prompts.
 
-### - Running in guest mode unexpectedly
-- Your client state may be corrupted or browser cookies unavailable. Check the log file at `$XDG_STATE_HOME/gytm/log.txt` for details.
-- Press `i` to open the client config popup and re-run the setup flow.
+### - Running in guest mode unexpectedly or request failed
+- Your client state may be corrupted or browser cookies unavailable.
+- Open the client config popup and reload client or re-run the setup flow.
 
 ### - Player continuously skips tracks / plays next song
 - This is usually caused by YouTube updating its API or stream extraction logic, causing audio stream fetching to fail.
@@ -201,7 +196,6 @@ To fix this, you need to ensure your system's credential store is accessible bef
 - Ensure the selected browser profile is currently signed into YouTube or YouTube Music.
 - For Chromium browsers, ensure the browser's `Local State` file is accessible (needed for cookie decryption).
 - For Gecko browsers, ensure `cookies.sqlite` exists in the profile directory and is not locked by a running browser instance.
-- Check the log file at `$XDG_STATE_HOME/gytm/log.txt` for specific error details.
 
 # ❤️ Credits & Inspiration
 
