@@ -43,17 +43,13 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
 
     let top_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(28),
-            Constraint::Min(0),
-            Constraint::Percentage(30),
-        ])
+        .constraints([Constraint::Length(28), Constraint::Percentage(100)])
         .split(main_layout[0]);
 
     render_tabs(frame, top_layout[0], &config.theme, app.page as usize);
     render_help_line(
         frame,
-        top_layout[2],
+        top_layout[1],
         &config.theme,
         vec![
             ("YTM client", "i"),
