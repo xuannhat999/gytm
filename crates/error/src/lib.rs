@@ -35,6 +35,9 @@ pub enum YError {
     #[error("Invalid Cookie")]
     InvalidCookie,
 
+    #[error("Cookie expired")]
+    CookieExpired,
+
     #[error("Unavailable feature for guest mode")]
     UnavailableFeature,
 

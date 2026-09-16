@@ -50,7 +50,8 @@ pub fn load_cookies(
                         .ok_or(YError::MissApiClientContext("Container".to_string()))?
                         .id,
                 )?;
-                let exp_filtered_cookies = filter_exp_gecko_cookies(cookies);
+                let exp_filtered_cookies = filter_exp_gecko_cookies(cookies)?;
+
                 build_jar_from_gecko_cookies(exp_filtered_cookies)
             }
             BrowserEngine::Chromium => {
@@ -59,22 +60,22 @@ pub fn load_cookies(
                 })?;
                 let local_state = get_file_path_from_root_and_filename(root_path, "Local State")
                     .ok_or_else(|| {
-                        error::YError::InvalidPath("Selected browsser's Local State".to_string())
+                        error::YError::InvalidPath("Selected browser's Local State".to_string())
                     })?;
                 let cookies = read_chromium_cookies(&db_path, &local_state)?;
-                let exp_filtered_cookies = filter_exp_chromium_cookies(cookies);
+                let exp_filtered_cookies = filter_exp_chromium_cookies(cookies)?;
                 build_jar_sapisid_from_chromium_cookies(exp_filtered_cookies)
             }
         };
         log_to_file(format!(
-            "Loaded cookies from:\nBROWSER: {:?}\nPROFILE: {:?}\nCONTAINER: {:?}",
+            "Loaded cookies from:\n - BROWSER: {:?}\n - PROFILE: {:?}\n - CONTAINER: {:?}",
             browser, profile, container
         ));
         res
     })();
     if let Err(e) = &result {
         log_to_file(format!(
-            "Failed to load cookies:\nBROWSER: {:?}\nPROFILE: {:?}\nCONTAINER: {:?}\nError: {e}",
+            "Failed to load cookies from :\n - BROWSER: {:?}\n - PROFILE: {:?}\n - CONTAINER: {:?}\n - Error: {e}",
             browser, profile, container
         ));
     }
@@ -141,7 +142,7 @@ fn get_root_path_from_browser(browser: &Browser) -> Option<PathBuf> {
             "microsoft-edge-dev",
             ".var/app/com.microsoft.Edge/config/microsoft-edge",
         ],
-        Browser::Vilvadi => vec![
+        Browser::Vivaldi => vec![
             "vivaldi",
             "vivaldi-beta",
             "vivaldi-snapshot",

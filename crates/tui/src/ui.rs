@@ -56,8 +56,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
         top_layout[2],
         &config.theme,
         vec![
-            ("YTM client info", "i"),
-            ("Toggle guest", "g"),
+            ("YTM client", "i"),
             ("Next tab", "Tab"),
             ("Minimize", "q"),
             ("Quit", "Q"),
@@ -736,7 +735,11 @@ fn render_api_client_popup(
     start_time: std::time::Instant,
 ) {
     let keymap = vec![
-        Span::styled("[ Close: ", config.theme.text_style()),
+        Span::styled("[ Reload: ", config.theme.text_style()),
+        Span::styled("r ", config.theme.key_style()),
+        Span::styled("| Guest: ", config.theme.text_style()),
+        Span::styled("g ", config.theme.key_style()),
+        Span::styled("| Close: ", config.theme.text_style()),
         Span::styled("Esc ", config.theme.key_style()),
         Span::styled("]", config.theme.text_style()),
     ];
@@ -796,21 +799,28 @@ fn render_api_client_popup(
         ]));
         let p = Paragraph::new(lines).alignment(Alignment::Left);
         frame.render_widget(p, layout[0]);
-        if app.api_loading_kind == Some(ApiLoadingKind::FetchAccountsList) {
+        if matches!(
+            app.api_loading_kind,
+            Some(ApiLoadingKind::ReloadClient) | Some(ApiLoadingKind::FetchAccountsList)
+        ) {
             render_spinner(frame, layout[1], &config.theme, start_time);
         }
     } else {
-        let lines = vec![
-            Line::from(Span::styled(
-                "Currently running in Guest mode",
-                config.theme.text_style(),
-            )),
-            Line::from(vec![
-                Span::styled("[b] ", config.theme.key_style()),
-                Span::styled("Setup YTM client", config.theme.text_style()),
-            ]),
-        ];
-        frame.render_widget(Paragraph::new(lines).centered(), inner_area);
+        if app.api_loading_kind == Some(ApiLoadingKind::ReloadClient) {
+            render_spinner(frame, inner_area, &config.theme, start_time);
+        } else {
+            let lines = vec![
+                Line::from(Span::styled(
+                    "Currently running in Guest mode",
+                    config.theme.text_style(),
+                )),
+                Line::from(vec![
+                    Span::styled("[b] ", config.theme.key_style()),
+                    Span::styled("Setup YTM client", config.theme.text_style()),
+                ]),
+            ];
+            frame.render_widget(Paragraph::new(lines).centered(), inner_area);
+        }
     }
 }
 // GECKO CONTAINER

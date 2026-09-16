@@ -1,5 +1,5 @@
 use data::app::{PlayListPrivacy, Song};
-use error::{YError, YResult, log_to_file};
+use error::{YError, YResult};
 use reqwest::{
     Client,
     cookie::Jar,
@@ -166,7 +166,6 @@ impl YTDao {
             .await?
             .text()
             .await?;
-        log_to_file(&response);
         Ok(response)
     }
 

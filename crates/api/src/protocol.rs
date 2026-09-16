@@ -78,4 +78,5 @@ pub enum ApiLoadingKind {
     GetSongsToView,
     GetSongsToPlay,
     FetchAccountsList,
+    ReloadClient,
 }

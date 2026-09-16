@@ -69,7 +69,7 @@ impl YTBus {
         Ok((all_albums, all_playlists, all_cus_playlists))
     }
 
-    pub async fn get_accounts_list(&mut self, client_state: &ClientState) -> YResult<Vec<Account>> {
+    pub async fn get_accounts_list(&self, client_state: &ClientState) -> YResult<Vec<Account>> {
         let dao = YTDao::new(client_state).await?;
         let mut emails = Vec::new();
         let mut auth_user = 0;

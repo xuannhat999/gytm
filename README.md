@@ -11,13 +11,18 @@ Stream Youtube Music from your terminal !
 
 # Features
 
-- Personalized Content: Seamlessly fetch your private playlists/album using local cookie authentication.
+- Personalized Content: Fetch your private playlists/album using local cookie authentication.
+- **Interactive YTM Client Setup**: Choose your browser, profile, container, and account directly from the TUI.
+- **Guest Mode**: Use without authentication (limited to search and public content).
+- **Multi-account Support**: Switch between multiple YouTube accounts.
+- **Firefox Container Support**: Works with Firefox Multi-Account Containers (Gecko browsers).
 - Play / Save / Remove albums in your Youtube Music Library
 - Search for Albums & Songs
 - Add / Remove Songs in Queue
 - When select to play a song in search result, it will automatically load list of related songs into Queue
 - Create / Edit personal playlists
 - Keep playing in background after quit app ( Minimize )
+
 ## Supported OS
 
 - **Linux** (Tested on Arch Linux)
@@ -29,7 +34,7 @@ Stream Youtube Music from your terminal !
 - **openssl** development headers
 - **yt-dlp**: for fetching stream URLs.
 - **mpv**   : the core media engine.
-- **sqlite**: local database
+- **SQLite**: runtime dependency for reading Firefox cookie databases (via `rusqlite`).
 
 # Optional Dependencies
 
@@ -45,7 +50,7 @@ Stream Youtube Music from your terminal !
 git clone https://github.com/xuannhat999/gytm.git
 ```
 
-1. Install the binary
+2. Install the binary
 
 ```
 cd gytm
@@ -67,44 +72,98 @@ paru -S gytm-git
 
 # Authentication (Personalized Content)
 
-`gytm` uses the `rookie` crate to automatically detect and fetch your YouTube Music session cookies from your local  web browsers.
+`gytm` lets you manually select your browser, profile, and account through an interactive in-app setup flow.
 
 ### Supported browsers
 
-- Chromium based ( Brave, Google Chrome, Chromium...)
-- Firefox based( Firefox, Librewolf, Zen )
+| Engine | Browsers |
+|--------|----------|
+| **Chromium** | Chrome, Google Chrome, Brave, Brave Origin, Edge, Vivaldi |
+| **Gecko** | Firefox, LibreWolf, Zen |
+
+### Supported clients
+
+- **Chromium-based browsers**: Cookie decryption via `rookie` (AEAD). Requires access to the browser's `Local State` file for the encryption key.
+- **Gecko-based browsers**: Direct `cookies.sqlite` reading via `rusqlite`. Supports **Firefox Multi-Account Containers** for selecting specific container contexts.
+
+### Supported features
+
+- Multiple profile selection per browser
+- Firefox Container selection (Gecko only)
+- Multi-account support (`X-Goog-AuthUser` header)
+- Guest mode (no authentication required)
 
 # How to use
+
 * **Prerequisite:** Keep your YouTube or YouTube Music account signed in on your browser.
-* **Launch:** Run `gytm` in the terminal to automatically detect your active session and start.
+* **First launch:** Run `gytm` in the terminal. Press `i` to open the YTM client configuration popup, then follow the setup flow:
+  1. Press `b` to select your browser
+  2. Press `p` to select the browser profile with your YouTube session
+  3. Press `c` to select a Firefox Container (Gecko browsers only)
+  4. Press `a` to fetch and select your YouTube account
+* **Guest mode:** Press `i` to open the client popup, then press `g` to toggle guest mode (no authentication). In guest mode, library features are unavailable but you can still search and play public content.
+* **Reload cookies:** If your YouTube session expires while `gytm` is running, press `i` then `r` to reload cookies and re-authenticate without restarting.
 * **Shutdown background playback without opening app interface:** Run `gytm quit`.
+
 # Keymap
+
+### Global
 
 - <kbd>Q</kbd>: Quit app
 - <kbd>q</kbd>: Minimize app and keep mpv playing
 - <kbd>Tab</kbd>: Switch tab
 - <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd>: Toggle focus area
+- <kbd>i</kbd>: Open YTM client info / setup popup
+
+### Navigation
+
 - (<kbd>arrow up</kbd>/<kbd>k</kbd>) / (<kbd>arrow down</kbd>/<kbd>j</kbd>): Navigate up/down list items
-- <kbd>l</kbd>: View Songs from album/playlist ( In Library )
+- <kbd>l</kbd>: View Songs from album/playlist (In Library)
 - <kbd>Enter</kbd>: Play Album/Playlist/Song
+
+### Playback
+
 - <kbd>Space</kbd>: Pause/Resume
 - <kbd>m</kbd>: Toggle playmode (Default/Shuffle)
-- <kbd>b</kbd>/<kbd>n</kbd>: Play previous/next song in Queue ( If playmode is Shuffle, next song will be random )
+- <kbd>b</kbd>/<kbd>n</kbd>: Play previous/next song in Queue (If playmode is Shuffle, next song will be random)
 - <kbd>+</kbd>/<kbd>-</kbd>: Increase/Decrease volume
 - <kbd>arrow left</kbd>/<kbd>arrow right</kbd>: Go Back/Forward 5s
-- <kbd>s</kbd>: Toggle search input ( in Search Tab )
-- <kbd>Esc</kbd>: Exit insert mode ( in search input )
-- <kbd>Enter</kbd>: Submit and search ( in search input )
+
+### Search
+
+- <kbd>s</kbd>: Toggle search input (in Search Tab)
+- <kbd>Esc</kbd>: Exit insert mode (in search input)
+- <kbd>Enter</kbd>: Submit and search (in search input)
+
+### Content Management
+
 - <kbd>x</kbd>:
   - [1]Albums Search results: Save/Unsave album
   - [1]Albums/[2]Playlists in Library: Unsave album/playlist
   - [4]Content: Save song to playlist, Unsave with <kbd>X</kbd>
 - <kbd>a</kbd>:
-  - [2]Songs Search results  / [4]Content: Add song to Queue
+  - [2]Songs Search results / [4]Content: Add song to Queue
   - [2]Playlist in Library: Create new playlist
 - <kbd>d</kbd>:
   - [3]Queue: Remove song from Queue
 - <kbd>c</kbd>: Clear Queue
+
+### YTM Client Setup Popup (press `i`)
+
+- <kbd>b</kbd>: Select browser
+- <kbd>p</kbd>: Select profile
+- <kbd>c</kbd>: Select container (Gecko browsers only)
+- <kbd>a</kbd>: Fetch and select account
+- <kbd>r</kbd>: Reload cookies (re-authenticate when the session expires)
+- <kbd>g</kbd>: Toggle guest mode
+- <kbd>Esc</kbd>: Close popup
+
+### Select Popups (Browser / Profile / Container / Account)
+
+- <kbd>Enter</kbd> / <kbd>l</kbd> / <kbd>→</kbd>: Confirm selection
+- <kbd>h</kbd> / <kbd>←</kbd>: Go back to previous popup
+- <kbd>Esc</kbd>: Cancel and close
+
 # Configuration  
 **File path:**
 `$XDG_CONFIG_HOME/gytm/config.toml` (defaults to `~/.config/gytm/config.toml`)
@@ -128,10 +187,22 @@ To fix this, you need to ensure your system's credential store is accessible bef
 
 - **Option 1 (Unlock Keyring/Wallet):** Open your terminal and manually force-unlock your system's keyring or wallet daemon using its respective CLI command (e.g., `gnome-keyring-daemon --unlock` or `kwalletd6`) before launching the app.
 - **Option 2 (Launch a Polkit Agent):** Ensure you have a Polkit authentication agent installed and running in your Window Manager configuration to properly handle and display graphical password prompts.
+
+### - Running in guest mode unexpectedly
+- Your client state may be corrupted or browser cookies unavailable. Check the log file at `$XDG_STATE_HOME/gytm/log.txt` for details.
+- Press `i` to open the client config popup and re-run the setup flow.
+
 ### - Player continuously skips tracks / plays next song
 - This is usually caused by YouTube updating its API or stream extraction logic, causing audio stream fetching to fail.
 - **Fix:** Update `yt-dlp` to the latest version using your package manager
 - If you are already on the latest stable release and the issue persists, switch to the nightly build or wait for the next update
+
+### - Invalid cookie / Client setup fails
+- Ensure the selected browser profile is currently signed into YouTube or YouTube Music.
+- For Chromium browsers, ensure the browser's `Local State` file is accessible (needed for cookie decryption).
+- For Gecko browsers, ensure `cookies.sqlite` exists in the profile directory and is not locked by a running browser instance.
+- Check the log file at `$XDG_STATE_HOME/gytm/log.txt` for specific error details.
+
 # ❤️ Credits & Inspiration
 
 This project is inspired by: [ytermusic](https://github.com/ccgauche/ytermusic.git)

@@ -11,7 +11,7 @@ use rusqlite::Connection;
 
 use crate::{client::get_file_path_from_root_and_filename, dao::YTM_DOMAIN};
 
-pub fn get_geckgo_containers_from_profile(profile_path: &Path) -> YResult<Vec<GeckoContainer>> {
+pub fn get_gecko_containers_from_profile(profile_path: &Path) -> YResult<Vec<GeckoContainer>> {
     let file_path = get_file_path_from_root_and_filename(profile_path, "containers.json");
     if let Some(file) = file_path {
         return get_gecko_containers_from_json(&file);
@@ -85,19 +85,24 @@ pub(crate) fn read_gecko_cookies(
     result
 }
 
-pub(crate) fn filter_exp_gecko_cookies(cookies: Vec<GeckoCookie>) -> Vec<GeckoCookie> {
+pub(crate) fn filter_exp_gecko_cookies(cookies: Vec<GeckoCookie>) -> YResult<Vec<GeckoCookie>> {
     let now_secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs() as i64;
 
-    cookies
+    let valid_cookies: Vec<GeckoCookie> = cookies
         .into_iter()
         .filter(|c| {
             let not_expired = c.expires > now_secs.max(0) || c.expires == 0;
             not_expired && !c.name.is_empty() && !c.value.is_empty()
         })
-        .collect()
+        .collect();
+
+    if valid_cookies.is_empty() {
+        return Err(YError::CookieExpired);
+    }
+    Ok(valid_cookies)
 }
 
 pub(crate) fn build_jar_from_gecko_cookies(cookies: Vec<GeckoCookie>) -> YResult<(Jar, String)> {
@@ -175,7 +180,7 @@ pub(crate) fn get_gecko_profiles_from_ini(root_path: &Path) -> YResult<Vec<Brows
             };
             let name: &str = properties.get("Name").map_or("", |n| n);
             let path_str: &str = properties.get("Path").map_or("", |p| p);
-            let is_relative = properties.get("IsRelative").map_or(false, |v| v == "1");
+            let is_relative = properties.get("IsRelative") == Some("1");
             if name.is_empty() || path_str.is_empty() {
                 continue;
             }

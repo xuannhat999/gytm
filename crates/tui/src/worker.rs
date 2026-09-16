@@ -90,16 +90,15 @@ pub fn spawn_api_worker(
                 },
                 ApiCmd::FetchLibraryData => ApiResponse::FetchLibraryData(bus.get_lists().await),
                 ApiCmd::FetchAccountsList(client_state) => {
-                    let accounts = bus
-                        .get_accounts_list(&client_state)
-                        .await
-                        .unwrap_or_default();
-                    ApiResponse::FetchAccountsList(Ok((
-                        accounts,
-                        client_state.browser.unwrap(),
-                        client_state.profile.unwrap(),
-                        client_state.gecko_container,
-                    )))
+                    match bus.get_accounts_list(&client_state).await {
+                        Ok(accounts) => ApiResponse::FetchAccountsList(Ok((
+                            accounts,
+                            client_state.browser.unwrap(),
+                            client_state.profile.unwrap(),
+                            client_state.gecko_container,
+                        ))),
+                        Err(e) => ApiResponse::FetchAccountsList(Err(e)),
+                    }
                 }
                 ApiCmd::ReloadApiClient(client) => match bus.reload_dao(&client).await {
                     Ok(_) => ApiResponse::ReloadApiCLient(Ok(client)),

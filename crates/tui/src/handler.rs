@@ -4,7 +4,7 @@ use crate::{
     notification::NotifyType,
 };
 use api::{
-    client::{self, gecko::get_geckgo_containers_from_profile, get_profiles_from_browser},
+    client::{self, gecko::get_gecko_containers_from_profile, get_profiles_from_browser},
     protocol::{ApiCmd, ApiLoadingKind, ApiResponse},
 };
 use config::Config;
@@ -111,13 +111,6 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                 }
                 KeyCode::Char('i') => {
                     app.popup_state = PopupState::ApiCLient;
-                }
-                KeyCode::Char('g') => {
-                    app.api_cmd_tx.send(ApiCmd::ToggleGuest()).ok();
-                    app.client_state = ClientState::default();
-                    app.client_state.save().ok();
-                    app.albums.clear();
-                    app.playlists.clear();
                 }
                 _ => {}
             }
@@ -727,8 +720,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                     let profile = &profiles[index];
                     match browser.engine() {
                         BrowserEngine::Gecko => {
-                            if let Ok(containers) =
-                                get_geckgo_containers_from_profile(&profile.path)
+                            if let Ok(containers) = get_gecko_containers_from_profile(&profile.path)
                             {
                                 let mut containers_liststate = ListState::default();
                                 containers_liststate.select(Some(0));
@@ -806,7 +798,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
             KeyCode::Char('h') | KeyCode::Left => {
                 if container.is_some() {
-                    match get_geckgo_containers_from_profile(&profile.path) {
+                    match get_gecko_containers_from_profile(&profile.path) {
                         Ok(containers) => {
                             let mut liststate = ListState::default();
                             if !containers.is_empty() {
@@ -854,8 +846,10 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                     app.api_cmd_tx
                         .send(ApiCmd::ReloadApiClient(client_state))
                         .ok();
-                    app.api_loading_kind = Some(ApiLoadingKind::FetchLibraryData);
-                    app.popup_state = PopupState::ApiCLient;
+                    app.api_loading_kind = Some(ApiLoadingKind::ReloadClient);
+                    if !matches!(app.popup_state, PopupState::None) {
+                        app.popup_state = PopupState::ApiCLient;
+                    }
                 }
             }
             _ => {}
@@ -889,7 +883,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             KeyCode::Char('c') => {
                 if let Ok((browser, profile, _, _)) = app.client_state.get_validated_fields()
                     && browser.engine() == BrowserEngine::Gecko
-                    && let Ok(containers) = get_geckgo_containers_from_profile(&profile.path)
+                    && let Ok(containers) = get_gecko_containers_from_profile(&profile.path)
                 {
                     let mut containers_liststate = ListState::default();
                     containers_liststate.select(Some(0));
@@ -916,6 +910,26 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                     app.popup_state = PopupState::ApiCLient;
                 }
             },
+            KeyCode::Char('r') => {
+                if app.client_state.get_validated_fields().is_ok() {
+                    app.api_cmd_tx
+                        .send(ApiCmd::ReloadApiClient(app.client_state.clone()))
+                        .ok();
+                    app.api_loading_kind = Some(ApiLoadingKind::ReloadClient);
+                } else {
+                    app.noti.notify(
+                        NotifyType::Error,
+                        String::from("YTM client not configured, press b to setup"),
+                    );
+                }
+            }
+            KeyCode::Char('g') => {
+                app.api_cmd_tx.send(ApiCmd::ToggleGuest()).ok();
+                app.client_state = ClientState::default();
+                app.client_state.save().ok();
+                app.albums.clear();
+                app.playlists.clear();
+            }
 
             _ => {}
         },
@@ -1246,6 +1260,10 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                     }
                 }
                 Err(e) => {
+                    app.noti.notify(
+                        NotifyType::Error,
+                        format!("Failed to fetch account list: {e}"),
+                    );
                     log_to_file(e);
                 }
             }
@@ -1255,11 +1273,12 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             Ok(client_state) => {
                 app.noti.notify(
                     NotifyType::Success,
-                    "Reloaded Api Client successfully".to_string(),
+                    "Reloaded YTM client successfully".to_string(),
                 );
                 app.client_state = client_state;
                 app.client_state.save().ok();
                 app.api_cmd_tx.send(ApiCmd::FetchLibraryData).ok();
+                app.api_loading_kind = Some(ApiLoadingKind::FetchLibraryData);
                 skip_clear = true;
             }
             Err(e) => {

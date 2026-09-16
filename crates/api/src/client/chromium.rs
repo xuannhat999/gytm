@@ -49,13 +49,13 @@ pub(crate) fn read_chromium_cookies(db_path: &Path, key_path: &Path) -> YResult<
     }
 }
 
-pub(crate) fn filter_exp_chromium_cookies(cookies: Vec<Cookie>) -> Vec<Cookie> {
+pub(crate) fn filter_exp_chromium_cookies(cookies: Vec<Cookie>) -> YResult<Vec<Cookie>> {
     let now_secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs() as i64;
 
-    cookies
+    let valid_cookies: Vec<Cookie> = cookies
         .into_iter()
         .filter(|c| {
             let not_expired = match c.expires {
@@ -64,7 +64,11 @@ pub(crate) fn filter_exp_chromium_cookies(cookies: Vec<Cookie>) -> Vec<Cookie> {
             };
             not_expired && !c.name.is_empty() && !c.value.is_empty()
         })
-        .collect()
+        .collect();
+    if valid_cookies.is_empty() {
+        return Err(YError::CookieExpired);
+    }
+    Ok(valid_cookies)
 }
 
 pub(crate) fn build_jar_sapisid_from_chromium_cookies(

@@ -15,7 +15,7 @@ pub enum Browser {
     Brave,
     BraveOrigin,
     Edge,
-    Vilvadi,
+    Vivaldi,
     // Gecko
     FireFox,
     LibreWolf,
@@ -37,7 +37,7 @@ pub static ALL_BROWSERS: &[Browser] = &[
     Browser::Brave,
     Browser::BraveOrigin,
     Browser::Edge,
-    Browser::Vilvadi,
+    Browser::Vivaldi,
     Browser::FireFox,
     Browser::LibreWolf,
     Browser::Zen,
