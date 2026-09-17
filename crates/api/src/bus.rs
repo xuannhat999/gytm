@@ -11,22 +11,48 @@ use state::client_state::ClientState;
 
 pub struct YTBus {
     dao: YTDao,
+    pending_dao: Option<YTDao>,
 }
 
 impl YTBus {
     pub fn new(dao: YTDao) -> Self {
-        Self { dao }
+        Self {
+            dao,
+            pending_dao: None,
+        }
     }
-    pub async fn reload_dao(&mut self, client_state: &ClientState) -> YResult<()> {
+    pub async fn reload_client(&mut self, client_state: &ClientState) -> YResult<()> {
+        self.pending_dao = None;
         let (browser, profile, container, account) = &client_state.get_validated_fields()?;
         let (jar, sapisid) = load_cookies(browser, profile, *container)?;
         self.dao
             .reload(jar, sapisid, account.map_or(0, |a| a.auth_user))
             .await
     }
+
     pub async fn toggle_guest(&mut self) -> YResult<()> {
+        self.pending_dao = None;
         self.dao = YTDao::default().await?;
         Ok(())
+    }
+
+    pub async fn set_client(&mut self, client_state: &ClientState) -> YResult<()> {
+        let (_, _, _, account) = client_state.get_validated_fields()?;
+        match self.pending_dao.take() {
+            Some(mut dao) => {
+                if dao.sapisid.is_none() {
+                    return Err(YError::InvalidCookie);
+                }
+                dao.auth_user = account.map_or(0, |a| a.auth_user);
+                self.dao = dao;
+                Ok(())
+            }
+            None => self.reload_client(client_state).await,
+        }
+    }
+
+    pub fn discard_pending_client(&mut self) {
+        self.pending_dao = None;
     }
 
     pub async fn create_playlist(
@@ -69,8 +95,11 @@ impl YTBus {
         Ok((all_albums, all_playlists, all_cus_playlists))
     }
 
-    pub async fn get_accounts_list(&self, client_state: &ClientState) -> YResult<Vec<Account>> {
+    pub async fn get_accounts_list(&mut self, client_state: &ClientState) -> YResult<Vec<Account>> {
         let dao = YTDao::new(client_state).await?;
+        if dao.sapisid.is_none() {
+            return Err(YError::InvalidCookie);
+        }
         let mut emails = Vec::new();
         let mut auth_user = 0;
         while let Ok(res) = dao.get_account_email_from_idx(auth_user).await {
@@ -84,6 +113,7 @@ impl YTBus {
                 }
             }
         }
+        self.pending_dao = Some(dao);
         Ok(emails)
     }
 

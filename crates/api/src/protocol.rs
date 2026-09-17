@@ -30,6 +30,8 @@ pub enum ApiCmd {
     GetRelatedSongsToPlay(Song),
     FetchLibraryData,
     FetchAccountsList(ClientState),
+    SetClient(ClientState),
+    DiscardPendingClient,
     ReloadApiClient(ClientState),
     ToggleGuest(),
 }
@@ -66,6 +68,7 @@ pub enum ApiResponse {
         )>,
     ),
     ReloadApiCLient(YResult<ClientState>),
+    SetClient(YResult<ClientState>),
     ToggleGuest(YResult<()>),
 }
 

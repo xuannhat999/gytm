@@ -795,8 +795,12 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             accounts,
             accounts_liststate,
         } => match key_event.code {
-            KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
+            KeyCode::Esc => {
+                app.api_cmd_tx.send(ApiCmd::DiscardPendingClient).ok();
+                app.popup_state = PopupState::ApiCLient;
+            }
             KeyCode::Char('h') | KeyCode::Left => {
+                app.api_cmd_tx.send(ApiCmd::DiscardPendingClient).ok();
                 if container.is_some() {
                     match get_gecko_containers_from_profile(&profile.path) {
                         Ok(containers) => {
@@ -843,9 +847,7 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                         gecko_container: container.clone(),
                         account: Some(selected_acc.clone()),
                     };
-                    app.api_cmd_tx
-                        .send(ApiCmd::ReloadApiClient(client_state))
-                        .ok();
+                    app.api_cmd_tx.send(ApiCmd::SetClient(client_state)).ok();
                     app.api_loading_kind = Some(ApiLoadingKind::ReloadClient);
                     if !matches!(app.popup_state, PopupState::None) {
                         app.popup_state = PopupState::ApiCLient;
@@ -1269,7 +1271,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             }
             app.api_loading_kind = None;
         }
-        ApiResponse::ReloadApiCLient(result) => match result {
+        ApiResponse::ReloadApiCLient(result) | ApiResponse::SetClient(result) => match result {
             Ok(client_state) => {
                 app.noti.notify(
                     NotifyType::Success,

@@ -100,10 +100,18 @@ pub fn spawn_api_worker(
                         Err(e) => ApiResponse::FetchAccountsList(Err(e)),
                     }
                 }
-                ApiCmd::ReloadApiClient(client) => match bus.reload_dao(&client).await {
+                ApiCmd::ReloadApiClient(client) => match bus.reload_client(&client).await {
                     Ok(_) => ApiResponse::ReloadApiCLient(Ok(client)),
                     Err(e) => ApiResponse::ReloadApiCLient(Err(e)),
                 },
+                ApiCmd::SetClient(client) => match bus.set_client(&client).await {
+                    Ok(_) => ApiResponse::SetClient(Ok(client)),
+                    Err(e) => ApiResponse::SetClient(Err(e)),
+                },
+                ApiCmd::DiscardPendingClient => {
+                    bus.discard_pending_client();
+                    continue;
+                }
                 ApiCmd::ToggleGuest() => ApiResponse::ToggleGuest(bus.toggle_guest().await),
             };
             if api_res_tx.send(res).is_err() {

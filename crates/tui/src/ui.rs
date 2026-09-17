@@ -746,7 +746,7 @@ fn render_api_client_popup(
         .title(" YTM client 󱛜 ")
         .title_bottom(Line::from(keymap).centered());
 
-    let center_area = area.centered(Constraint::Percentage(30), Constraint::Length(20));
+    let center_area = area.centered(Constraint::Percentage(40), Constraint::Length(20));
     let inner_area = block.inner(center_area);
     let layout = Layout::default()
         .direction(Direction::Vertical)
