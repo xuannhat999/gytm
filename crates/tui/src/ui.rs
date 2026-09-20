@@ -590,7 +590,9 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         Span::styled("a ", theme.key_style()),
         Span::styled("| Save to Playlist: ", theme.text_style()),
         Span::styled("x ", theme.key_style()),
-        Span::styled(" ]", theme.text_style()),
+        Span::styled("| Switch type: ", theme.text_style()),
+        Span::styled("h/l", theme.key_style()),
+        Span::styled("]", theme.text_style()),
     ]);
 
     let is_focused =
@@ -600,13 +602,29 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
     } else {
         theme.inactive_border_style()
     };
+    let tab_hl = Style::default()
+        .bg(if is_focused {
+            theme.active
+        } else {
+            theme.inactive
+        })
+        .fg(theme.bg)
+        .add_modifier(Modifier::BOLD);
+
+    let (song_style, video_style) = match app.search_songs_source {
+        SearchSongSource::Song => (tab_hl, border_style),
+        SearchSongSource::Video => (border_style, tab_hl),
+    };
+    let title = Line::from(vec![
+        Span::styled("[2]-", border_style),
+        Span::styled(" 󰎇 Songs ", song_style),
+        Span::styled("|", border_style),
+        Span::styled("  Videos ", video_style),
+    ]);
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .title(match app.search_songs_source {
-            SearchSongSource::Song => "[2]-󰎇 Songs",
-            SearchSongSource::Video => "[2]-  Videos",
-        })
+        .title(title)
         .title_bottom(keymap.centered())
         .border_style(border_style);
 
