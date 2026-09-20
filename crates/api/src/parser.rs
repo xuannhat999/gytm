@@ -225,55 +225,7 @@ pub fn parse_search_albums(data: &str) -> YResult<Vec<Playlist>> {
     });
     Ok(albums)
 }
-pub fn parse_top_songs(data: &str) -> YResult<Vec<Song>> {
-    let mut songs = Vec::new();
-    let content = gjson::get(
-        data,
-        "contents.tabbedSearchResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents",
-    );
-    if !content.exists() {
-        return Err(YError::InvalidResponse("Search top result".to_string()));
-    }
-    content.each(|_, item| {
-        let card = item.get("musicCardShelfRenderer");
-        if !card.exists() {
-            return true;
-        }
-        let video_id = card.get("title.runs.0.navigationEndpoint.watchEndpoint.videoId");
-        if !video_id.str().is_empty() {
-            let title = card.get("title.runs.0.text");
-            let mut artist = String::new();
-            let mut duration = String::new();
-            let subtitle = card.get("subtitle.runs");
-            subtitle.each(|_, run| {
-                let t = run.get("text").str().to_string();
-                if run
-                    .get("navigationEndpoint.browseEndpoint.browseId")
-                    .exists()
-                {
-                    artist = t;
-                } else if t.contains(':') {
-                    duration = t.trim().to_string();
-                }
-                true
-            });
-            songs.push(Song {
-                video_id: video_id.str().to_string(),
-                set_video_id: String::new(),
-                title: if title.str().is_empty() {
-                    "Unknown".to_string()
-                } else {
-                    title.str().to_string()
-                },
-                artist,
-                duration,
-            });
-            return false;
-        }
-        false
-    });
-    Ok(songs)
-}
+
 pub fn parse_search_songs(data: &str) -> YResult<Vec<Song>> {
     let contents = gjson::get(
         data,

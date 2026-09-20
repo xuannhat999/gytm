@@ -1,6 +1,6 @@
 use crate::{client::load_cookies, dao::YTDao, parser};
 use data::{
-    api_client::Account,
+    api_client::{Account, SearchType},
     app::{PlayListPrivacy, Playlist, Song},
 };
 use error::{
@@ -122,25 +122,31 @@ impl YTBus {
         parser::parse_songs(&raw)
     }
 
+    // SEARCH ALBUMS
     pub async fn get_search_albums(&self, query: &str) -> YResult<Vec<Playlist>> {
-        let raw_list = self.dao.search_with_params_raw(query, 2).await?;
+        let raw_list = self
+            .dao
+            .search_with_params_raw(query, SearchType::Album)
+            .await?;
         parser::parse_search_albums(&raw_list)
     }
 
+    // SEARCH SONGS
     pub async fn get_search_songs(&self, query: &str) -> YResult<Vec<Song>> {
-        let top_res_raw = self.dao.search_raw(query).await?;
-        let raw_songs = self.dao.search_with_params_raw(query, 1).await?;
-        let mut songs = parser::parse_search_songs(&raw_songs)?;
-        if let Ok(top_res) = parser::parse_top_songs(&top_res_raw) {
-            let mut seen: Vec<String> = songs.iter().map(|s| s.video_id.clone()).collect();
-            for song in top_res.into_iter().rev() {
-                if !seen.contains(&song.video_id) {
-                    seen.push(song.video_id.clone());
-                    songs.insert(0, song);
-                }
-            }
-        }
-        Ok(songs)
+        let raw_songs = self
+            .dao
+            .search_with_params_raw(query, SearchType::Song)
+            .await?;
+        parser::parse_search_songs(&raw_songs)
+    }
+
+    // SEARCH VIDEOS
+    pub async fn get_search_videos(&self, query: &str) -> YResult<Vec<Song>> {
+        let videos_raw = self
+            .dao
+            .search_with_params_raw(query, SearchType::Video)
+            .await?;
+        parser::parse_search_songs(&videos_raw)
     }
 
     pub async fn get_params(&self, video_id: &str) -> YResult<String> {

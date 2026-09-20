@@ -5,6 +5,7 @@ use config::Config;
 use data::api_client::{ALL_BROWSERS, BrowserEngine};
 use data::app::{
     AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus, PopupState,
+    SearchSongSource,
 };
 use data::theme::Theme;
 use ratatui::layout::Flex;
@@ -576,7 +577,7 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
 
 fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let items: Vec<ListItem> = app
-        .search_songs
+        .get_search_songs_from_source()
         .iter()
         .map(|item| {
             let content = format!("   {} - {}", item.title, item.artist);
@@ -602,7 +603,10 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .title("[2]-󰎇 Songs")
+        .title(match app.search_songs_source {
+            SearchSongSource::Song => "[2]-󰎇 Songs",
+            SearchSongSource::Video => "[2]-  Videos",
+        })
         .title_bottom(keymap.centered())
         .border_style(border_style);
 
@@ -614,7 +618,11 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
             Style::default()
         });
 
-    frame.render_stateful_widget(list_widget, area, &mut app.search_songs_liststate);
+    frame.render_stateful_widget(
+        list_widget,
+        area,
+        app.get_search_songs_liststate_from_source(),
+    );
 }
 
 // SAVE SONG TO PLAYLIST

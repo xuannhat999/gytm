@@ -4,7 +4,9 @@ use crate::{
 };
 use api::protocol::{ApiCmd, ApiLoadingKind};
 use config::Config;
-use data::app::{AppPage, FocusArea, PlayerStatus, Playlist, PopupState, QueueData, Song};
+use data::app::{
+    AppPage, FocusArea, PlayerStatus, Playlist, PopupState, QueueData, SearchSongSource, Song,
+};
 use error::YResult;
 use player::Player;
 use ratatui::widgets::ListState;
@@ -36,6 +38,9 @@ pub struct App {
     pub search_albums_liststate: ListState,
     pub search_songs: Vec<Song>,
     pub search_songs_liststate: ListState,
+    pub search_videos: Vec<Song>,
+    pub search_videos_liststate: ListState,
+    pub search_songs_source: SearchSongSource,
 
     pub search_query: String,
     pub is_insert: bool,
@@ -96,6 +101,9 @@ impl App {
             search_songs: Vec::new(),
             search_songs_liststate: ListState::default(),
             search_query: String::new(),
+            search_videos: Vec::new(),
+            search_videos_liststate: ListState::default(),
+
             is_insert: false,
 
             // PLAYER
@@ -118,6 +126,33 @@ impl App {
             // API WORKER
             api_cmd_tx,
             api_loading_kind: None,
+            search_songs_source: SearchSongSource::default(),
+        }
+    }
+
+    pub fn get_search_songs_from_source(&self) -> &[Song] {
+        match self.search_songs_source {
+            SearchSongSource::Song => &self.search_songs,
+            SearchSongSource::Video => &self.search_videos,
+        }
+    }
+    pub fn get_search_songs_liststate_from_source(&mut self) -> &mut ListState {
+        match self.search_songs_source {
+            SearchSongSource::Song => &mut self.search_songs_liststate,
+            SearchSongSource::Video => &mut self.search_videos_liststate,
+        }
+    }
+    pub fn selected_search_song(&self) -> Option<&Song> {
+        let (songs, state) = match self.search_songs_source {
+            SearchSongSource::Song => (&self.search_songs, &self.search_songs_liststate),
+            SearchSongSource::Video => (&self.search_videos, &self.search_videos_liststate),
+        };
+        state.selected().and_then(|i| songs.get(i))
+    }
+    pub fn toggle_search_songs_source(&mut self) {
+        self.search_songs_source = match self.search_songs_source {
+            SearchSongSource::Song => SearchSongSource::Video,
+            SearchSongSource::Video => SearchSongSource::Song,
         }
     }
 

@@ -1,4 +1,7 @@
-use data::app::{PlayListPrivacy, Song};
+use data::{
+    api_client::SearchType,
+    app::{PlayListPrivacy, Song},
+};
 use error::{YError, YResult};
 use reqwest::{
     Client,
@@ -12,9 +15,9 @@ use crate::{
     client,
     request::{
         ActionsContent, BrowseIdRequest, CreatePlaylistRequest, EmptyRequest,
-        GetContinuationRequest, GetRelatedSongsRequest, PlaylistIdRequest, QueryRequest,
-        QueryWithParamsRequest, RequestClient, RequestContext, SaveAlbumRequest,
-        SaveUnsaveListRequest, TargetContent, TargetRequest, VideoIdRequest,
+        GetContinuationRequest, GetRelatedSongsRequest, PlaylistIdRequest, QueryWithParamsRequest,
+        RequestClient, RequestContext, SaveAlbumRequest, SaveUnsaveListRequest, TargetContent,
+        TargetRequest, VideoIdRequest,
     },
 };
 
@@ -205,12 +208,12 @@ impl YTDao {
         Ok(text)
     }
 
-    pub async fn search_with_params_raw(&self, query: &str, rtype: u8) -> YResult<String> {
-        let params = if rtype == 1 {
-            "EgWKAQIIAWoMEAQQAxAFEAkQEBAK" // SONG
-        } else {
-            "EgWKAQIYAWoMEAQQAxAFEAkQEBAK" // ALBUM
-        };
+    pub async fn search_with_params_raw(
+        &self,
+        query: &str,
+        search_type: SearchType,
+    ) -> YResult<String> {
+        let params = search_type.get_param();
         let url = self.api_url("search");
 
         let body = QueryWithParamsRequest {
@@ -229,23 +232,7 @@ impl YTDao {
             .await?;
         Ok(response)
     }
-    pub async fn search_raw(&self, query: &str) -> YResult<String> {
-        let body = QueryRequest {
-            context: self.get_context(),
-            query,
-        };
-        let url = self.api_url("search");
-        let response = self
-            .http
-            .post(&url)
-            .headers(self.get_api_headers())
-            .json(&body)
-            .send()
-            .await?
-            .text()
-            .await?;
-        Ok(response)
-    }
+
     pub async fn get_params_raw(&self, video_id: &str) -> YResult<String> {
         let url = self.api_url("next");
         let body = VideoIdRequest {

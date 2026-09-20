@@ -34,6 +34,13 @@ pub enum PlayerStatus {
     Paused,
 }
 
+#[derive(Default)]
+pub enum SearchSongSource {
+    #[default]
+    Song,
+    Video,
+}
+
 #[derive(Default, PartialEq, Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum PlayMode {
