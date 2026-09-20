@@ -592,7 +592,7 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         Span::styled("x ", theme.key_style()),
         Span::styled("| Switch type: ", theme.text_style()),
         Span::styled("h/l", theme.key_style()),
-        Span::styled("]", theme.text_style()),
+        Span::styled(" ]", theme.text_style()),
     ]);
 
     let is_focused =
