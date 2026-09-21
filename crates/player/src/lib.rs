@@ -42,6 +42,7 @@ impl Player {
             .spawn()?;
         Ok(())
     }
+
     pub fn shutdown(&mut self) {
         std::process::Command::new("pkill")
             .args(["-f", "mpv.*input-ipc-server=/tmp/gytm-mpv-socket"])
