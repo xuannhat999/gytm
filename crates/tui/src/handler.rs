@@ -29,7 +29,7 @@ use std::fs;
 pub fn handle_mpv_event(app: &mut App, event: MpvEvent) {
     match event {
         MpvEvent::ListChange(list) => {
-            let ids = helper::list_vid_id_from_list_url(list);
+            let ids = helper::list_vid_id_from_list_url(&list);
             app.mpv_list = ids;
             app.save_queue_file().ok();
             fs::remove_file(data::file_path::MPV_PLAYLIST).ok();

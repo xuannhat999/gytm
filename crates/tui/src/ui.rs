@@ -502,12 +502,13 @@ fn render_search_bar(
         Span::styled("Enter", theme.key_style()),
         Span::styled(" ]", theme.text_style()),
     ]);
-    let display_text = if app.is_insert {
-        format!("{}_", app.search_query)
+    let line = if app.is_insert {
+        Line::from(vec![Span::raw(app.search_query.as_str()), Span::raw("_")])
     } else {
-        app.search_query.clone()
+        Line::from(app.search_query.as_str())
     };
-    let input = Paragraph::new(display_text)
+
+    let input = Paragraph::new(line)
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -1187,14 +1188,12 @@ fn render_input_field(
     } else {
         theme.inactive_border_style()
     };
-
-    let display = if is_focused {
-        format!("{}_", text)
+    let line = if is_focused {
+        Line::from(vec![Span::raw(text), Span::raw("_")])
     } else {
-        text.to_string()
+        Line::from(text)
     };
-
-    let input = Paragraph::new(display)
+    let input = Paragraph::new(line)
         .block(
             Block::default()
                 .borders(Borders::ALL)

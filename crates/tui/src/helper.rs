@@ -9,7 +9,7 @@ pub fn get_url_from_vid_id(video_id: &str) -> String {
     format!("https://www.youtube.com/watch?v={}", video_id)
 }
 
-pub fn list_vid_id_from_list_url(urls: Vec<String>) -> Vec<String> {
+pub fn list_vid_id_from_list_url(urls: &[String]) -> Vec<String> {
     urls.iter().map(|u| get_vid_id_from_url(u)).collect()
 }
 
