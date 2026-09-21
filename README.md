@@ -17,7 +17,7 @@ Stream Youtube Music from your terminal !
 - Multi-account Support: Switch between multiple YouTube accounts.
 - Firefox Container Support: Works with Firefox Multi-Account Containers (Gecko browsers).
 - Play / Save / Remove albums in your Youtube Music Library
-- Search for Albums & Songs
+- Search for Albums, Songs & Videos
 - Add / Remove Songs in Queue
 - When select to play a song in search result, it will automatically load list of related songs into Queue
 - Create / Edit personal playlists
@@ -134,6 +134,7 @@ paru -S gytm-git
 - <kbd>s</kbd>: Toggle search input (in Search Tab)
 - <kbd>Esc</kbd>: Exit insert mode (in search input)
 - <kbd>Enter</kbd>: Submit and search (in search input)
+- <kbd>l</kbd>/<kbd>h</kbd>: Switch between Songs and Videos results (in [2] box)
 
 ### Content Management
 
@@ -142,7 +143,7 @@ paru -S gytm-git
   - [1]Albums/[2]Playlists in Library: Unsave album/playlist
   - [4]Content: Save song to playlist, Unsave with <kbd>X</kbd>
 - <kbd>a</kbd>:
-  - [2]Songs Search results / [4]Content: Add song to Queue
+  - [2]Songs/Videos Search results / [4]Content: Add song to Queue
   - [2]Playlist in Library: Create new playlist
 - <kbd>d</kbd>:
   - [3]Queue: Remove song from Queue
