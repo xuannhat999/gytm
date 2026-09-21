@@ -154,7 +154,7 @@ pub fn parse_created_playlist(data: &str) -> YResult<Playlist> {
     let renderer_path =
         "actions.1.handlePlaylistCreationCommand.createdPlaylist.musicTwoRowItemRenderer";
     let renderer = gjson::get(data, renderer_path);
-    if playlist_id.is_empty() || !renderer.exists() {
+    if !renderer.exists() {
         return Err(YError::InvalidResponse("Create playlist".to_string()));
     }
     let title = renderer.get("title.runs.0.text").str().to_string();
