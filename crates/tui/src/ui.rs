@@ -5,6 +5,7 @@ use config::Config;
 use data::api_client::{ALL_BROWSERS, BrowserEngine};
 use data::app::{
     AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus, PopupState,
+    SearchSongSource,
 };
 use data::theme::Theme;
 use ratatui::layout::Flex;
@@ -501,12 +502,13 @@ fn render_search_bar(
         Span::styled("Enter", theme.key_style()),
         Span::styled(" ]", theme.text_style()),
     ]);
-    let display_text = if app.is_insert {
-        format!("{}_", app.search_query)
+    let line = if app.is_insert {
+        Line::from(vec![Span::raw(app.search_query.as_str()), Span::raw("_")])
     } else {
-        app.search_query.clone()
+        Line::from(app.search_query.as_str())
     };
-    let input = Paragraph::new(display_text)
+
+    let input = Paragraph::new(line)
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -576,7 +578,7 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
 
 fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let items: Vec<ListItem> = app
-        .search_songs
+        .get_search_songs_from_source()
         .iter()
         .map(|item| {
             let content = format!("   {} - {}", item.title, item.artist);
@@ -589,6 +591,8 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         Span::styled("a ", theme.key_style()),
         Span::styled("| Save to Playlist: ", theme.text_style()),
         Span::styled("x ", theme.key_style()),
+        Span::styled("| Switch type: ", theme.text_style()),
+        Span::styled("h/l", theme.key_style()),
         Span::styled(" ]", theme.text_style()),
     ]);
 
@@ -599,10 +603,29 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
     } else {
         theme.inactive_border_style()
     };
+    let tab_hl = Style::default()
+        .bg(if is_focused {
+            theme.active
+        } else {
+            theme.inactive
+        })
+        .fg(theme.bg)
+        .add_modifier(Modifier::BOLD);
+
+    let (song_style, video_style) = match app.search_songs_source {
+        SearchSongSource::Song => (tab_hl, border_style),
+        SearchSongSource::Video => (border_style, tab_hl),
+    };
+    let title = Line::from(vec![
+        Span::styled("[2]-", border_style),
+        Span::styled(" 󰎇 Songs ", song_style),
+        Span::styled("|", border_style),
+        Span::styled("  Videos ", video_style),
+    ]);
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .title("[2]-󰎇 Songs")
+        .title(title)
         .title_bottom(keymap.centered())
         .border_style(border_style);
 
@@ -614,7 +637,11 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
             Style::default()
         });
 
-    frame.render_stateful_widget(list_widget, area, &mut app.search_songs_liststate);
+    frame.render_stateful_widget(
+        list_widget,
+        area,
+        app.get_search_songs_liststate_from_source(),
+    );
 }
 
 // SAVE SONG TO PLAYLIST
@@ -1161,14 +1188,12 @@ fn render_input_field(
     } else {
         theme.inactive_border_style()
     };
-
-    let display = if is_focused {
-        format!("{}_", text)
+    let line = if is_focused {
+        Line::from(vec![Span::raw(text), Span::raw("_")])
     } else {
-        text.to_string()
+        Line::from(text)
     };
-
-    let input = Paragraph::new(display)
+    let input = Paragraph::new(line)
         .block(
             Block::default()
                 .borders(Borders::ALL)

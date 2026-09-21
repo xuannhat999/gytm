@@ -16,7 +16,7 @@ use data::{
         FocusArea::{self},
         PlayListPrivacy, PlayMode,
         PlayerStatus::{self},
-        PopupState, Song,
+        PopupState, SearchSongSource, Song,
     },
     mpv::{MpvCommand, MpvEvent},
 };
@@ -29,7 +29,7 @@ use std::fs;
 pub fn handle_mpv_event(app: &mut App, event: MpvEvent) {
     match event {
         MpvEvent::ListChange(list) => {
-            let ids = helper::list_vid_id_from_list_url(list);
+            let ids = helper::list_vid_id_from_list_url(&list);
             app.mpv_list = ids;
             app.save_queue_file().ok();
             fs::remove_file(data::file_path::MPV_PLAYLIST).ok();
@@ -254,9 +254,9 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                         KeyCode::Char('s') => {
                             app.is_insert = true;
                         }
-                        KeyCode::Char('x') => {
-                            match app.focus_area {
-                                FocusArea::SearchAlbums => {
+                        _ => match app.focus_area {
+                            FocusArea::SearchAlbums => match key_event.code {
+                                KeyCode::Char('x') => {
                                     if let Some(i) = app.search_albums_liststate.selected() {
                                         if let Some(selected) = app.search_albums.get_mut(i) {
                                             if !selected.is_saved {
@@ -278,75 +278,70 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                                         }
                                     }
                                 }
-                                FocusArea::SearchSongs => {
-                                    if let Some(i) = app.search_songs_liststate.selected() {
-                                        if let Some(song) = app.search_songs.get(i) {
-                                            app.popup_state = PopupState::SaveSong {
-                                                selected_save_song: song.clone(),
-                                            };
-                                            app.cus_playlists_liststate.select(Some(0));
-                                        }
+                                KeyCode::Enter => {
+                                    let selected = app
+                                        .search_albums_liststate
+                                        .selected()
+                                        .map(|i| &app.search_albums[i]);
+                                    if let Some(album) = selected {
+                                        app.api_cmd_tx
+                                            .send(ApiCmd::GetSongsToPlay(album.clone()))
+                                            .ok();
+                                        app.api_loading_kind = Some(ApiLoadingKind::GetSongsToPlay);
+                                        app.focus_area = FocusArea::Queue;
+                                    }
+                                }
+                                KeyCode::Char('l') => {
+                                    let list = app
+                                        .search_albums_liststate
+                                        .selected()
+                                        .map(|i| &app.search_albums[i]);
+                                    if let Some(list) = list {
+                                        app.api_cmd_tx
+                                            .send(ApiCmd::GetSongsToView(list.clone()))
+                                            .ok();
+
+                                        app.api_loading_kind = Some(ApiLoadingKind::GetSongsToView);
+                                        app.focus_area = FocusArea::Songs;
                                     }
                                 }
                                 _ => {}
-                            }
-                        }
-                        KeyCode::Char('a') => {
-                            if app.focus_area == FocusArea::SearchSongs {
-                                if let Some(song) = app
-                                    .search_songs_liststate
-                                    .selected()
-                                    .map(|i| app.search_songs[i].clone())
-                                {
-                                    if let Err(e) = append_song_to_queue(app, player, song) {
-                                        log_to_file(&e);
+                            },
+                            FocusArea::SearchSongs => match key_event.code {
+                                KeyCode::Char('x') => {
+                                    if let Some(song) = app.selected_search_song() {
+                                        app.popup_state = PopupState::SaveSong {
+                                            selected_save_song: song.clone(),
+                                        };
+                                        app.cus_playlists_liststate.select(Some(0));
                                     }
                                 }
-                            }
-                        }
-                        KeyCode::Enter => {
-                            if app.focus_area == FocusArea::SearchAlbums {
-                                let selected = app
-                                    .search_albums_liststate
-                                    .selected()
-                                    .map(|i| &app.search_albums[i]);
-                                if let Some(album) = selected {
-                                    app.api_cmd_tx
-                                        .send(ApiCmd::GetSongsToPlay(album.clone()))
-                                        .ok();
-                                    app.api_loading_kind = Some(ApiLoadingKind::GetSongsToPlay);
+                                KeyCode::Char('a') => {
+                                    if let Some(song) = app.selected_search_song() {
+                                        if let Err(e) =
+                                            append_song_to_queue(app, player, song.clone())
+                                        {
+                                            log_to_file(&e);
+                                        }
+                                    }
                                 }
-                            } else if app.focus_area == FocusArea::SearchSongs {
-                                let selected = app
-                                    .search_songs_liststate
-                                    .selected()
-                                    .map(|i| &app.search_songs[i]);
-                                if let Some(song) = selected {
-                                    app.api_cmd_tx
-                                        .send(ApiCmd::GetRelatedSongsToPlay(song.clone()))
-                                        .ok();
-                                    app.api_loading_kind = Some(ApiLoadingKind::GetSongsToPlay);
+                                KeyCode::Enter => {
+                                    let selected = app.selected_search_song();
+                                    if let Some(song) = selected {
+                                        app.api_cmd_tx
+                                            .send(ApiCmd::GetRelatedSongsToPlay(song.clone()))
+                                            .ok();
+                                        app.api_loading_kind = Some(ApiLoadingKind::GetSongsToPlay);
+                                        app.focus_area = FocusArea::Queue;
+                                    }
                                 }
-                            }
-                            app.focus_area = FocusArea::Queue;
-                        }
-                        KeyCode::Char('l') => {
-                            if app.focus_area == FocusArea::SearchAlbums {
-                                let list = app
-                                    .search_albums_liststate
-                                    .selected()
-                                    .map(|i| &app.search_albums[i]);
-                                if let Some(list) = list {
-                                    app.api_cmd_tx
-                                        .send(ApiCmd::GetSongsToView(list.clone()))
-                                        .ok();
-
-                                    app.api_loading_kind = Some(ApiLoadingKind::GetSongsToView);
-                                    app.focus_area = FocusArea::Songs;
+                                KeyCode::Char('l') | KeyCode::Char('h') => {
+                                    app.toggle_search_songs_source();
                                 }
-                            }
-                        }
-                        _ => {}
+                                _ => {}
+                            },
+                            _ => {}
+                        },
                     }
                 }
             }
@@ -386,7 +381,12 @@ fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
             FocusArea::Playlists => (&mut app.playlists_liststate, app.playlists.len()),
             FocusArea::Queue => (&mut app.queue_liststate, app.queue.len()),
             FocusArea::SearchAlbums => (&mut app.search_albums_liststate, app.search_albums.len()),
-            FocusArea::SearchSongs => (&mut app.search_songs_liststate, app.search_songs.len()),
+            FocusArea::SearchSongs => match app.search_songs_source {
+                SearchSongSource::Song => (&mut app.search_songs_liststate, app.search_songs.len()),
+                SearchSongSource::Video => {
+                    (&mut app.search_videos_liststate, app.search_videos.len())
+                }
+            },
             FocusArea::Songs => (&mut app.songs_liststate, app.songs.len()),
         }
     };
@@ -1066,7 +1066,11 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                     .notify(NotifyType::Error, format!("Failed to save song: {e}"));
             }
         },
-        ApiResponse::Search { albums, songs } => {
+        ApiResponse::Search {
+            albums,
+            songs,
+            videos,
+        } => {
             match albums {
                 Ok(albums) => {
                     app.search_albums = albums;
@@ -1084,6 +1088,17 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                     app.search_songs = songs;
                     if !app.search_songs.is_empty() {
                         app.search_songs_liststate.select(Some(0));
+                    }
+                }
+                Err(e) => {
+                    log_to_file(&e);
+                }
+            }
+            match videos {
+                Ok(videos) => {
+                    app.search_videos = videos;
+                    if !app.search_videos.is_empty() {
+                        app.search_videos_liststate.select(Some(0));
                     }
                 }
                 Err(e) => {

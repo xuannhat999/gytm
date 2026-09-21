@@ -27,9 +27,16 @@ pub fn spawn_api_worker(
                     })
                 }
                 ApiCmd::Search(query) => {
-                    let (albums, songs) =
-                        tokio::join!(bus.get_search_albums(&query), bus.get_search_songs(&query));
-                    ApiResponse::Search { albums, songs }
+                    let (albums, songs, videos) = tokio::join!(
+                        bus.get_search_albums(&query),
+                        bus.get_search_songs(&query),
+                        bus.get_search_videos(&query)
+                    );
+                    ApiResponse::Search {
+                        albums,
+                        songs,
+                        videos,
+                    }
                 }
                 ApiCmd::LikeSong(song) => ApiResponse::LikeSong(match bus.like_song(&song).await {
                     Ok(_) => Ok(song),

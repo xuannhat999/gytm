@@ -1,5 +1,5 @@
 use error::{YError, YResult, log_to_file};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::{fs, path::PathBuf};
 
 pub trait Persist: Sized + Default + Serialize + DeserializeOwned {

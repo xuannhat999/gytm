@@ -1,4 +1,7 @@
-use data::app::{PlayListPrivacy, Song};
+use data::{
+    api_client::SearchType,
+    app::{PlayListPrivacy, Song},
+};
 use error::{YError, YResult};
 use reqwest::{
     Client,
@@ -12,9 +15,9 @@ use crate::{
     client,
     request::{
         ActionsContent, BrowseIdRequest, CreatePlaylistRequest, EmptyRequest,
-        GetContinuationRequest, GetRelatedSongsRequest, PlaylistIdRequest, QueryRequest,
-        QueryWithParamsRequest, RequestClient, RequestContext, SaveAlbumRequest,
-        SaveUnsaveListRequest, TargetContent, TargetRequest, VideoIdRequest,
+        GetContinuationRequest, GetRelatedSongsRequest, PlaylistIdRequest, QueryWithParamsRequest,
+        RequestClient, RequestContext, SaveAlbumRequest, SaveUnsaveListRequest, TargetContent,
+        TargetRequest, VideoIdRequest,
     },
 };
 
@@ -133,7 +136,7 @@ impl YTDao {
         }
     }
 
-    pub async fn get_raw_lists(&self) -> YResult<String> {
+    pub async fn get_library_playlists(&self) -> YResult<String> {
         let url = self.api_url("browse");
 
         let body = BrowseIdRequest {
@@ -169,7 +172,7 @@ impl YTDao {
         Ok(response)
     }
 
-    pub async fn get_continuation_raw(&self, token: &str) -> YResult<String> {
+    pub async fn get_continuation(&self, token: &str) -> YResult<String> {
         let url = self.api_url("browse");
         let body = GetContinuationRequest {
             context: self.get_context(),
@@ -187,7 +190,7 @@ impl YTDao {
 
         Ok(response)
     }
-    pub async fn get_songs_raw(&self, browse_id: &str) -> YResult<String> {
+    pub async fn get_songs_from_browse_id(&self, browse_id: &str) -> YResult<String> {
         let url = self.api_url("browse");
         let body = BrowseIdRequest {
             context: self.get_context(),
@@ -205,12 +208,12 @@ impl YTDao {
         Ok(text)
     }
 
-    pub async fn search_with_params_raw(&self, query: &str, rtype: u8) -> YResult<String> {
-        let params = if rtype == 1 {
-            "EgWKAQIIAWoMEAQQAxAFEAkQEBAK" // SONG
-        } else {
-            "EgWKAQIYAWoMEAQQAxAFEAkQEBAK" // ALBUM
-        };
+    pub async fn search_with_params(
+        &self,
+        query: &str,
+        search_type: SearchType,
+    ) -> YResult<String> {
+        let params = search_type.get_param();
         let url = self.api_url("search");
 
         let body = QueryWithParamsRequest {
@@ -229,24 +232,8 @@ impl YTDao {
             .await?;
         Ok(response)
     }
-    pub async fn search_raw(&self, query: &str) -> YResult<String> {
-        let body = QueryRequest {
-            context: self.get_context(),
-            query,
-        };
-        let url = self.api_url("search");
-        let response = self
-            .http
-            .post(&url)
-            .headers(self.get_api_headers())
-            .json(&body)
-            .send()
-            .await?
-            .text()
-            .await?;
-        Ok(response)
-    }
-    pub async fn get_params_raw(&self, video_id: &str) -> YResult<String> {
+
+    pub async fn get_params(&self, video_id: &str) -> YResult<String> {
         let url = self.api_url("next");
         let body = VideoIdRequest {
             context: self.get_context(),
@@ -264,7 +251,7 @@ impl YTDao {
         Ok(response)
     }
 
-    pub async fn create_playlist_raw(
+    pub async fn create_playlist(
         &self,
         title: &str,
         desc: &str,
@@ -294,7 +281,7 @@ impl YTDao {
         Ok(response)
     }
 
-    pub async fn get_related_songs_raw(&self, playlist_id: &str, params: &str) -> YResult<String> {
+    pub async fn get_related_songs(&self, playlist_id: &str, params: &str) -> YResult<String> {
         let url = self.api_url("next");
         let body = GetRelatedSongsRequest {
             context: self.get_context(),
@@ -314,7 +301,7 @@ impl YTDao {
         Ok(response)
     }
 
-    pub async fn save_album_raw(&self, playlist_id: &str) -> YResult<()> {
+    pub async fn save_album(&self, playlist_id: &str) -> YResult<()> {
         let url = self.api_url("like/like");
         let body = SaveAlbumRequest {
             context: self.get_context(),
@@ -337,11 +324,11 @@ impl YTDao {
         if status {
             Ok(())
         } else {
-            Err(YError::BadStatus(String::from("Unsave custom playlist")))
+            Err(YError::BadStatus(String::from("Save album")))
         }
     }
 
-    pub async fn unsave_cus_playlist_raw(&self, playlist_id: &str) -> YResult<()> {
+    pub async fn unsave_cus_playlist(&self, playlist_id: &str) -> YResult<()> {
         let url = self.api_url("playlist/delete");
 
         let body = PlaylistIdRequest {
@@ -364,7 +351,7 @@ impl YTDao {
         }
     }
 
-    pub async fn unsave_album_raw(&self, playlist_id: &str) -> YResult<()> {
+    pub async fn unsave_album(&self, playlist_id: &str) -> YResult<()> {
         let url = self.api_url("like/removelike");
         let body = TargetRequest {
             context: self.get_context(),
@@ -390,7 +377,8 @@ impl YTDao {
         }
     }
 
-    pub async fn save_to_playlist_raw(&self, song: &Song, playlist_id: &str) -> YResult<()> {
+    pub async fn save_to_playlist(&self, song: &Song, playlist_id: &str) -> YResult<()> {
+        let url = self.api_url("browse/edit_playlist");
         let video_id = &song.video_id;
         let actions = vec![ActionsContent {
             action: "ACTION_ADD_VIDEO",
@@ -399,8 +387,6 @@ impl YTDao {
             removed_video_id: None,
             set_video_id: None,
         }];
-
-        let url = self.api_url("browse/edit_playlist");
         let body = SaveUnsaveListRequest {
             context: self.get_context(),
             actions,
@@ -426,7 +412,7 @@ impl YTDao {
         }
     }
 
-    pub async fn unsave_to_playlist_raw(&self, song: &Song, playlist_id: &str) -> YResult<()> {
+    pub async fn unsave_to_playlist(&self, song: &Song, playlist_id: &str) -> YResult<()> {
         let video_id = &song.video_id;
         let set_video_id = &song.set_video_id;
         let url = self.api_url("browse/edit_playlist");
@@ -463,7 +449,7 @@ impl YTDao {
         }
     }
 
-    pub async fn unlike_song_raw(&self, song: &Song) -> YResult<()> {
+    pub async fn unlike_song(&self, song: &Song) -> YResult<()> {
         let video_id = &song.video_id;
         let url = self.api_url("like/removelike");
         let body = TargetRequest {
@@ -489,7 +475,7 @@ impl YTDao {
         }
     }
 
-    pub async fn like_song_raw(&self, song: &Song) -> YResult<()> {
+    pub async fn like_song(&self, song: &Song) -> YResult<()> {
         let video_id = &song.video_id;
         let url = self.api_url("like/like");
 

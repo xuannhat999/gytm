@@ -146,23 +146,25 @@ pub(crate) fn get_gecko_profiles_from_sqlite(root_path: &Path) -> YResult<Vec<Br
     };
 
     let tmp_sqlite = copy_sqlite_with_wal(&sqlite_path)?;
-    let conn = Connection::open(&tmp_sqlite)?;
-
-    let profiles = conn
-        .prepare("SELECT path, name FROM Profiles")
-        .and_then(|mut stmt| {
-            stmt.query_map([], |row| {
-                let path: String = row.get(0)?;
-                let name: String = row.get(1)?;
-                Ok(BrowserProfile {
-                    name,
-                    path: root_path.join(path),
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()
-        })?;
+    let result = (|| -> YResult<Vec<BrowserProfile>> {
+        let conn = Connection::open(&tmp_sqlite)?;
+        let profiles = conn
+            .prepare("SELECT path, name FROM Profiles")
+            .and_then(|mut stmt| {
+                stmt.query_map([], |row| {
+                    let path: String = row.get(0)?;
+                    let name: String = row.get(1)?;
+                    Ok(BrowserProfile {
+                        name,
+                        path: root_path.join(path),
+                    })
+                })?
+                .collect::<Result<Vec<_>, _>>()
+            })?;
+        Ok(profiles)
+    })();
     cleanup_temp_sqlite(&tmp_sqlite);
-    Ok(profiles)
+    result
 }
 
 pub(crate) fn get_gecko_profiles_from_ini(root_path: &Path) -> YResult<Vec<BrowserProfile>> {

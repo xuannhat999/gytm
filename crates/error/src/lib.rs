@@ -5,9 +5,13 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::PathBuf,
+    sync::{
+        OnceLock,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
 };
 use thiserror::Error;
-use time::{OffsetDateTime, format_description};
+use time::{OffsetDateTime, format_description, format_description::BorrowedFormatItem};
 
 #[derive(Debug, Error)]
 pub enum YError {
@@ -74,35 +78,61 @@ pub enum YError {
 
 pub type YResult<T> = std::result::Result<T, YError>;
 
+const LOG_MAX_SIZE: u64 = 5 * 1024 * 1024;
+const LOG_CHECK_EVERY: u64 = 1024;
+
+static LOG_FORMAT: OnceLock<Vec<BorrowedFormatItem<'static>>> = OnceLock::new();
+static LOG_FILE: OnceLock<Option<PathBuf>> = OnceLock::new();
+static LOG_TICKS: AtomicU64 = AtomicU64::new(0);
+static LOG_OVERSIZE: AtomicBool = AtomicBool::new(false);
+
+fn log_format() -> &'static Vec<BorrowedFormatItem<'static>> {
+    LOG_FORMAT.get_or_init(|| {
+        format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")
+            .expect("static log timestamp format")
+    })
+}
+
+fn log_file_path() -> Option<PathBuf> {
+    LOG_FILE
+        .get_or_init(|| {
+            dirs::state_dir().map(|p| {
+                let dir = p.join("gytm");
+                let _ = fs::create_dir_all(&dir);
+                dir.join("log.txt")
+            })
+        })
+        .clone()
+}
+
 pub fn log_to_file<T: Display>(message: T) {
-    if let Some(log_path) = dirs::state_dir().map(|p| p.join("gytm")) {
-        if !log_path.exists() {
-            let _ = fs::create_dir_all(&log_path);
-        }
-        let file_path = log_path.join("log.txt");
+    let Some(file_path) = log_file_path() else {
+        return;
+    };
 
-        let now = OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc());
+    let now = OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc());
+    let datetime = now.format(log_format()).unwrap_or_default();
 
-        let format =
-            format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]").unwrap();
-
-        let datetime = now.format(&format).unwrap_or_default();
-
-        let max_size = 5 * 1024 * 1024;
-        let is_oversize = fs::metadata(&file_path)
-            .map(|meta| meta.len() >= max_size)
+    let tick = LOG_TICKS.fetch_add(1, Ordering::Relaxed);
+    let oversize = if tick.is_multiple_of(LOG_CHECK_EVERY) {
+        let over = fs::metadata(&file_path)
+            .map(|meta| meta.len() >= LOG_MAX_SIZE)
             .unwrap_or(false);
+        LOG_OVERSIZE.store(over, Ordering::Relaxed);
+        over
+    } else {
+        LOG_OVERSIZE.load(Ordering::Relaxed)
+    };
 
-        let mut options = OpenOptions::new();
-        options.create(true).write(true);
+    let mut options = OpenOptions::new();
+    options.create(true).write(true);
 
-        if is_oversize {
-            options.truncate(true);
-        } else {
-            options.append(true);
-        }
-        if let Ok(mut file) = options.open(file_path) {
-            let _ = writeln!(file, "{} : {}", datetime, message);
-        }
+    if oversize {
+        options.truncate(true);
+    } else {
+        options.append(true);
+    }
+    if let Ok(mut file) = options.open(file_path) {
+        let _ = writeln!(file, "{} : {}", datetime, message);
     }
 }

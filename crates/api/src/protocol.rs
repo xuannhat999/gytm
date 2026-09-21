@@ -45,6 +45,7 @@ pub enum ApiResponse {
     Search {
         albums: YResult<Vec<Playlist>>,
         songs: YResult<Vec<Song>>,
+        videos: YResult<Vec<Song>>,
     },
     GetSongsToView {
         songs: YResult<Vec<Song>>,

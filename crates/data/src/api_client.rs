@@ -1,6 +1,20 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+pub enum SearchType {
+    Song,
+    Album,
+    Video,
+}
+impl SearchType {
+    pub fn get_param(&self) -> &'static str {
+        match self {
+            SearchType::Song => "EgWKAQIIAWoMEAQQAxAFEAkQEBAK",
+            SearchType::Album => "EgWKAQIYAWoMEAQQAxAFEAkQEBAK",
+            SearchType::Video => "EgWKAQIQAWoMEAMQBBAFEAkQChAQ",
+        }
+    }
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BrowserEngine {
     Gecko,
