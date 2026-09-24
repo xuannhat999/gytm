@@ -88,28 +88,13 @@ impl YTDao {
 
     // This function is adapted from: https://github.com/ccgauche/ytermusic.git
     // Original source: https://github.com/ccgauche/ytermusic/blob/master/crates/ytpapi2/src/lib.rs
-    pub fn get_api_headers(&self) -> HeaderMap {
+    pub fn get_api_headers(&self, auth_user: usize) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
         headers.insert("Origin", HeaderValue::from_static(YTM_URL));
         headers.insert(
             "X-Goog-AuthUser",
-            HeaderValue::from_str(&self.auth_user.to_string()).unwrap(),
-        );
-        if let Some(ref sapisid) = self.sapisid {
-            let auth_val = format!("SAPISIDHASH {}", self.compute_sapi_hash(sapisid));
-            headers.insert("Authorization", HeaderValue::from_str(&auth_val).unwrap());
-        }
-        headers
-    }
-
-    pub fn get_api_headers_with_user_auth(&self, usr_auth: usize) -> HeaderMap {
-        let mut headers = HeaderMap::new();
-        headers.insert("Content-Type", HeaderValue::from_static("application/json"));
-        headers.insert("Origin", HeaderValue::from_static(YTM_URL));
-        headers.insert(
-            "X-Goog-AuthUser",
-            HeaderValue::from_str(&usr_auth.to_string()).unwrap(),
+            HeaderValue::from_str(&auth_user.to_string()).unwrap(),
         );
         if let Some(ref sapisid) = self.sapisid {
             let auth_val = format!("SAPISIDHASH {}", self.compute_sapi_hash(sapisid));
@@ -143,7 +128,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?
@@ -160,7 +145,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers_with_user_auth(user_auth))
+            .headers(self.get_api_headers(user_auth))
             .json(&body)
             .send()
             .await?
@@ -178,7 +163,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?
@@ -196,7 +181,7 @@ impl YTDao {
         let text = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?
@@ -221,7 +206,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?
@@ -239,7 +224,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?
@@ -269,7 +254,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?
@@ -289,7 +274,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?
@@ -312,7 +297,7 @@ impl YTDao {
         let status = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?
@@ -335,7 +320,7 @@ impl YTDao {
         let status = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?
@@ -361,7 +346,7 @@ impl YTDao {
         let status = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?
@@ -392,7 +377,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?;
@@ -429,7 +414,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?;
@@ -459,7 +444,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?;
@@ -486,7 +471,7 @@ impl YTDao {
         let response = self
             .http
             .post(&url)
-            .headers(self.get_api_headers())
+            .headers(self.get_api_headers(self.auth_user))
             .json(&body)
             .send()
             .await?;
