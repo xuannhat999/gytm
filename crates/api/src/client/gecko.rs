@@ -9,7 +9,7 @@ use ini::Ini;
 use reqwest::{Url, cookie::Jar};
 use rusqlite::Connection;
 
-use crate::{client::get_file_path_from_root_and_filename, dao::YTM_DOMAIN};
+use crate::{YTM_DOMAIN, YTM_URL, client::get_file_path_from_root_and_filename};
 
 pub fn get_gecko_containers_from_profile(profile_path: &Path) -> YResult<Vec<GeckoContainer>> {
     let file_path = get_file_path_from_root_and_filename(profile_path, "containers.json");
@@ -27,8 +27,7 @@ pub(crate) fn read_gecko_cookies(
 
     let result = (|| -> YResult<Vec<GeckoCookie>> {
         let conn = Connection::open(&tmp_path)?;
-        let domain = ".youtube.com";
-        let host_pattern = format!("%{}%", domain);
+        let host_pattern = format!("%{}", YTM_DOMAIN);
         match container_id {
             Some(container_id) => {
                 let exact_pattern = format!("^userContextId={}", container_id);
@@ -106,7 +105,7 @@ pub(crate) fn filter_exp_gecko_cookies(cookies: Vec<GeckoCookie>) -> YResult<Vec
 }
 
 pub(crate) fn build_jar_from_gecko_cookies(cookies: Vec<GeckoCookie>) -> YResult<(Jar, String)> {
-    let url = YTM_DOMAIN.parse::<Url>()?;
+    let url = YTM_URL.parse::<Url>()?;
     let jar = Jar::default();
     let mut sapisid: Option<String> = None;
     for cookie in cookies {

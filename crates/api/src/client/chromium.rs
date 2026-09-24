@@ -5,7 +5,7 @@ use error::{YError, YResult};
 use reqwest::{Url, cookie::Jar};
 use rookie::enums::Cookie;
 
-use crate::{client, dao::YTM_DOMAIN};
+use crate::{YTM_DOMAIN, YTM_URL, client};
 
 use client::get_file_path_from_root_and_filename;
 
@@ -39,7 +39,7 @@ pub(crate) fn get_chromium_profiles_from_root(root: &Path) -> YResult<Vec<Browse
 }
 
 pub(crate) fn read_chromium_cookies(db_path: &Path, key_path: &Path) -> YResult<Vec<Cookie>> {
-    let domains = vec![".youtube.com".to_string()];
+    let domains = vec![YTM_DOMAIN.to_string()];
     let str_db_path = db_path.to_string_lossy().into_owned();
     let str_key_path = key_path.to_string_lossy().into_owned();
     let cookies = rookie::any_browser(&str_db_path, Some(domains), Some(&str_key_path));
@@ -74,7 +74,7 @@ pub(crate) fn filter_exp_chromium_cookies(cookies: Vec<Cookie>) -> YResult<Vec<C
 pub(crate) fn build_jar_sapisid_from_chromium_cookies(
     cookies: Vec<Cookie>,
 ) -> YResult<(Jar, String)> {
-    let url = YTM_DOMAIN.parse::<Url>()?;
+    let url = YTM_URL.parse::<Url>()?;
     let jar = Jar::default();
     let mut sapisid: Option<String> = None;
     for cookie in cookies {

@@ -12,7 +12,7 @@ use state::client_state::ClientState;
 use std::sync::Arc;
 
 use crate::{
-    client,
+    USER_AGENT, YTM_URL, client,
     request::{
         ActionsContent, BrowseIdRequest, CreatePlaylistRequest, EmptyRequest,
         GetContinuationRequest, GetRelatedSongsRequest, PlaylistIdRequest, QueryWithParamsRequest,
@@ -28,9 +28,6 @@ pub struct YTDao {
     pub client_version: String,
     pub auth_user: usize,
 }
-
-pub static YTM_DOMAIN: &str = "https://music.youtube.com";
-const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 impl YTDao {
     pub async fn default() -> YResult<Self> {
@@ -82,7 +79,7 @@ impl YTDao {
             .as_secs();
 
         let mut hasher = sha1_smol::Sha1::new();
-        let message = format!("{timestamp} {sapisid} {YTM_DOMAIN}");
+        let message = format!("{timestamp} {sapisid} {}", YTM_URL);
         hasher.update(message.as_bytes());
         let result = hasher.digest();
         let hex_hash = result.to_string();
@@ -94,7 +91,7 @@ impl YTDao {
     pub fn get_api_headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
-        headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
+        headers.insert("Origin", HeaderValue::from_static(YTM_URL));
         headers.insert(
             "X-Goog-AuthUser",
             HeaderValue::from_str(&self.auth_user.to_string()).unwrap(),
@@ -109,7 +106,7 @@ impl YTDao {
     pub fn get_api_headers_with_user_auth(&self, usr_auth: usize) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
-        headers.insert("Origin", HeaderValue::from_static(YTM_DOMAIN));
+        headers.insert("Origin", HeaderValue::from_static(YTM_URL));
         headers.insert(
             "X-Goog-AuthUser",
             HeaderValue::from_str(&usr_auth.to_string()).unwrap(),
@@ -123,7 +120,7 @@ impl YTDao {
     fn api_url(&self, endpoint: &str) -> String {
         format!(
             "{}/youtubei/v1/{}?key={}&alt=json",
-            YTM_DOMAIN, endpoint, self.innertube_api_key
+            YTM_URL, endpoint, self.innertube_api_key
         )
     }
 
@@ -508,7 +505,7 @@ async fn build_client_fields(jar: Jar) -> YResult<(Client, String, String)> {
         .user_agent(USER_AGENT)
         .build()?;
 
-    let response_text = http.get(YTM_DOMAIN).send().await?.text().await?;
+    let response_text = http.get(YTM_URL).send().await?.text().await?;
     let innertube_api_key = extract_between(&response_text, "INNERTUBE_API_KEY\":\"", "\"")
         .ok_or_else(|| YError::InvalidCookie)?;
 
