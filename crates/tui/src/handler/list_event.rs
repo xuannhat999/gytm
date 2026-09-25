@@ -1,8 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use data::{
-    api_client::ALL_BROWSERS,
-    app::{FocusArea, PopupState, SearchSongSource},
-};
+use data::{api_client::ALL_BROWSERS, app::PopupState};
+use ratatui::widgets::ListState;
 
 use crate::app::App;
 
@@ -33,19 +31,7 @@ pub(crate) fn handle_list_event(key_event: KeyEvent, app: &mut App) {
     {
         (accounts_liststate, accounts.len())
     } else {
-        match app.focus_area {
-            FocusArea::Albums => (&mut app.albums_liststate, app.albums.len()),
-            FocusArea::Playlists => (&mut app.playlists_liststate, app.playlists.len()),
-            FocusArea::Queue => (&mut app.queue_liststate, app.queue.len()),
-            FocusArea::SearchAlbums => (&mut app.search_albums_liststate, app.search_albums.len()),
-            FocusArea::SearchSongs => match app.search_songs_source {
-                SearchSongSource::Song => (&mut app.search_songs_liststate, app.search_songs.len()),
-                SearchSongSource::Video => {
-                    (&mut app.search_videos_liststate, app.search_videos.len())
-                }
-            },
-            FocusArea::Songs => (&mut app.songs_liststate, app.songs.len()),
-        }
+        (&mut ListState::default(), 0)
     };
     match key_event.code {
         KeyCode::Down | KeyCode::Char('j') => App::next_item(state, len),

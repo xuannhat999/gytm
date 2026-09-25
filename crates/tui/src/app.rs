@@ -21,21 +21,19 @@ pub struct App {
 
     // ALBUMS (LIBRARY)
     pub albums: Vec<Playlist>,
-    pub albums_liststate: ListState,
     pub albums_tablestate: TableState,
 
     // PLAYLISTS (LIBRARY)
     pub playlists: Vec<Playlist>,
-    pub playlists_liststate: ListState,
     pub playlists_tablestate: TableState,
 
     // SONGS (CONTENT)
     pub songs: Vec<Song>,
-    pub songs_liststate: ListState,
+    pub songs_tablestate: TableState,
 
     // QUEUE
     pub queue: Vec<Song>,
-    pub queue_liststate: ListState,
+    pub queue_tablestate: TableState,
 
     // PLAYER
     pub time_pos: Option<f64>,
@@ -48,15 +46,15 @@ pub struct App {
 
     // ALBUMS (SEARCH)
     pub search_albums: Vec<Playlist>,
-    pub search_albums_liststate: ListState,
+    pub search_albums_tablestate: TableState,
 
     // SONGS (SEARCH)
     pub search_songs: Vec<Song>,
-    pub search_songs_liststate: ListState,
+    pub search_songs_tablestate: TableState,
 
     // VIDEOS (SEARCH)
     pub search_videos: Vec<Song>,
-    pub search_videos_liststate: ListState,
+    pub search_videos_tablestate: TableState,
 
     pub search_songs_source: SearchSongSource,
 
@@ -93,21 +91,19 @@ impl App {
 
             // ALBUMS (LIBRARY)
             albums: Vec::new(),
-            albums_liststate: ListState::default(),
             albums_tablestate: TableState::default(),
 
             // PLAYLISTS (LIBRARY)
             playlists: Vec::new(),
-            playlists_liststate: ListState::default(),
             playlists_tablestate: TableState::default(),
 
             // SONGS (CONTENT)
             songs: Vec::new(),
-            songs_liststate: ListState::default(),
+            songs_tablestate: TableState::default(),
 
             // QUEUE
             queue: Vec::new(),
-            queue_liststate: ListState::default(),
+            queue_tablestate: TableState::default(),
 
             // PLAYER
             time_pos: None,
@@ -120,15 +116,15 @@ impl App {
 
             // ALBUMS (SEARCH)
             search_albums: Vec::new(),
-            search_albums_liststate: ListState::default(),
+            search_albums_tablestate: TableState::default(),
 
             // SONGS (SEARCH)
             search_songs: Vec::new(),
-            search_songs_liststate: ListState::default(),
+            search_songs_tablestate: TableState::default(),
 
             // VIDEOS (SEARCH)
             search_videos: Vec::new(),
-            search_videos_liststate: ListState::default(),
+            search_videos_tablestate: TableState::default(),
 
             search_songs_source: SearchSongSource::default(),
 
@@ -157,19 +153,21 @@ impl App {
             SearchSongSource::Video => &self.search_videos,
         }
     }
-    pub fn get_search_songs_liststate_from_source(&mut self) -> &mut ListState {
+
+    pub fn get_search_songs_tablestate_from_source(&mut self) -> &mut TableState {
         match self.search_songs_source {
-            SearchSongSource::Song => &mut self.search_songs_liststate,
-            SearchSongSource::Video => &mut self.search_videos_liststate,
+            SearchSongSource::Song => &mut self.search_songs_tablestate,
+            SearchSongSource::Video => &mut self.search_videos_tablestate,
         }
     }
     pub fn selected_search_song(&self) -> Option<&Song> {
         let (songs, state) = match self.search_songs_source {
-            SearchSongSource::Song => (&self.search_songs, &self.search_songs_liststate),
-            SearchSongSource::Video => (&self.search_videos, &self.search_videos_liststate),
+            SearchSongSource::Song => (&self.search_songs, &self.search_songs_tablestate),
+            SearchSongSource::Video => (&self.search_videos, &self.search_videos_tablestate),
         };
         state.selected().and_then(|i| songs.get(i))
     }
+
     pub fn toggle_search_songs_source(&mut self) {
         self.search_songs_source = match self.search_songs_source {
             SearchSongSource::Song => SearchSongSource::Video,

@@ -71,8 +71,8 @@ pub(crate) fn clear_queue(app: &mut App, player: &Player) -> YResult<()> {
     app.playing_song_idx = None;
     app.time_pos = None;
     app.queue.clear();
+    app.queue_tablestate.select(None);
     app.playing_playlist_id = None;
-
     Ok(())
 }
 
@@ -93,7 +93,7 @@ pub(crate) fn load_list(
             player.send_mpv_command(MpvCommand::Shuffle)?;
         }
         app.queue = songs;
-        app.queue_liststate.select(Some(start_index));
+        app.queue_tablestate.select(Some(start_index));
         app.playing_playlist_id = playlist_id;
         app.playing_song_idx = None;
     } else {

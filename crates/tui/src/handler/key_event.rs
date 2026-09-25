@@ -1,5 +1,9 @@
 use super::{append_song_to_queue, clear_queue, load_list, remove_song_from_queue};
-use crate::{app::App, handler::table_event::handle_table_event, notification::NotifyType};
+use crate::{
+    app::App,
+    handler::{list_event::handle_list_event, table_event::handle_table_event},
+    notification::NotifyType,
+};
 use api::{
     client::{self, gecko::get_gecko_containers_from_profile, get_profiles_from_browser},
     protocol::{ApiCmd, ApiLoadingKind},
@@ -28,11 +32,11 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
         || matches!(app.popup_state, PopupState::SelectGeckoContainer { .. })
         || matches!(app.popup_state, PopupState::SelectAccount { .. })
     {
-        handle_lists_event(key_event, app);
+        handle_list_event(key_event, app);
     }
 
     if app.is_popup_active() {
-        handle_popup_event(key_event, app);
+        handle_popup_key(key_event, app);
     } else {
         if key_event.code == KeyCode::Tab {
             handle_page_event(app);
@@ -51,9 +55,6 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                 }
                 KeyCode::Char('3') => {
                     app.focus_area = FocusArea::Queue;
-                    if app.queue_liststate.selected().is_none() && !app.queue.is_empty() {
-                        app.queue_liststate.select(Some(0));
-                    }
                 }
                 KeyCode::Char('4') => {
                     app.focus_area = FocusArea::Songs;
@@ -76,11 +77,11 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                     handle_queue_event(key_event, app, player);
                 }
                 FocusArea::Songs => {
-                    handle_songs_event(key_event, app, player);
+                    handle_songs_key(key_event, app, player);
                 }
                 _ => {}
             }
-            handle_player_event(key_event, app, player, config);
+            handle_player_key(key_event, app, player, config);
         }
 
         match app.page {
@@ -126,91 +127,12 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                             app.is_insert = true;
                         }
                         _ => match app.focus_area {
-                            FocusArea::SearchAlbums => match key_event.code {
-                                KeyCode::Char('x') => {
-                                    if let Some(i) = app.search_albums_liststate.selected() {
-                                        if let Some(selected) = app.search_albums.get_mut(i) {
-                                            if !selected.is_saved {
-                                                selected.is_saved = true;
-                                                app.api_cmd_tx
-                                                    .send(ApiCmd::SaveAlbum(selected.clone()))
-                                                    .ok();
-                                            } else {
-                                                app.api_cmd_tx
-                                                    .send(ApiCmd::UnsaveAlbum(selected.clone()))
-                                                    .ok();
-                                                selected.is_saved = false;
-                                                if let Some(idx) = app.albums.iter().position(|a| {
-                                                    a.playlist_id == selected.playlist_id
-                                                }) {
-                                                    app.albums.remove(idx);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                KeyCode::Enter => {
-                                    let selected = app
-                                        .search_albums_liststate
-                                        .selected()
-                                        .map(|i| &app.search_albums[i]);
-                                    if let Some(album) = selected {
-                                        app.api_cmd_tx
-                                            .send(ApiCmd::GetSongsToPlay(album.clone()))
-                                            .ok();
-                                        app.api_loading_kind = Some(ApiLoadingKind::GetSongsToPlay);
-                                        app.focus_area = FocusArea::Queue;
-                                    }
-                                }
-                                KeyCode::Char('l') => {
-                                    let list = app
-                                        .search_albums_liststate
-                                        .selected()
-                                        .map(|i| &app.search_albums[i]);
-                                    if let Some(list) = list {
-                                        app.api_cmd_tx
-                                            .send(ApiCmd::GetSongsToView(list.clone()))
-                                            .ok();
-
-                                        app.api_loading_kind = Some(ApiLoadingKind::GetSongsToView);
-                                        app.focus_area = FocusArea::Songs;
-                                    }
-                                }
-                                _ => {}
-                            },
-                            FocusArea::SearchSongs => match key_event.code {
-                                KeyCode::Char('x') => {
-                                    if let Some(song) = app.selected_search_song() {
-                                        app.popup_state = PopupState::SaveSong {
-                                            selected_save_song: song.clone(),
-                                        };
-                                        app.cus_playlists_liststate.select(Some(0));
-                                    }
-                                }
-                                KeyCode::Char('a') => {
-                                    if let Some(song) = app.selected_search_song() {
-                                        if let Err(e) =
-                                            append_song_to_queue(app, player, song.clone())
-                                        {
-                                            log_to_file(&e);
-                                        }
-                                    }
-                                }
-                                KeyCode::Enter => {
-                                    let selected = app.selected_search_song();
-                                    if let Some(song) = selected {
-                                        app.api_cmd_tx
-                                            .send(ApiCmd::GetRelatedSongsToPlay(song.clone()))
-                                            .ok();
-                                        app.api_loading_kind = Some(ApiLoadingKind::GetSongsToPlay);
-                                        app.focus_area = FocusArea::Queue;
-                                    }
-                                }
-                                KeyCode::Char('l') | KeyCode::Char('h') => {
-                                    app.toggle_search_songs_source();
-                                }
-                                _ => {}
-                            },
+                            FocusArea::SearchAlbums => {
+                                handle_search_albums_key(app, key_event.code)
+                            }
+                            FocusArea::SearchSongs => {
+                                handle_seach_songs_key(app, player, key_event.code)
+                            }
                             _ => {}
                         },
                     }
@@ -220,80 +142,37 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
     }
 }
 
-fn handle_lists_event(key_event: KeyEvent, app: &mut App) {
-    let (state, len) = if matches!(app.popup_state, PopupState::SaveSong { .. }) {
-        (&mut app.cus_playlists_liststate, app.cus_playlists.len())
-    } else if matches!(app.popup_state, PopupState::SelectBrowser) {
-        (&mut app.browser_liststate, ALL_BROWSERS.len())
-    } else if let PopupState::SelectBrowserProfile {
-        profiles,
-        profiles_liststate,
-        ..
-    } = &mut app.popup_state
-    {
-        (profiles_liststate, profiles.len())
-    } else if let PopupState::SelectGeckoContainer {
-        containers,
-        containers_liststate,
-        ..
-    } = &mut app.popup_state
-    {
-        (containers_liststate, containers.len())
-    } else if let PopupState::SelectAccount {
-        accounts,
-        accounts_liststate,
-        ..
-    } = &mut app.popup_state
-    {
-        (accounts_liststate, accounts.len())
-    } else {
-        match app.focus_area {
-            FocusArea::Albums => (&mut app.albums_liststate, app.albums.len()),
-            FocusArea::Playlists => (&mut app.playlists_liststate, app.playlists.len()),
-            FocusArea::Queue => (&mut app.queue_liststate, app.queue.len()),
-            FocusArea::SearchAlbums => (&mut app.search_albums_liststate, app.search_albums.len()),
-            FocusArea::SearchSongs => match app.search_songs_source {
-                SearchSongSource::Song => (&mut app.search_songs_liststate, app.search_songs.len()),
-                SearchSongSource::Video => {
-                    (&mut app.search_videos_liststate, app.search_videos.len())
-                }
-            },
-            FocusArea::Songs => (&mut app.songs_liststate, app.songs.len()),
-        }
-    };
-    match key_event.code {
-        KeyCode::Down | KeyCode::Char('j') => App::next_item(state, len),
-        KeyCode::Up | KeyCode::Char('k') => App::previous_item(state, len),
-        _ => {}
-    }
-}
-
 fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
+    if handle_table_event(&mut app.queue_tablestate, app.queue.len(), key_event.code) {
+        return;
+    }
     match key_event.code {
         KeyCode::Char('d') => {
-            if let Some(i) = app.queue_liststate.selected() {
+            if let Some(i) = app.queue_tablestate.selected() {
                 if app.player_state.play_mode == PlayMode::DefaultMode {
                     remove_song_from_queue(app, player, i, i);
                 } else {
-                    let video_id = &app.queue[i].video_id;
-                    if let Some(idx_mpv) = app.get_mpv_idx(video_id) {
-                        remove_song_from_queue(app, player, i, idx_mpv);
+                    if let Some(song) = app.queue.get(i) {
+                        if let Some(idx_mpv) = app.get_mpv_idx(&song.video_id) {
+                            remove_song_from_queue(app, player, i, idx_mpv);
+                        }
                     }
                 }
             }
         }
         KeyCode::Enter => {
-            if let Some(i) = app.queue_liststate.selected() {
+            if let Some(i) = app.queue_tablestate.selected() {
                 if app.player_state.play_mode == PlayMode::DefaultMode {
                     if let Err(e) = player.send_mpv_command(MpvCommand::PlayPos(i)) {
                         log_to_file(&e);
                     }
                 } else {
-                    let video_id = &app.queue[i].video_id;
-                    if let Some(pos) = app.get_mpv_idx(video_id)
-                        && let Err(e) = player.send_mpv_command(MpvCommand::PlayPos(pos))
-                    {
-                        log_to_file(&e);
+                    if let Some(song) = app.queue.get(i) {
+                        if let Some(pos) = app.get_mpv_idx(&song.video_id)
+                            && let Err(e) = player.send_mpv_command(MpvCommand::PlayPos(pos))
+                        {
+                            log_to_file(&e);
+                        }
                     }
                 }
             }
@@ -322,7 +201,7 @@ fn handle_page_event(app: &mut App) {
     }
 }
 
-fn handle_player_event(key_event: KeyEvent, app: &mut App, player: &mut Player, config: &Config) {
+fn handle_player_key(key_event: KeyEvent, app: &mut App, player: &mut Player, config: &Config) {
     match key_event.code {
         KeyCode::Char(' ') if app.playing_song_idx.is_some() => {
             if let Err(e) = player.send_mpv_command(MpvCommand::TogglePause) {
@@ -388,13 +267,16 @@ fn handle_player_event(key_event: KeyEvent, app: &mut App, player: &mut Player, 
     }
 }
 
-fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
+fn handle_songs_key(key_event: KeyEvent, app: &mut App, player: &mut Player) {
+    if handle_table_event(&mut app.songs_tablestate, app.songs.len(), key_event.code) {
+        return;
+    }
     match key_event.code {
         KeyCode::Enter => {
             if let Some(list) = &app.viewing_list {
                 let is_dup = app.playing_playlist_id.as_ref() == Some(&list.playlist_id);
                 if !is_dup {
-                    if let Some(i) = app.songs_liststate.selected() {
+                    if let Some(i) = app.songs_tablestate.selected() {
                         if let Err(e) = load_list(
                             app,
                             player,
@@ -416,7 +298,12 @@ fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
             }
         }
         KeyCode::Char('a') => {
-            if let Some(song) = app.songs_liststate.selected().map(|i| app.songs[i].clone()) {
+            if let Some(song) = app
+                .songs_tablestate
+                .selected()
+                .and_then(|i| app.songs.get(i))
+                .cloned()
+            {
                 if let Err(e) = append_song_to_queue(app, player, song) {
                     log_to_file(&e);
                 }
@@ -425,20 +312,20 @@ fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
         KeyCode::Char('X') => {
             if let Some(list) = &app.viewing_list {
                 if list.is_custom {
-                    if let Some(i) = app.songs_liststate.selected() {
-                        let song = &app.songs[i];
-                        if list.playlist_id == "LM" {
-                            app.api_cmd_tx.send(ApiCmd::UnlikeSong(song.clone())).ok()
-                        } else {
-                            app.api_cmd_tx
-                                .send(ApiCmd::UnsaveSong {
-                                    song: song.clone(),
-                                    playlist_id: list.playlist_id.clone(),
-                                })
-                                .ok()
-                        };
-
-                        app.songs.remove(i);
+                    if let Some(i) = app.songs_tablestate.selected() {
+                        if let Some(song) = app.songs.get(i) {
+                            if list.playlist_id == "LM" {
+                                app.api_cmd_tx.send(ApiCmd::UnlikeSong(song.clone())).ok()
+                            } else {
+                                app.api_cmd_tx
+                                    .send(ApiCmd::UnsaveSong {
+                                        song: song.clone(),
+                                        playlist_id: list.playlist_id.clone(),
+                                    })
+                                    .ok()
+                            };
+                            app.songs.remove(i);
+                        }
                     }
                 } else {
                     app.noti.notify(
@@ -449,7 +336,7 @@ fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
             }
         }
         KeyCode::Char('x') => {
-            if let Some(i) = app.songs_liststate.selected() {
+            if let Some(i) = app.songs_tablestate.selected() {
                 if let Some(song) = app.songs.get(i) {
                     app.popup_state = PopupState::SaveSong {
                         selected_save_song: song.clone(),
@@ -463,7 +350,7 @@ fn handle_songs_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
     }
 }
 
-fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
+fn handle_popup_key(key_event: KeyEvent, app: &mut App) {
     match &mut app.popup_state {
         PopupState::SaveSong { selected_save_song } => match key_event.code {
             KeyCode::Esc => {
@@ -806,6 +693,8 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
                 app.client_state.save().ok();
                 app.albums.clear();
                 app.playlists.clear();
+                app.albums_tablestate.select(None);
+                app.playlists_tablestate.select(None);
             }
 
             _ => {}
@@ -814,8 +703,65 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
     }
 }
 
+fn handle_search_albums_key(app: &mut App, key_code: KeyCode) {
+    if handle_table_event(
+        &mut app.search_albums_tablestate,
+        app.search_albums.len(),
+        key_code,
+    ) {
+        return;
+    }
+    match key_code {
+        KeyCode::Char('l') => view_list_content(app, FocusArea::SearchAlbums),
+        KeyCode::Char('x') => toggle_save_search_album(app),
+        KeyCode::Enter => play_list(app, FocusArea::SearchAlbums),
+        _ => {}
+    }
+}
+
+fn handle_seach_songs_key(app: &mut App, player: &Player, key_code: KeyCode) {
+    let rows = match app.search_songs_source {
+        SearchSongSource::Song => app.search_songs.len(),
+        SearchSongSource::Video => app.search_videos.len(),
+    };
+    if handle_table_event(
+        app.get_search_songs_tablestate_from_source(),
+        rows,
+        key_code,
+    ) {
+        return;
+    }
+    match key_code {
+        KeyCode::Char('x') => {
+            if let Some(song) = app.selected_search_song() {
+                app.popup_state = PopupState::SaveSong {
+                    selected_save_song: song.clone(),
+                };
+                app.cus_playlists_liststate.select(Some(0));
+            }
+        }
+        KeyCode::Char('a') => {
+            if let Some(song) = app.selected_search_song() {
+                if let Err(e) = append_song_to_queue(app, player, song.clone()) {
+                    log_to_file(&e);
+                }
+            }
+        }
+        KeyCode::Char('h') | KeyCode::Char('l') => app.toggle_search_songs_source(),
+        KeyCode::Enter => {
+            if let Some(song) = app.selected_search_song() {
+                app.api_cmd_tx
+                    .send(ApiCmd::GetRelatedSongsToPlay(song.clone()))
+                    .ok();
+                app.api_loading_kind = Some(ApiLoadingKind::GetSongsToPlay);
+                app.focus_area = FocusArea::Queue;
+            }
+        }
+        _ => {}
+    }
+}
 fn handle_albums_key(app: &mut App, key_code: KeyCode) {
-    if handle_table_event(&mut app.albums_tablestate, key_code) {
+    if handle_table_event(&mut app.albums_tablestate, app.albums.len(), key_code) {
         return;
     }
     match key_code {
@@ -826,7 +772,7 @@ fn handle_albums_key(app: &mut App, key_code: KeyCode) {
     }
 }
 fn handle_playlists_key(app: &mut App, key_code: KeyCode) {
-    if handle_table_event(&mut app.playlists_tablestate, key_code) {
+    if handle_table_event(&mut app.playlists_tablestate, app.playlists.len(), key_code) {
         return;
     }
     match key_code {
@@ -844,6 +790,31 @@ fn handle_playlists_key(app: &mut App, key_code: KeyCode) {
         _ => {}
     }
 }
+fn toggle_save_search_album(app: &mut App) {
+    if let Some(i) = app.search_albums_tablestate.selected() {
+        if let Some(selected) = app.search_albums.get_mut(i) {
+            if !selected.is_saved {
+                selected.is_saved = true;
+                app.api_cmd_tx
+                    .send(ApiCmd::SaveAlbum(selected.clone()))
+                    .ok();
+            } else {
+                app.api_cmd_tx
+                    .send(ApiCmd::UnsaveAlbum(selected.clone()))
+                    .ok();
+                selected.is_saved = false;
+                if let Some(idx) = app
+                    .albums
+                    .iter()
+                    .position(|a| a.playlist_id == selected.playlist_id)
+                {
+                    app.albums.remove(idx);
+                }
+            }
+        }
+    }
+}
+
 fn unsave_album(app: &mut App) {
     if let Some(i) = app.albums_tablestate.selected() {
         if let Some(album) = app.albums.get(i) {
@@ -856,6 +827,9 @@ fn unsave_album(app: &mut App) {
                 app.search_albums[pos].is_saved = false;
             }
             app.albums.remove(i);
+            if app.albums.is_empty() {
+                app.albums_tablestate.select(None);
+            }
         }
     }
 }
@@ -879,6 +853,9 @@ fn unsave_playlist(app: &mut App) {
                         .ok();
                 };
                 app.playlists.remove(i);
+                if app.playlists.is_empty() {
+                    app.playlists_tablestate.select(None);
+                }
             }
         }
     }
@@ -893,6 +870,10 @@ fn view_list_content(app: &mut App, focus_area: FocusArea) {
             .playlists_tablestate
             .selected()
             .and_then(|i| app.playlists.get(i)),
+        FocusArea::SearchAlbums => app
+            .search_albums_tablestate
+            .selected()
+            .and_then(|i| app.search_albums.get(i)),
         _ => None,
     };
     if let Some(list) = list {
@@ -914,6 +895,10 @@ fn play_list(app: &mut App, focus_area: FocusArea) {
             .playlists_tablestate
             .selected()
             .and_then(|i| app.playlists.get(i)),
+        FocusArea::SearchAlbums => app
+            .search_albums_tablestate
+            .selected()
+            .and_then(|i| app.search_albums.get(i)),
         _ => None,
     };
     if let Some(list) = list {

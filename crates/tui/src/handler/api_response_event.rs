@@ -63,7 +63,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                     app.search_albums = albums;
                     if !app.search_albums.is_empty() {
                         app.focus_area = FocusArea::SearchAlbums;
-                        app.search_albums_liststate.select(Some(0));
+                        app.search_albums_tablestate.select(Some(0));
                     }
                 }
                 Err(e) => {
@@ -74,7 +74,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 Ok(songs) => {
                     app.search_songs = songs;
                     if !app.search_songs.is_empty() {
-                        app.search_songs_liststate.select(Some(0));
+                        app.search_songs_tablestate.select(Some(0));
                     }
                 }
                 Err(e) => {
@@ -85,7 +85,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 Ok(videos) => {
                     app.search_videos = videos;
                     if !app.search_videos.is_empty() {
-                        app.search_videos_liststate.select(Some(0));
+                        app.search_videos_tablestate.select(Some(0));
                     }
                 }
                 Err(e) => {
@@ -147,7 +147,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 app.songs = songs;
                 app.viewing_list = Some(playlist);
                 if !app.songs.is_empty() {
-                    app.songs_liststate.select(Some(0));
+                    app.songs_tablestate.select(Some(0));
                 }
             }
             Err(e) => {
@@ -233,10 +233,10 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 app.playlists = playlists;
                 app.cus_playlists = cus_playlists;
                 if !app.albums.is_empty() {
-                    app.albums_liststate.select(Some(0));
+                    app.albums_tablestate.select(Some(0));
                 }
                 if !app.playlists.is_empty() {
-                    app.playlists_liststate.select(Some(0));
+                    app.playlists_tablestate.select(Some(0));
                 }
             }
             Err(e) => {

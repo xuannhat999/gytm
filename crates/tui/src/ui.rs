@@ -1,3 +1,5 @@
+use std::vec;
+
 use crate::app::App;
 use crate::helper;
 use api::protocol::ApiLoadingKind;
@@ -10,7 +12,7 @@ use data::app::{
 use data::theme::Theme;
 use ratatui::layout::Flex;
 use ratatui::style::Color;
-use ratatui::widgets::{Row, Table};
+use ratatui::widgets::{Padding, Row, Table};
 use ratatui::{
     self, Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -26,21 +28,21 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),
+            Constraint::Length(1), // TOP
             if app.page == AppPage::Library {
                 Constraint::Length(0)
             } else {
-                Constraint::Length(3)
+                Constraint::Length(3) // SEARCH BAR
             },
-            Constraint::Fill(1),
-            Constraint::Percentage(30),
-            Constraint::Length(4),
+            Constraint::Fill(1),        // CONTENT
+            Constraint::Percentage(30), // QUEUE
+            Constraint::Length(4),      // PLAYER
         ])
         .split(frame.area());
 
     let hor_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+        .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
         .split(main_layout[2]);
 
     let top_layout = Layout::default()
@@ -234,7 +236,7 @@ fn render_list(
         let rows = data.iter().map(|item| {
             let playing = app.playing_playlist_id.as_deref().map_or("", |id| {
                 if id == item.playlist_id.as_str() {
-                    " "
+                    ""
                 } else {
                     ""
                 }
@@ -248,7 +250,7 @@ fn render_list(
             Style::default()
         };
         let colum_width = [
-            Constraint::Length(2),
+            Constraint::Length(1),
             Constraint::Percentage(80),
             Constraint::Percentage(20),
         ];
@@ -276,15 +278,6 @@ fn render_songs(
     } else {
         theme.inactive_border_style()
     };
-    let items: Vec<ListItem> = app
-        .songs
-        .iter()
-        .enumerate()
-        .map(|(i, song)| {
-            let content = format!(" {:>3}. {} - {}", i + 1, song.title, song.artist);
-            ListItem::new(content)
-        })
-        .collect();
     let keymap = Line::from(vec![
         Span::styled("[ Save/Unsave song: ", theme.text_style()),
         Span::styled("x/X ", theme.key_style()),
@@ -299,40 +292,63 @@ fn render_songs(
         .title_bottom(keymap.centered())
         .border_style(border_style);
 
+    let inner_area = block.inner(area);
+    frame.render_widget(block, area);
     if app.api_loading_kind == Some(ApiLoadingKind::GetSongsToView) {
-        let inner_area = block.inner(area);
         render_spinner(frame, inner_area, theme, start_time);
-        frame.render_widget(block, area);
+        return;
+    }
+    if app.viewing_list.is_none() {
         return;
     }
 
-    let inner_area = block.inner(area);
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1),
             Constraint::Length(1),
-            Constraint::Min(10),
+            Constraint::Min(1),
         ])
         .split(inner_area);
+
     let list_title = if let Some(viewing_list) = &app.viewing_list {
-        Line::from(format!(" {} - {}", viewing_list.title, viewing_list.artist))
+        Line::from(vec![
+            Span::raw(&viewing_list.title),
+            Span::raw(" - "),
+            Span::raw(&viewing_list.artist),
+        ])
     } else {
         Line::default()
     };
+    frame.render_widget(list_title, layout[0]);
+    render_v_divider(frame, layout[1], Borders::BOTTOM, border_style);
+
+    if app.songs.is_empty() {
+        return;
+    }
+
     let highlight_style = if is_focused {
         theme.selected_item()
     } else {
         Style::default()
     };
-    let list_widget = List::new(items).highlight_style(highlight_style);
+    let rows = app.songs.iter().map(|song| {
+        Row::new([
+            song.title.as_str(),
+            song.artist.as_str(),
+            song.duration.as_str(),
+        ])
+    });
+    let column_widths = [
+        Constraint::Percentage(80),
+        Constraint::Percentage(20),
+        Constraint::Length(10),
+    ];
+    let table = Table::new(rows, column_widths)
+        .header(Row::new(["Title", "Artist", "Duration"]))
+        .row_highlight_style(highlight_style);
 
-    frame.render_widget(block, area);
-    frame.render_widget(list_title, layout[0]);
-    if app.viewing_list.is_some() {
-        render_v_divider(frame, layout[1], Borders::BOTTOM, border_style);
-    }
-    frame.render_stateful_widget(list_widget, layout[2], &mut app.songs_liststate);
+    frame.render_stateful_widget(table, layout[2], &mut app.songs_tablestate);
 }
 
 // RENDER QUEUE
@@ -364,81 +380,48 @@ fn render_queue(
         .title(format!("[3]- Queue ({})", app.queue.len()))
         .title_bottom(key_map.centered())
         .border_style(border_style);
-
+    let inner_area = block.inner(area);
+    frame.render_widget(block, area);
     if app.api_loading_kind == Some(ApiLoadingKind::GetSongsToPlay) {
-        let inner_area = block.inner(area);
         render_spinner(frame, inner_area, theme, start_time);
-        frame.render_widget(block, area);
         return;
     }
     if app.queue.is_empty() {
-        frame.render_widget(block, area);
         return;
     }
-    let items: Vec<ListItem> = app
-        .queue
-        .iter()
-        .enumerate()
-        .map(|(i, song)| {
-            if app.playing_song_idx.is_some_and(|playing| playing == i) {
-                let content = format!("{:>3}. {} - {}", i + 1, song.title, song.artist);
-                ListItem::new(content).style(Style::default().fg(theme.primary))
-            } else {
-                let content = format!(" {:>3}. {} - {}", i + 1, song.title, song.artist);
-                ListItem::new(content)
-            }
-        })
-        .collect();
     let highlight_style = if is_focused {
         theme.selected_item()
     } else {
         Style::default()
     };
+    let rows = app.queue.iter().enumerate().map(|(i, song)| {
+        let playing = if app.playing_song_idx.is_some_and(|playing| playing == i) {
+            ""
+        } else {
+            ""
+        };
+        Row::new([
+            playing,
+            song.title.as_str(),
+            song.artist.as_str(),
+            song.duration.as_str(),
+        ])
+    });
+    let column_widths = [
+        Constraint::Length(1),
+        Constraint::Percentage(80),
+        Constraint::Percentage(20),
+        Constraint::Length(10),
+    ];
+    let table = Table::new(rows, column_widths)
+        .header(Row::new(["", "Title", "Artist", "Duration"]))
+        .row_highlight_style(highlight_style);
 
-    let list_widget = List::new(items)
-        .block(block)
-        .highlight_style(highlight_style);
-
-    frame.render_stateful_widget(list_widget, area, &mut app.queue_liststate);
+    frame.render_stateful_widget(table, inner_area, &mut app.queue_tablestate);
 }
 
 // MPV PLAYER
 fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
-    let song_info = match app.player_status {
-        PlayerStatus::Idle => vec![Line::from("   No song is playing ".to_string())],
-        _ => {
-            let icon = if app.player_status == PlayerStatus::Playing {
-                ""
-            } else {
-                ""
-            };
-            if let (Some(idx), Some(time_pos)) = (app.playing_song_idx, app.time_pos)
-                && idx < app.queue.len()
-            {
-                let time_pos_text = helper::format_time(time_pos);
-                vec![
-                    Line::from(format!(
-                        " {}  {} - {} ",
-                        icon, app.queue[idx].title, app.queue[idx].artist
-                    )),
-                    Line::from(format!(
-                        "    {} / {}",
-                        time_pos_text, app.queue[idx].duration
-                    )),
-                ]
-            } else {
-                vec![Line::from(String::new())]
-            }
-        }
-    };
-    let mode_text = match app.player_state.play_mode {
-        PlayMode::DefaultMode => "Play mode:   Default ",
-        PlayMode::ShuffleMode => "Play mode:   Shuffle ",
-    };
-    let right_content = vec![
-        Line::from(mode_text),
-        Line::from(format!("  {}% ", app.player_state.volume)),
-    ];
     let key_map = Line::from(vec![
         Span::styled("[ ⏸ / : ", theme.text_style()),
         Span::styled("Space ", theme.key_style()),
@@ -453,31 +436,68 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
         Span::styled(" ]", theme.text_style()),
     ]);
 
-    let main_block = Block::default()
+    let block = Block::default()
         .borders(Borders::ALL)
+        .padding(Padding::horizontal(1))
         .title(" Player")
-        .title_bottom(key_map)
-        .title_alignment(Alignment::Center)
+        .title_bottom(key_map.alignment(Alignment::Center))
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(theme.base));
+    let inner_area = block.inner(area);
+    frame.render_widget(block, area);
 
+    let song_info = match app.player_status {
+        PlayerStatus::Idle => vec![Line::raw("  No song is playing")],
+        _ => {
+            let icon = if app.player_status == PlayerStatus::Playing {
+                " "
+            } else {
+                " "
+            };
+            if let (Some(idx), Some(time_pos)) = (app.playing_song_idx, app.time_pos)
+                && idx < app.queue.len()
+            {
+                let playing_song = &app.queue[idx];
+                let time_pos_text = helper::format_time(time_pos);
+                vec![
+                    Line::from(vec![
+                        Span::raw(icon),
+                        Span::raw(&playing_song.title),
+                        Span::raw(" - "),
+                        Span::raw(&playing_song.artist),
+                    ]),
+                    Line::from(vec![
+                        Span::raw("  "),
+                        Span::raw(time_pos_text),
+                        Span::raw(" / "),
+                        Span::raw(&playing_song.duration),
+                    ]),
+                ]
+            } else {
+                vec![Line::raw("")]
+            }
+        }
+    };
+    let is_shuffle = match app.player_state.play_mode {
+        PlayMode::DefaultMode => "Off",
+        PlayMode::ShuffleMode => "On ",
+    };
+    let right_content = vec![
+        Line::from(vec![Span::raw(" :"), Span::raw(is_shuffle)]),
+        Line::from(format!("  {}% ", app.player_state.volume)),
+    ];
     let left_area = Paragraph::new(song_info)
-        .style(Style::default().fg(theme.base).add_modifier(Modifier::BOLD))
+        .style(theme.text_style())
         .alignment(Alignment::Left);
     let right_area = Paragraph::new(right_content)
-        .style(Style::default().fg(theme.base).add_modifier(Modifier::BOLD))
-        .alignment(Alignment::Right);
+        .style(theme.text_style())
+        .alignment(Alignment::Left);
 
-    let inner_area = area.inner(ratatui::layout::Margin {
-        vertical: 1,
-        horizontal: 1,
-    });
     let inner_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+        .constraints([Constraint::Min(1), Constraint::Length(8)])
         .split(inner_area);
 
-    frame.render_widget(main_block, area);
     frame.render_widget(left_area, inner_chunks[0]);
     frame.render_widget(right_area, inner_chunks[1]);
 }
@@ -529,19 +549,6 @@ fn render_search_bar(
 
 // SEARCH ALBUM RESULTS
 fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
-    let items: Vec<ListItem> = app
-        .search_albums
-        .iter()
-        .map(|item| {
-            let is_saved = match item.is_saved {
-                true => "󰃂",
-                false => " ",
-            };
-            let content = format!(" {} {} - {}", is_saved, item.title, item.artist);
-            ListItem::new(content)
-        })
-        .collect();
-
     let is_focused =
         FocusArea::SearchAlbums == app.focus_area && !app.is_insert && !app.is_popup_active();
     let border_style = if is_focused {
@@ -564,27 +571,34 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
         .title("[1]- Albums")
         .border_style(border_style)
         .title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
-    let list_widget = List::new(items)
-        .block(block)
-        .highlight_style(if is_focused {
-            theme.selected_item()
-        } else {
-            Style::default()
-        });
 
-    frame.render_stateful_widget(list_widget, area, &mut app.search_albums_liststate);
+    let inner_area = block.inner(area);
+    frame.render_widget(block, area);
+    if app.search_albums.is_empty() {
+        return;
+    }
+    let rows = app.search_albums.iter().map(|item| {
+        let saved = if item.is_saved { "󰃂" } else { " " };
+        Row::new([saved, item.title.as_str(), item.artist.as_str()])
+    });
+
+    let highlight_style = if is_focused {
+        theme.selected_item()
+    } else {
+        Style::default()
+    };
+    let colum_width = [
+        Constraint::Length(1),
+        Constraint::Percentage(80),
+        Constraint::Percentage(20),
+    ];
+    let table = Table::new(rows, colum_width)
+        .header(Row::new(["", "Title", "Artist"]))
+        .row_highlight_style(highlight_style);
+
+    frame.render_stateful_widget(table, inner_area, &mut app.search_albums_tablestate);
 }
-
 fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
-    let items: Vec<ListItem> = app
-        .get_search_songs_from_source()
-        .iter()
-        .map(|item| {
-            let content = format!("   {} - {}", item.title, item.artist);
-            ListItem::new(content)
-        })
-        .collect();
-
     let keymap = Line::from(vec![
         Span::styled("[ Add to Queue: ", theme.text_style()),
         Span::styled("a ", theme.key_style()),
@@ -627,22 +641,43 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         .title(title)
         .title_bottom(keymap.centered())
         .border_style(border_style);
+    let inner_area = block.inner(area);
+    frame.render_widget(block, area);
 
-    let list_widget = List::new(items)
-        .block(block)
-        .highlight_style(if is_focused {
-            theme.selected_item()
-        } else {
-            Style::default()
-        });
+    let (search_songs, tablestate) = match app.search_songs_source {
+        SearchSongSource::Song => (&app.search_songs, &mut app.search_songs_tablestate),
+        SearchSongSource::Video => (&app.search_videos, &mut app.search_videos_tablestate),
+    };
 
-    frame.render_stateful_widget(
-        list_widget,
-        area,
-        app.get_search_songs_liststate_from_source(),
-    );
+    if search_songs.is_empty() {
+        return;
+    }
+
+    let rows = search_songs.iter().map(|song| {
+        Row::new([
+            "",
+            song.title.as_str(),
+            song.artist.as_str(),
+            song.duration.as_str(),
+        ])
+    });
+    let column_widths = [
+        Constraint::Length(1),
+        Constraint::Percentage(80),
+        Constraint::Percentage(20),
+        Constraint::Length(10),
+    ];
+    let highlight_style = if is_focused {
+        theme.selected_item()
+    } else {
+        Style::default()
+    };
+    let table = Table::new(rows, column_widths)
+        .header(Row::new(["", "Title", "Artist", "Duration"]))
+        .row_highlight_style(highlight_style);
+
+    frame.render_stateful_widget(table, inner_area, tablestate);
 }
-
 // SAVE SONG TO PLAYLIST
 fn render_save_song_to_playlist_popup(
     frame: &mut Frame,
