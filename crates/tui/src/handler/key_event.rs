@@ -1,5 +1,5 @@
 use super::{append_song_to_queue, clear_queue, load_list, remove_song_from_queue};
-use crate::{app::App, notification::NotifyType};
+use crate::{app::App, handler::table_event::handle_table_event, notification::NotifyType};
 use api::{
     client::{self, gecko::get_gecko_containers_from_profile, get_profiles_from_browser},
     protocol::{ApiCmd, ApiLoadingKind},
@@ -91,97 +91,11 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                 KeyCode::Char('2') => {
                     app.focus_area = FocusArea::Playlists;
                 }
-                KeyCode::Char('l') => {
-                    let list = if app.focus_area == FocusArea::Albums {
-                        app.albums_liststate.selected().map(|i| &app.albums[i])
-                    } else if app.focus_area == FocusArea::Playlists {
-                        app.playlists_liststate
-                            .selected()
-                            .map(|i| &app.playlists[i])
-                    } else {
-                        None
-                    };
-                    if let Some(list) = list {
-                        app.api_cmd_tx
-                            .send(ApiCmd::GetSongsToView(list.clone()))
-                            .ok();
-                        app.focus_area = FocusArea::Songs;
-                        app.api_loading_kind = Some(ApiLoadingKind::GetSongsToView);
-                    }
-                }
-                KeyCode::Enter => match app.focus_area {
-                    FocusArea::Albums | FocusArea::Playlists => {
-                        let is_album = app.focus_area == FocusArea::Albums;
-                        let selection = if is_album {
-                            app.albums_liststate.selected().map(|i| &app.albums[i])
-                        } else {
-                            app.playlists_liststate
-                                .selected()
-                                .map(|i| &app.playlists[i])
-                        };
-                        if let Some(list) = selection {
-                            app.api_cmd_tx
-                                .send(ApiCmd::GetSongsToPlay(list.clone()))
-                                .ok();
-                            app.api_loading_kind = Some(ApiLoadingKind::GetSongsToPlay);
-                            app.focus_area = FocusArea::Queue;
-                        }
-                    }
+                _ => match app.focus_area {
+                    FocusArea::Albums => handle_albums_key(app, key_event.code),
+                    FocusArea::Playlists => handle_playlists_key(app, key_event.code),
                     _ => {}
                 },
-                KeyCode::Char('x') => match app.focus_area {
-                    FocusArea::Albums => {
-                        if let Some(i) = app.albums_liststate.selected() {
-                            if let Some(album) = app.albums.get(i) {
-                                app.api_cmd_tx.send(ApiCmd::UnsaveAlbum(album.clone())).ok();
-                                if let Some(pos) = app
-                                    .search_albums
-                                    .iter()
-                                    .position(|a| album.playlist_id == a.playlist_id)
-                                {
-                                    app.search_albums[pos].is_saved = false;
-                                }
-                                app.albums.remove(i);
-                            }
-                        }
-                    }
-                    FocusArea::Playlists => {
-                        if let Some(i) = app.playlists_liststate.selected() {
-                            if let Some(playlist) = app.playlists.get(i) {
-                                if playlist.playlist_id == "LM" || playlist.playlist_id == "SE" {
-                                    app.noti.notify(
-                                        NotifyType::Error,
-                                        String::from("Can not remove this playlist"),
-                                    );
-                                } else {
-                                    if playlist.is_custom {
-                                        app.api_cmd_tx
-                                            .send(ApiCmd::UnsaveCusPlaylist(playlist.clone()))
-                                            .ok();
-                                    } else {
-                                        app.api_cmd_tx
-                                            .send(ApiCmd::UnsaveAlbum(playlist.clone()))
-                                            .ok();
-                                    };
-                                    app.playlists.remove(i);
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
-                },
-                KeyCode::Char('a') => {
-                    if app.focus_area == FocusArea::Playlists {
-                        app.popup_state = PopupState::CreatePlaylist {
-                            title: String::new(),
-                            description: String::new(),
-                            privacy: PlayListPrivacy::Private,
-                            focused_field: CreatePlaylistFocus::Title,
-                        };
-                    }
-                }
-
-                _ => {}
             },
             AppPage::Search => {
                 if app.is_insert {
@@ -897,5 +811,116 @@ fn handle_popup_event(key_event: KeyEvent, app: &mut App) {
             _ => {}
         },
         _ => {}
+    }
+}
+
+fn handle_albums_key(app: &mut App, key_code: KeyCode) {
+    if handle_table_event(&mut app.albums_tablestate, key_code) {
+        return;
+    }
+    match key_code {
+        KeyCode::Char('l') => view_list_content(app, FocusArea::Albums),
+        KeyCode::Char('x') => unsave_album(app),
+        KeyCode::Enter => play_list(app, FocusArea::Albums),
+        _ => {}
+    }
+}
+fn handle_playlists_key(app: &mut App, key_code: KeyCode) {
+    if handle_table_event(&mut app.playlists_tablestate, key_code) {
+        return;
+    }
+    match key_code {
+        KeyCode::Char('l') => view_list_content(app, FocusArea::Playlists),
+        KeyCode::Char('x') => unsave_playlist(app),
+        KeyCode::Char('a') => {
+            app.popup_state = PopupState::CreatePlaylist {
+                title: String::new(),
+                description: String::new(),
+                privacy: PlayListPrivacy::Private,
+                focused_field: CreatePlaylistFocus::Title,
+            };
+        }
+        KeyCode::Enter => play_list(app, FocusArea::Playlists),
+        _ => {}
+    }
+}
+fn unsave_album(app: &mut App) {
+    if let Some(i) = app.albums_tablestate.selected() {
+        if let Some(album) = app.albums.get(i) {
+            app.api_cmd_tx.send(ApiCmd::UnsaveAlbum(album.clone())).ok();
+            if let Some(pos) = app
+                .search_albums
+                .iter()
+                .position(|a| album.playlist_id == a.playlist_id)
+            {
+                app.search_albums[pos].is_saved = false;
+            }
+            app.albums.remove(i);
+        }
+    }
+}
+
+fn unsave_playlist(app: &mut App) {
+    if let Some(i) = app.playlists_tablestate.selected() {
+        if let Some(playlist) = app.playlists.get(i) {
+            if playlist.playlist_id == "LM" || playlist.playlist_id == "SE" {
+                app.noti.notify(
+                    NotifyType::Error,
+                    String::from("Can not remove this playlist"),
+                );
+            } else {
+                if playlist.is_custom {
+                    app.api_cmd_tx
+                        .send(ApiCmd::UnsaveCusPlaylist(playlist.clone()))
+                        .ok();
+                } else {
+                    app.api_cmd_tx
+                        .send(ApiCmd::UnsaveAlbum(playlist.clone()))
+                        .ok();
+                };
+                app.playlists.remove(i);
+            }
+        }
+    }
+}
+fn view_list_content(app: &mut App, focus_area: FocusArea) {
+    let list = match focus_area {
+        FocusArea::Albums => app
+            .albums_tablestate
+            .selected()
+            .and_then(|i| app.albums.get(i)),
+        FocusArea::Playlists => app
+            .playlists_tablestate
+            .selected()
+            .and_then(|i| app.playlists.get(i)),
+        _ => None,
+    };
+    if let Some(list) = list {
+        app.api_cmd_tx
+            .send(ApiCmd::GetSongsToView(list.clone()))
+            .ok();
+        app.focus_area = FocusArea::Songs;
+        app.api_loading_kind = Some(ApiLoadingKind::GetSongsToView);
+    }
+}
+
+fn play_list(app: &mut App, focus_area: FocusArea) {
+    let list = match focus_area {
+        FocusArea::Albums => app
+            .albums_tablestate
+            .selected()
+            .and_then(|i| app.albums.get(i)),
+        FocusArea::Playlists => app
+            .playlists_tablestate
+            .selected()
+            .and_then(|i| app.playlists.get(i)),
+        _ => None,
+    };
+    if let Some(list) = list {
+        app.api_cmd_tx
+            .send(ApiCmd::GetSongsToPlay(list.clone()))
+            .ok();
+        app.api_loading_kind = Some(ApiLoadingKind::GetSongsToPlay);
+        app.focus_area = FocusArea::Queue;
     }
 }

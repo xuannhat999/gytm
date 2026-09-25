@@ -255,6 +255,7 @@ fn render_list(
         let table = Table::new(rows, colum_width)
             .header(Row::new(["", "Title", "Artist"]))
             .row_highlight_style(highlight_style);
+
         frame.render_stateful_widget(table, inner_area, list);
     }
 }
