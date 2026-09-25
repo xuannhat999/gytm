@@ -14,54 +14,63 @@ use state::{client_state::ClientState, player_state::PlayerState};
 use tokio::sync::mpsc;
 
 pub struct App {
-    // PAGE LIBRARY
-    pub albums: Vec<Playlist>,
-    pub playlists: Vec<Playlist>,
-    pub queue: Vec<Song>,
+    pub noti: NotificationManager,
+    pub page: AppPage,
+    pub is_exit: bool,
     pub focus_area: FocusArea,
 
+    // ALBUMS (LIBRARY)
+    pub albums: Vec<Playlist>,
     pub albums_liststate: ListState,
+
+    // PLAYLISTS (LIBRARY)
+    pub playlists: Vec<Playlist>,
     pub playlists_liststate: ListState,
+
+    // SONGS (CONTENT)
+    pub songs: Vec<Song>,
+    pub songs_liststate: ListState,
+
+    // QUEUE
+    pub queue: Vec<Song>,
     pub queue_liststate: ListState,
 
+    // PLAYER
     pub time_pos: Option<f64>,
     pub playing_song_idx: Option<usize>,
     pub mpv_list: Vec<String>,
+    pub player_status: PlayerStatus,
 
     pub playing_playlist_id: Option<String>,
-    pub songs: Vec<Song>,
-    pub songs_liststate: ListState,
     pub viewing_list: Option<Playlist>,
 
-    // PAGE SEARCH
+    // ALBUMS (SEARCH)
     pub search_albums: Vec<Playlist>,
     pub search_albums_liststate: ListState,
+
+    // SONGS (SEARCH)
     pub search_songs: Vec<Song>,
     pub search_songs_liststate: ListState,
+
+    // VIDEOS (SEARCH)
     pub search_videos: Vec<Song>,
     pub search_videos_liststate: ListState,
+
     pub search_songs_source: SearchSongSource,
 
     pub search_query: String,
     pub is_insert: bool,
 
     //POPUP
+    pub popup_state: PopupState,
     pub cus_playlists: Vec<usize>,
     pub cus_playlists_liststate: ListState,
-    pub popup_state: PopupState,
-    pub browser_liststate: ListState,
 
-    // OTHER
-    pub player_status: PlayerStatus,
+    pub browser_liststate: ListState,
 
     // STATE
     pub player_state: PlayerState,
     pub client_state: ClientState,
-
-    pub noti: NotificationManager,
-    pub page: AppPage,
-    pub is_exit: bool,
-
     // API WORKER
     pub api_cmd_tx: mpsc::UnboundedSender<ApiCmd>,
     pub api_loading_kind: Option<ApiLoadingKind>,
@@ -75,58 +84,66 @@ impl App {
         api_cmd_tx: mpsc::UnboundedSender<ApiCmd>,
     ) -> Self {
         Self {
-            // PAGE LIBRARY
-            albums: Vec::new(),
-            playlists: Vec::new(),
-            queue: Vec::new(),
-
-            albums_liststate: ListState::default(),
-            playlists_liststate: ListState::default(),
-            queue_liststate: ListState::default(),
-
+            noti: NotificationManager::new(config),
+            page: AppPage::Library,
+            is_exit: false,
             focus_area: FocusArea::Albums,
 
-            time_pos: None,
-            playing_song_idx: None,
+            // ALBUMS (LIBRARY)
+            albums: Vec::new(),
+            albums_liststate: ListState::default(),
+
+            // PLAYLISTS (LIBRARY)
+            playlists: Vec::new(),
+            playlists_liststate: ListState::default(),
+
+            // SONGS (CONTENT)
             songs: Vec::new(),
             songs_liststate: ListState::default(),
+
+            // QUEUE
+            queue: Vec::new(),
+            queue_liststate: ListState::default(),
+
+            // PLAYER
+            time_pos: None,
+            playing_song_idx: None,
             mpv_list: Vec::new(),
+            player_status: PlayerStatus::Idle,
 
             playing_playlist_id: None,
             viewing_list: None,
 
-            //PAGE SEARCH
+            // ALBUMS (SEARCH)
             search_albums: Vec::new(),
             search_albums_liststate: ListState::default(),
+
+            // SONGS (SEARCH)
             search_songs: Vec::new(),
             search_songs_liststate: ListState::default(),
-            search_query: String::new(),
+
+            // VIDEOS (SEARCH)
             search_videos: Vec::new(),
             search_videos_liststate: ListState::default(),
 
+            search_songs_source: SearchSongSource::default(),
+
+            search_query: String::new(),
             is_insert: false,
 
-            // PLAYER
-            player_status: PlayerStatus::Idle,
-            player_state,
-            client_state,
-
             //POPUP
+            popup_state: PopupState::None,
             cus_playlists: Vec::new(),
             cus_playlists_liststate: ListState::default(),
-            popup_state: PopupState::None,
 
             browser_liststate: ListState::default(),
 
-            //OTHER
-            noti: NotificationManager::new(config),
-            is_exit: false,
-            page: AppPage::Library,
-
+            // STATE
+            player_state,
+            client_state,
             // API WORKER
             api_cmd_tx,
             api_loading_kind: None,
-            search_songs_source: SearchSongSource::default(),
         }
     }
 
