@@ -804,6 +804,7 @@ fn render_api_client_popup(
     ];
     let block = Block::default()
         .borders(Borders::ALL)
+        .padding(Padding::horizontal(1))
         .border_type(BorderType::Thick)
         .border_style(config.theme.active_border_style())
         .title(" YTM client 󱛜 ")
@@ -893,6 +894,7 @@ fn render_select_gecko_container_popup(
     };
     let block = Block::default()
         .borders(Borders::ALL)
+        .padding(Padding::horizontal(1))
         .border_type(BorderType::Thick)
         .border_style(config.theme.active_border_style())
         .title(" Container  ")
@@ -963,6 +965,7 @@ fn render_select_profile_popup(
     };
     let block = Block::default()
         .borders(Borders::ALL)
+        .padding(Padding::horizontal(1))
         .border_type(BorderType::Thick)
         .border_style(config.theme.active_border_style())
         .title(" Profile  ")
@@ -1021,6 +1024,7 @@ fn render_select_profile_popup(
 fn render_select_browser_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
     let block = Block::default()
         .borders(Borders::ALL)
+        .padding(Padding::horizontal(1))
         .border_type(BorderType::Thick)
         .border_style(config.theme.active_border_style())
         .title_bottom(select_keymap(&config.theme).centered())
@@ -1059,6 +1063,7 @@ fn render_select_account_popup(frame: &mut Frame, app: &mut App, area: Rect, con
     };
     let block = Block::default()
         .borders(Borders::ALL)
+        .padding(Padding::horizontal(1))
         .border_type(BorderType::Thick)
         .border_style(config.theme.active_border_style())
         .title(" Account 󰀄 ")
@@ -1153,6 +1158,7 @@ fn render_create_playlist_popup(
 
     let block = Block::default()
         .borders(Borders::ALL)
+        .padding(Padding::horizontal(1))
         .border_type(BorderType::Thick)
         .border_style(config.theme.active_border_style())
         .title(" Create Playlist ")
