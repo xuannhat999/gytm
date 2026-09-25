@@ -1,10 +1,11 @@
 use ratatui::style::{Color, Style};
+use ratatui::widgets::{Scrollbar, ScrollbarOrientation};
 
 #[derive(Debug, Clone)]
 pub struct Theme {
     pub primary: Color,
     pub secondary: Color,
-    pub active: Color,
+    pub third: Color,
     pub inactive: Color,
     pub base: Color,
     pub bg: Color,
@@ -21,11 +22,11 @@ impl Default for Theme {
 impl Theme {
     pub const fn catppuccin_mocha() -> Self {
         Theme {
-            primary: Color::Rgb(203, 166, 247),
-            secondary: Color::Rgb(249, 226, 175),
-            active: Color::Rgb(137, 180, 250),
+            primary: Color::Rgb(137, 180, 250),
+            secondary: Color::Rgb(44, 53, 68),
+            third: Color::Rgb(249, 226, 175),
             inactive: Color::Rgb(108, 112, 134),
-            base: Color::Rgb(205, 214, 244),
+            base: Color::Rgb(194, 202, 231),
             bg: Color::Rgb(30, 30, 46),
             bg_popup: Color::Rgb(40, 40, 56),
             surface: Color::Rgb(69, 71, 90),
@@ -34,9 +35,9 @@ impl Theme {
 
     pub const fn gruvbox() -> Self {
         Theme {
-            primary: Color::Rgb(184, 187, 38),
-            secondary: Color::Rgb(215, 153, 33),
-            active: Color::Rgb(222, 130, 50),
+            primary: Color::Rgb(222, 130, 50),
+            secondary: Color::Rgb(66, 39, 15),
+            third: Color::Rgb(215, 153, 33),
             inactive: Color::Rgb(168, 152, 131),
             base: Color::Rgb(235, 219, 178),
             bg: Color::Rgb(40, 40, 40),
@@ -47,9 +48,9 @@ impl Theme {
 
     pub const fn dracula() -> Self {
         Theme {
-            primary: Color::Rgb(200, 130, 220),
-            secondary: Color::Rgb(241, 250, 140),
-            active: Color::Rgb(139, 233, 253),
+            primary: Color::Rgb(139, 233, 253),
+            secondary: Color::Rgb(45, 67, 72),
+            third: Color::Rgb(241, 250, 140),
             inactive: Color::Rgb(98, 114, 164),
             base: Color::Rgb(248, 248, 242),
             bg: Color::Rgb(40, 42, 54),
@@ -60,9 +61,9 @@ impl Theme {
 
     pub const fn tokyo_night() -> Self {
         Theme {
-            primary: Color::Rgb(187, 154, 247),
-            secondary: Color::Rgb(224, 175, 104),
-            active: Color::Rgb(122, 162, 247),
+            primary: Color::Rgb(122, 162, 247),
+            secondary: Color::Rgb(36, 48, 74),
+            third: Color::Rgb(224, 175, 104),
             inactive: Color::Rgb(86, 95, 137),
             base: Color::Rgb(169, 177, 214),
             bg: Color::Rgb(26, 27, 38),
@@ -72,9 +73,9 @@ impl Theme {
     }
     pub const fn nord() -> Self {
         Theme {
-            primary: Color::Rgb(136, 192, 208),
-            secondary: Color::Rgb(235, 203, 139),
-            active: Color::Rgb(143, 188, 187),
+            primary: Color::Rgb(143, 188, 187),
+            secondary: Color::Rgb(42, 56, 56),
+            third: Color::Rgb(235, 203, 139),
             inactive: Color::Rgb(76, 86, 106),
             base: Color::Rgb(236, 239, 244),
             bg: Color::Rgb(36, 42, 54),
@@ -97,19 +98,30 @@ impl Theme {
     }
 
     pub fn key_style(&self) -> Style {
-        Style::default().fg(self.secondary).bold()
+        Style::default().fg(self.third)
     }
 
     pub fn active_border_style(&self) -> Style {
-        Style::default().fg(self.active).bold()
+        Style::default().fg(self.primary).bold()
     }
 
     pub fn inactive_border_style(&self) -> Style {
-        Style::default().fg(self.inactive).bold()
+        Style::default().fg(self.inactive)
     }
 
     pub fn selected_item(&self) -> Style {
-        Style::default().bg(self.surface).fg(self.primary)
+        Style::default().bg(self.surface).fg(Color::White).bold()
+    }
+    pub fn table_header_style(&self) -> Style {
+        Style::default().bg(self.secondary).fg(self.third).bold()
+    }
+
+    pub fn scrollbar(&self) -> Scrollbar<'static> {
+        Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .track_style(Style::default().fg(self.secondary))
+            .thumb_style(Style::default().fg(self.third))
+            .begin_style(Style::default().fg(self.third))
+            .end_style(Style::default().fg(self.third))
     }
 
     pub fn error_style(&self) -> Style {

@@ -59,6 +59,7 @@ pub(crate) fn remove_song_from_queue(
             app.player_status = PlayerStatus::Idle;
             app.playing_playlist_id = None;
             app.time_pos = None;
+            app.queue_tablestate.select(None);
         }
         app.noti
             .notify(NotifyType::Success, String::from("Removed song from Queue"));

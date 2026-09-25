@@ -11,8 +11,8 @@ use data::app::{
 };
 use data::theme::Theme;
 use ratatui::layout::Flex;
-use ratatui::style::Color;
-use ratatui::widgets::{Padding, Row, Table};
+use ratatui::style::{Color, Stylize};
+use ratatui::widgets::{Cell, Padding, Row, Table};
 use ratatui::{
     self, Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -147,7 +147,7 @@ fn render_tabs(frame: &mut Frame, area: Rect, theme: &Theme, current_idx: usize)
     let tabs = Tabs::new(titles)
         .highlight_style(
             Style::default()
-                .bg(theme.active)
+                .bg(theme.primary)
                 .fg(theme.bg)
                 .add_modifier(Modifier::BOLD),
         )
@@ -230,20 +230,29 @@ fn render_list(
         return;
     }
     let result = match area_type {
-        FocusArea::Albums => Some((&app.albums, &mut app.albums_tablestate)),
-        FocusArea::Playlists => Some((&app.playlists, &mut app.playlists_tablestate)),
+        FocusArea::Albums => Some((
+            &app.albums,
+            &mut app.albums_tablestate,
+            &mut app.albums_scrollbar_state,
+        )),
+        FocusArea::Playlists => Some((
+            &app.playlists,
+            &mut app.playlists_tablestate,
+            &mut app.playlists_scrollbar_state,
+        )),
         _ => None,
     };
-    if let Some((data, list)) = result {
+    if let Some((data, list, scrollbar_state)) = result {
         let rows = data.iter().map(|item| {
-            let playing = app.playing_playlist_id.as_deref().map_or("", |id| {
-                if id == item.playlist_id.as_str() {
-                    ""
-                } else {
-                    ""
-                }
-            });
-            Row::new([playing, item.title.as_str(), item.artist.as_str()])
+            if let Some(id) = &app.playing_playlist_id
+                && id == &item.playlist_id
+            {
+                Row::new(["", item.title.as_str(), item.artist.as_str()])
+                    .fg(theme.primary)
+                    .bold()
+            } else {
+                Row::new(["", item.title.as_str(), item.artist.as_str()]).style(theme.text_style())
+            }
         });
 
         let highlight_style = if is_focused {
@@ -257,10 +266,19 @@ fn render_list(
             Constraint::Percentage(20),
         ];
         let table = Table::new(rows, colum_width)
-            .header(Row::new(["", "Title", "Artist"]))
+            .header(Row::new(["", "Title", "Artist"]).style(theme.table_header_style()))
             .row_highlight_style(highlight_style);
 
         frame.render_stateful_widget(table, inner_area, list);
+        let visible = inner_area.height.saturating_sub(1) as usize;
+        if data.len() > visible {
+            *scrollbar_state = scrollbar_state
+                .content_length(data.len() - visible + 1)
+                .position(list.offset())
+                .viewport_content_length(visible);
+            let scrollbar = theme.scrollbar();
+            frame.render_stateful_widget(scrollbar, inner_area, scrollbar_state);
+        }
     }
 }
 
@@ -334,23 +352,46 @@ fn render_songs(
     } else {
         Style::default()
     };
-    let rows = app.songs.iter().map(|song| {
-        Row::new([
-            song.title.as_str(),
-            song.artist.as_str(),
-            song.duration.as_str(),
+    let rows = app.songs.iter().enumerate().map(|(i, song)| {
+        Row::new(vec![
+            Cell::from(""),
+            Cell::from((i + 1).to_string()),
+            Cell::from(song.title.as_str()),
+            Cell::from(song.artist.as_str()),
+            Cell::from(song.duration.as_str()),
         ])
+        .style(theme.text_style())
     });
+    let idx_width = app
+        .songs
+        .len()
+        .saturating_sub(1)
+        .checked_ilog10()
+        .map_or(1, |d| d as usize + 1) as u16;
     let column_widths = [
+        Constraint::Length(1),
+        Constraint::Length(idx_width + 1),
         Constraint::Percentage(80),
         Constraint::Percentage(20),
         Constraint::Length(10),
     ];
     let table = Table::new(rows, column_widths)
-        .header(Row::new(["Title", "Artist", "Duration"]))
+        .header(
+            Row::new(["", "#", "Title", "Artist", "Duration"]).style(theme.table_header_style()),
+        )
         .row_highlight_style(highlight_style);
 
     frame.render_stateful_widget(table, layout[2], &mut app.songs_tablestate);
+    let visible = layout[2].height.saturating_sub(1) as usize;
+    if app.songs.len() > visible {
+        app.songs_scrollbar_state = app
+            .songs_scrollbar_state
+            .viewport_content_length(visible)
+            .position(app.songs_tablestate.offset())
+            .content_length(app.songs.len() - visible + 1);
+        let scrollbar = theme.scrollbar();
+        frame.render_stateful_widget(scrollbar, layout[2], &mut app.songs_scrollbar_state);
+    }
 }
 
 // RENDER QUEUE
@@ -397,29 +438,58 @@ fn render_queue(
         Style::default()
     };
     let rows = app.queue.iter().enumerate().map(|(i, song)| {
-        let playing = if app.playing_song_idx.is_some_and(|playing| playing == i) {
-            ""
+        if app.playing_song_idx.is_some_and(|playing| playing == i) {
+            Row::new(vec![
+                Cell::from(""),
+                Cell::from((i + 1).to_string()),
+                Cell::from(song.title.as_str()),
+                Cell::from(song.artist.as_str()),
+                Cell::from(song.duration.as_str()),
+            ])
+            .fg(theme.primary)
+            .bold()
         } else {
-            ""
-        };
-        Row::new([
-            playing,
-            song.title.as_str(),
-            song.artist.as_str(),
-            song.duration.as_str(),
-        ])
+            Row::new(vec![
+                Cell::from(""),
+                Cell::from((i + 1).to_string()),
+                Cell::from(song.title.as_str()),
+                Cell::from(song.artist.as_str()),
+                Cell::from(song.duration.as_str()),
+            ])
+            .style(theme.text_style())
+        }
     });
+    let idx_width = app
+        .queue
+        .len()
+        .saturating_sub(1)
+        .checked_ilog10()
+        .map_or(1, |d| d as usize + 1) as u16;
+
     let column_widths = [
         Constraint::Length(1),
+        Constraint::Length(idx_width + 1),
         Constraint::Percentage(80),
         Constraint::Percentage(20),
         Constraint::Length(10),
     ];
     let table = Table::new(rows, column_widths)
-        .header(Row::new(["", "Title", "Artist", "Duration"]))
+        .header(
+            Row::new(["", "#", "Title", "Artist", "Duration"]).style(theme.table_header_style()),
+        )
         .row_highlight_style(highlight_style);
 
     frame.render_stateful_widget(table, inner_area, &mut app.queue_tablestate);
+    let visible = inner_area.height.saturating_sub(1) as usize;
+    if app.queue.len() > visible {
+        app.queue_scrollbar_state = app
+            .queue_scrollbar_state
+            .viewport_content_length(visible)
+            .content_length(app.queue.len() - visible + 1)
+            .position(app.queue_tablestate.offset());
+        let scrollbar = theme.scrollbar();
+        frame.render_stateful_widget(scrollbar, inner_area, &mut app.queue_scrollbar_state);
+    }
 }
 
 // MPV PLAYER
@@ -581,7 +651,7 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
     }
     let rows = app.search_albums.iter().map(|item| {
         let saved = if item.is_saved { "󰃂" } else { " " };
-        Row::new([saved, item.title.as_str(), item.artist.as_str()])
+        Row::new([saved, item.title.as_str(), item.artist.as_str()]).style(theme.text_style())
     });
 
     let highlight_style = if is_focused {
@@ -593,12 +663,27 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
         Constraint::Length(1),
         Constraint::Percentage(80),
         Constraint::Percentage(20),
+        Constraint::Length(10),
     ];
     let table = Table::new(rows, colum_width)
-        .header(Row::new(["", "Title", "Artist"]))
+        .header(Row::new(["", "Title", "Artist"]).style(theme.table_header_style()))
         .row_highlight_style(highlight_style);
 
     frame.render_stateful_widget(table, inner_area, &mut app.search_albums_tablestate);
+    let visible = inner_area.height.saturating_sub(1) as usize;
+    if app.search_albums.len() > visible {
+        app.search_albums_scrollbar_state = app
+            .search_albums_scrollbar_state
+            .viewport_content_length(visible)
+            .position(app.search_albums_tablestate.offset())
+            .content_length(app.search_albums.len() - visible + 1);
+        let scrollbar = theme.scrollbar();
+        frame.render_stateful_widget(
+            scrollbar,
+            inner_area,
+            &mut app.search_albums_scrollbar_state,
+        );
+    }
 }
 // SEARCH SONGS/VIDEOS
 fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
@@ -621,7 +706,7 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
     };
     let tab_hl = Style::default()
         .bg(if is_focused {
-            theme.active
+            theme.primary
         } else {
             theme.inactive
         })
@@ -648,9 +733,17 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
 
-    let (search_songs, tablestate) = match app.search_songs_source {
-        SearchSongSource::Song => (&app.search_songs, &mut app.search_songs_tablestate),
-        SearchSongSource::Video => (&app.search_videos, &mut app.search_videos_tablestate),
+    let (search_songs, tablestate, scrollbar_state) = match app.search_songs_source {
+        SearchSongSource::Song => (
+            &app.search_songs,
+            &mut app.search_songs_tablestate,
+            &mut app.search_songs_scrollbar_state,
+        ),
+        SearchSongSource::Video => (
+            &app.search_videos,
+            &mut app.search_videos_tablestate,
+            &mut app.search_videos_scrollbar_state,
+        ),
     };
 
     if search_songs.is_empty() {
@@ -663,6 +756,7 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
             song.artist.as_str(),
             song.duration.as_str(),
         ])
+        .style(theme.text_style())
     });
     let column_widths = [
         Constraint::Percentage(80),
@@ -675,10 +769,19 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         Style::default()
     };
     let table = Table::new(rows, column_widths)
-        .header(Row::new(["Title", "Artist", "Duration"]))
+        .header(Row::new(["Title", "Artist", "Duration"]).style(theme.table_header_style()))
         .row_highlight_style(highlight_style);
 
     frame.render_stateful_widget(table, inner_area, tablestate);
+    let visible = inner_area.height.saturating_sub(1) as usize;
+    if search_songs.len() > visible {
+        *scrollbar_state = scrollbar_state
+            .content_length(search_songs.len() - visible + 1)
+            .viewport_content_length(visible)
+            .position(tablestate.offset());
+        let scrollbar = theme.scrollbar();
+        frame.render_stateful_widget(scrollbar, inner_area, scrollbar_state);
+    }
 }
 // SAVE SONG TO PLAYLIST
 fn render_save_song_to_playlist_popup(
@@ -1263,15 +1366,15 @@ fn render_privacy_selector(
     let spans: Vec<Span> = items
         .iter()
         .zip(choices.iter())
-        .map(|(label, value)| {
+        .flat_map(|(label, value)| {
             let selected = privacy == value;
-            let prefix = if selected { " ● " } else { " ○ " };
-            let text = format!("{}{}", prefix, label);
-            if selected {
-                Span::styled(text, theme.key_style())
+            let style = if selected {
+                theme.key_style()
             } else {
-                Span::styled(text, theme.text_style())
-            }
+                theme.text_style()
+            };
+            let prefix = if selected { " ● " } else { " ○ " };
+            [Span::styled(prefix, style), Span::styled(*label, style)]
         })
         .collect();
     let keymap = Line::from(vec![

@@ -9,7 +9,7 @@ use data::app::{
 };
 use error::YResult;
 use player::Player;
-use ratatui::widgets::{ListState, TableState};
+use ratatui::widgets::{ListState, ScrollbarState, TableState};
 use state::{client_state::ClientState, player_state::PlayerState};
 use tokio::sync::mpsc;
 
@@ -22,18 +22,22 @@ pub struct App {
     // ALBUMS (LIBRARY)
     pub albums: Vec<Playlist>,
     pub albums_tablestate: TableState,
+    pub albums_scrollbar_state: ScrollbarState,
 
     // PLAYLISTS (LIBRARY)
     pub playlists: Vec<Playlist>,
     pub playlists_tablestate: TableState,
+    pub playlists_scrollbar_state: ScrollbarState,
 
     // SONGS (CONTENT)
     pub songs: Vec<Song>,
     pub songs_tablestate: TableState,
+    pub songs_scrollbar_state: ScrollbarState,
 
     // QUEUE
     pub queue: Vec<Song>,
     pub queue_tablestate: TableState,
+    pub queue_scrollbar_state: ScrollbarState,
 
     // PLAYER
     pub time_pos: Option<f64>,
@@ -47,14 +51,17 @@ pub struct App {
     // ALBUMS (SEARCH)
     pub search_albums: Vec<Playlist>,
     pub search_albums_tablestate: TableState,
+    pub search_albums_scrollbar_state: ScrollbarState,
 
     // SONGS (SEARCH)
     pub search_songs: Vec<Song>,
     pub search_songs_tablestate: TableState,
+    pub search_songs_scrollbar_state: ScrollbarState,
 
     // VIDEOS (SEARCH)
     pub search_videos: Vec<Song>,
     pub search_videos_tablestate: TableState,
+    pub search_videos_scrollbar_state: ScrollbarState,
 
     pub search_songs_source: SearchSongSource,
 
@@ -92,18 +99,22 @@ impl App {
             // ALBUMS (LIBRARY)
             albums: Vec::new(),
             albums_tablestate: TableState::default(),
+            albums_scrollbar_state: ScrollbarState::default(),
 
             // PLAYLISTS (LIBRARY)
             playlists: Vec::new(),
             playlists_tablestate: TableState::default(),
+            playlists_scrollbar_state: ScrollbarState::default(),
 
             // SONGS (CONTENT)
             songs: Vec::new(),
             songs_tablestate: TableState::default(),
+            songs_scrollbar_state: ScrollbarState::default(),
 
             // QUEUE
             queue: Vec::new(),
             queue_tablestate: TableState::default(),
+            queue_scrollbar_state: ScrollbarState::default(),
 
             // PLAYER
             time_pos: None,
@@ -117,14 +128,17 @@ impl App {
             // ALBUMS (SEARCH)
             search_albums: Vec::new(),
             search_albums_tablestate: TableState::default(),
+            search_albums_scrollbar_state: ScrollbarState::default(),
 
             // SONGS (SEARCH)
             search_songs: Vec::new(),
             search_songs_tablestate: TableState::default(),
+            search_songs_scrollbar_state: ScrollbarState::default(),
 
             // VIDEOS (SEARCH)
             search_videos: Vec::new(),
             search_videos_tablestate: TableState::default(),
+            search_videos_scrollbar_state: ScrollbarState::default(),
 
             search_songs_source: SearchSongSource::default(),
 
@@ -154,7 +168,7 @@ impl App {
         }
     }
 
-    pub fn get_search_songs_tablestate_from_source(&mut self) -> &mut TableState {
+    pub fn get_search_songs_states_from_source(&mut self) -> &mut TableState {
         match self.search_songs_source {
             SearchSongSource::Song => &mut self.search_songs_tablestate,
             SearchSongSource::Video => &mut self.search_videos_tablestate,

@@ -45,6 +45,9 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                 }
                 KeyCode::Char('3') => {
                     app.focus_area = FocusArea::Queue;
+                    if !app.queue.is_empty() && app.queue_tablestate.selected().is_none() {
+                        app.queue_tablestate.select(Some(0));
+                    }
                 }
                 KeyCode::Char('4') => {
                     app.focus_area = FocusArea::Songs;
@@ -315,6 +318,9 @@ fn handle_songs_key(key_event: KeyEvent, app: &mut App, player: &mut Player) {
                                     .ok()
                             };
                             app.songs.remove(i);
+                            if app.songs.is_empty() {
+                                app.songs_tablestate.select(None);
+                            }
                         }
                     }
                 } else {
@@ -748,11 +754,8 @@ fn handle_seach_songs_key(app: &mut App, player: &Player, key_code: KeyCode) {
         SearchSongSource::Song => app.search_songs.len(),
         SearchSongSource::Video => app.search_videos.len(),
     };
-    if handle_table_event(
-        app.get_search_songs_tablestate_from_source(),
-        rows,
-        key_code,
-    ) {
+    let tablestate = app.get_search_songs_states_from_source();
+    if handle_table_event(tablestate, rows, key_code) {
         return;
     }
     match key_code {
@@ -834,6 +837,9 @@ fn toggle_save_search_album(app: &mut App) {
                     .position(|a| a.playlist_id == selected.playlist_id)
                 {
                     app.albums.remove(idx);
+                    if app.albums.is_empty() {
+                        app.albums_tablestate.select(None);
+                    }
                 }
             }
         }
