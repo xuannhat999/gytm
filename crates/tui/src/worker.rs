@@ -58,7 +58,7 @@ pub fn spawn_api_worker(
                 }
                 ApiCmd::GetSongsToView(playlist) => {
                     let songs = bus.get_songs(&playlist.browse_id).await;
-                    ApiResponse::GetSongsToView { songs, playlist }
+                    ApiResponse::GetSongsToView { songs }
                 }
                 ApiCmd::GetSongsToPlay(playlist) => {
                     let songs = bus.get_songs(&playlist.browse_id).await;

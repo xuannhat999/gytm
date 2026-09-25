@@ -50,7 +50,9 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                     }
                 }
                 KeyCode::Char('4') => {
-                    app.focus_area = FocusArea::Songs;
+                    if app.viewing_list.is_some() {
+                        app.focus_area = FocusArea::Songs;
+                    }
                 }
                 KeyCode::Char('c') => {
                     if let Err(e) = clear_queue(app, player) {
@@ -341,7 +343,19 @@ fn handle_songs_key(key_event: KeyEvent, app: &mut App, player: &mut Player) {
                 }
             }
         }
-
+        KeyCode::Char('h') => {
+            app.songs.clear();
+            app.songs_tablestate.select(None);
+            app.viewing_list = None;
+            match app.page {
+                AppPage::Library => {
+                    app.focus_area = FocusArea::Albums;
+                }
+                AppPage::Search => {
+                    app.focus_area = FocusArea::SearchAlbums;
+                }
+            }
+        }
         _ => {}
     }
 }
@@ -912,6 +926,7 @@ fn view_list_content(app: &mut App, focus_area: FocusArea) {
         app.api_cmd_tx
             .send(ApiCmd::GetSongsToView(list.clone()))
             .ok();
+        app.viewing_list = Some(list.clone());
         app.focus_area = FocusArea::Songs;
         app.api_loading_kind = Some(ApiLoadingKind::GetSongsToView);
     }

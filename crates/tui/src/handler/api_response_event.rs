@@ -148,10 +148,9 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 );
             }
         },
-        ApiResponse::GetSongsToView { songs, playlist } => match songs {
+        ApiResponse::GetSongsToView { songs } => match songs {
             Ok(songs) => {
                 app.songs = songs;
-                app.viewing_list = Some(playlist);
                 if !app.songs.is_empty() {
                     app.songs_tablestate.select(Some(0));
                 } else {

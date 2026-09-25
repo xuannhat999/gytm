@@ -26,7 +26,7 @@ impl Theme {
             secondary: Color::Rgb(44, 53, 68),
             third: Color::Rgb(249, 226, 175),
             inactive: Color::Rgb(108, 112, 134),
-            base: Color::Rgb(194, 202, 231),
+            base: Color::Rgb(197, 205, 234),
             bg: Color::Rgb(30, 30, 46),
             bg_popup: Color::Rgb(40, 40, 56),
             surface: Color::Rgb(69, 71, 90),
@@ -36,9 +36,9 @@ impl Theme {
     pub const fn gruvbox() -> Self {
         Theme {
             primary: Color::Rgb(222, 130, 50),
-            secondary: Color::Rgb(66, 39, 15),
-            third: Color::Rgb(215, 153, 33),
-            inactive: Color::Rgb(168, 152, 131),
+            secondary: Color::Rgb(65, 52, 40),
+            third: Color::Rgb(179, 182, 62),
+            inactive: Color::Rgb(134, 121, 104),
             base: Color::Rgb(235, 219, 178),
             bg: Color::Rgb(40, 40, 40),
             bg_popup: Color::Rgb(50, 50, 50),
@@ -73,11 +73,11 @@ impl Theme {
     }
     pub const fn nord() -> Self {
         Theme {
-            primary: Color::Rgb(143, 188, 187),
-            secondary: Color::Rgb(42, 56, 56),
+            primary: Color::Rgb(149, 205, 204),
+            secondary: Color::Rgb(49, 66, 66),
             third: Color::Rgb(235, 203, 139),
-            inactive: Color::Rgb(76, 86, 106),
-            base: Color::Rgb(236, 239, 244),
+            inactive: Color::Rgb(85, 96, 118),
+            base: Color::Rgb(189, 202, 228),
             bg: Color::Rgb(36, 42, 54),
             bg_popup: Color::Rgb(59, 66, 82),
             surface: Color::Rgb(67, 76, 94),

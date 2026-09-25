@@ -49,7 +49,6 @@ pub enum ApiResponse {
     },
     GetSongsToView {
         songs: YResult<Vec<Song>>,
-        playlist: Playlist,
     },
     GetSongsToPlay {
         songs: YResult<Vec<Song>>,

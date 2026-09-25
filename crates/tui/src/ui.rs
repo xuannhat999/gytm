@@ -42,7 +42,11 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
 
     let hor_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+        .constraints(if app.viewing_list.is_some() {
+            [Constraint::Percentage(55), Constraint::Percentage(45)]
+        } else {
+            [Constraint::Min(0), Constraint::Max(0)]
+        })
         .split(main_layout[2]);
 
     let top_layout = Layout::default()
@@ -64,7 +68,9 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
     );
     render_queue(frame, app, main_layout[3], &config.theme, start_time);
     render_player(frame, app, main_layout[4], &config.theme);
-    render_songs(frame, app, hor_layout[1], &config.theme, start_time);
+    if app.viewing_list.is_some() {
+        render_songs(frame, app, hor_layout[1], &config.theme, start_time);
+    }
 
     match app.page {
         AppPage::Library => {
@@ -303,6 +309,8 @@ fn render_songs(
         Span::styled("x/X ", theme.key_style()),
         Span::styled("| Add to Queue: ", theme.text_style()),
         Span::styled("a ", theme.key_style()),
+        Span::styled("| Close: ", theme.text_style()),
+        Span::styled("h ", theme.key_style()),
         Span::styled("]", theme.text_style()),
     ]);
     let block = Block::default()
@@ -371,8 +379,8 @@ fn render_songs(
     let column_widths = [
         Constraint::Length(1),
         Constraint::Length(idx_width + 1),
-        Constraint::Percentage(80),
-        Constraint::Percentage(20),
+        Constraint::Percentage(75),
+        Constraint::Percentage(25),
         Constraint::Length(10),
     ];
     let table = Table::new(rows, column_widths)
@@ -469,8 +477,8 @@ fn render_queue(
     let column_widths = [
         Constraint::Length(1),
         Constraint::Length(idx_width + 1),
-        Constraint::Percentage(80),
-        Constraint::Percentage(20),
+        Constraint::Percentage(75),
+        Constraint::Percentage(25),
         Constraint::Length(10),
     ];
     let table = Table::new(rows, column_widths)
@@ -511,10 +519,10 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let block = Block::default()
         .borders(Borders::ALL)
         .padding(Padding::horizontal(1))
-        .title(" Player")
+        .title("  Player ")
         .title_bottom(key_map.alignment(Alignment::Center))
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(theme.base));
+        .border_style(Style::default().fg(theme.third));
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
 
@@ -661,8 +669,8 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
     };
     let colum_width = [
         Constraint::Length(1),
-        Constraint::Percentage(80),
-        Constraint::Percentage(20),
+        Constraint::Percentage(70),
+        Constraint::Percentage(25),
         Constraint::Length(10),
     ];
     let table = Table::new(rows, colum_width)
@@ -759,8 +767,8 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         .style(theme.text_style())
     });
     let column_widths = [
-        Constraint::Percentage(80),
-        Constraint::Percentage(20),
+        Constraint::Percentage(75),
+        Constraint::Percentage(25),
         Constraint::Length(10),
     ];
     let highlight_style = if is_focused {
