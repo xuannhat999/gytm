@@ -9,7 +9,7 @@ use data::app::{
 };
 use error::YResult;
 use player::Player;
-use ratatui::widgets::ListState;
+use ratatui::widgets::{ListState, TableState};
 use state::{client_state::ClientState, player_state::PlayerState};
 use tokio::sync::mpsc;
 
@@ -22,10 +22,12 @@ pub struct App {
     // ALBUMS (LIBRARY)
     pub albums: Vec<Playlist>,
     pub albums_liststate: ListState,
+    pub albums_tablestate: TableState,
 
     // PLAYLISTS (LIBRARY)
     pub playlists: Vec<Playlist>,
     pub playlists_liststate: ListState,
+    pub playlists_tablestate: TableState,
 
     // SONGS (CONTENT)
     pub songs: Vec<Song>,
@@ -92,10 +94,12 @@ impl App {
             // ALBUMS (LIBRARY)
             albums: Vec::new(),
             albums_liststate: ListState::default(),
+            albums_tablestate: TableState::default(),
 
             // PLAYLISTS (LIBRARY)
             playlists: Vec::new(),
             playlists_liststate: ListState::default(),
+            playlists_tablestate: TableState::default(),
 
             // SONGS (CONTENT)
             songs: Vec::new(),

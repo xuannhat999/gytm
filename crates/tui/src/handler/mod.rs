@@ -1,6 +1,8 @@
 mod api_response_event;
 mod key_event;
+mod list_event;
 mod mpv_event;
+mod table_event;
 
 pub use api_response_event::handle_api_response;
 pub use key_event::handle_key_events;

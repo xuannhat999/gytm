@@ -10,6 +10,7 @@ use data::app::{
 use data::theme::Theme;
 use ratatui::layout::Flex;
 use ratatui::style::Color;
+use ratatui::widgets::{Row, Table};
 use ratatui::{
     self, Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -225,39 +226,36 @@ fn render_list(
         return;
     }
     let result = match area_type {
-        FocusArea::Albums => Some((&app.albums, &mut app.albums_liststate)),
-        FocusArea::Playlists => Some((&app.playlists, &mut app.playlists_liststate)),
+        FocusArea::Albums => Some((&app.albums, &mut app.albums_tablestate)),
+        FocusArea::Playlists => Some((&app.playlists, &mut app.playlists_tablestate)),
         _ => None,
     };
     if let Some((data, list)) = result {
-        let items: Vec<ListItem> = data
-            .iter()
-            .map(|item| {
-                let is_playing = app
-                    .playing_playlist_id
-                    .as_ref()
-                    .map_or_else(|| false, |playing| playing.as_str() == item.playlist_id);
-                let content = if is_playing {
-                    format!(" {} - {}", item.title, item.artist)
+        let rows = data.iter().map(|item| {
+            let playing = app.playing_playlist_id.as_deref().map_or("", |id| {
+                if id == item.playlist_id.as_str() {
+                    " "
                 } else {
-                    format!("  {} - {}", item.title, item.artist)
-                };
-                if is_playing {
-                    ListItem::new(content).style(Style::default().fg(theme.primary))
-                } else {
-                    ListItem::new(content)
+                    ""
                 }
-            })
-            .collect();
+            });
+            Row::new([playing, item.title.as_str(), item.artist.as_str()])
+        });
 
         let highlight_style = if is_focused {
             theme.selected_item()
         } else {
             Style::default()
         };
-
-        let list_widget = List::new(items).highlight_style(highlight_style);
-        frame.render_stateful_widget(list_widget, inner_area, list);
+        let colum_width = [
+            Constraint::Length(2),
+            Constraint::Percentage(80),
+            Constraint::Percentage(20),
+        ];
+        let table = Table::new(rows, colum_width)
+            .header(Row::new(["", "Title", "Artist"]))
+            .row_highlight_style(highlight_style);
+        frame.render_stateful_widget(table, inner_area, list);
     }
 }
 
