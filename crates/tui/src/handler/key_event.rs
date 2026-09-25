@@ -25,16 +25,6 @@ use ratatui::widgets::ListState;
 use state::{Persist, client_state::ClientState};
 
 pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player, config: &Config) {
-    if (!app.is_popup_active() && !app.is_insert)
-        || matches!(app.popup_state, PopupState::SaveSong { .. })
-        || matches!(app.popup_state, PopupState::SelectBrowser)
-        || matches!(app.popup_state, PopupState::SelectBrowserProfile { .. })
-        || matches!(app.popup_state, PopupState::SelectGeckoContainer { .. })
-        || matches!(app.popup_state, PopupState::SelectAccount { .. })
-    {
-        handle_list_event(key_event, app);
-    }
-
     if app.is_popup_active() {
         handle_popup_key(key_event, app);
     } else {
@@ -352,33 +342,39 @@ fn handle_songs_key(key_event: KeyEvent, app: &mut App, player: &mut Player) {
 
 fn handle_popup_key(key_event: KeyEvent, app: &mut App) {
     match &mut app.popup_state {
-        PopupState::SaveSong { selected_save_song } => match key_event.code {
-            KeyCode::Esc => {
-                app.popup_state = PopupState::None;
+        PopupState::SaveSong { selected_save_song } => {
+            let len = app.cus_playlists.len();
+            if handle_list_event(&mut app.cus_playlists_liststate, len, key_event.code) {
+                return;
             }
-            KeyCode::Enter => {
-                let song = selected_save_song;
-                if let Some(i) = app.cus_playlists_liststate.selected() {
-                    if let Some(idx) = app.cus_playlists.get(i) {
-                        if let Some(playlist) = app.playlists.get(*idx) {
-                            let playlist_id = &playlist.playlist_id;
-                            if playlist_id == "LM" {
-                                app.api_cmd_tx.send(ApiCmd::LikeSong(song.clone())).ok();
-                            } else {
-                                app.api_cmd_tx
-                                    .send(ApiCmd::SaveSong {
-                                        song: song.clone(),
-                                        playlist_id: playlist_id.clone(),
-                                    })
-                                    .ok();
-                            }
-                            app.api_loading_kind = Some(ApiLoadingKind::SaveToPlaylist)
-                        };
+            match key_event.code {
+                KeyCode::Esc => {
+                    app.popup_state = PopupState::None;
+                }
+                KeyCode::Enter => {
+                    let song = selected_save_song;
+                    if let Some(i) = app.cus_playlists_liststate.selected() {
+                        if let Some(idx) = app.cus_playlists.get(i) {
+                            if let Some(playlist) = app.playlists.get(*idx) {
+                                let playlist_id = &playlist.playlist_id;
+                                if playlist_id == "LM" {
+                                    app.api_cmd_tx.send(ApiCmd::LikeSong(song.clone())).ok();
+                                } else {
+                                    app.api_cmd_tx
+                                        .send(ApiCmd::SaveSong {
+                                            song: song.clone(),
+                                            playlist_id: playlist_id.clone(),
+                                        })
+                                        .ok();
+                                }
+                                app.api_loading_kind = Some(ApiLoadingKind::SaveToPlaylist)
+                            };
+                        }
                     }
                 }
+                _ => {}
             }
-            _ => {}
-        },
+        }
         PopupState::CreatePlaylist {
             title,
             description,
@@ -445,12 +441,100 @@ fn handle_popup_key(key_event: KeyEvent, app: &mut App) {
 
             _ => {}
         },
-        PopupState::SelectBrowser => match key_event.code {
-            KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
-            KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::ApiCLient,
-            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
-                if let Some(index) = app.browser_liststate.selected() {
-                    let browser = &ALL_BROWSERS[index];
+        PopupState::SelectBrowser => {
+            if handle_list_event(
+                &mut app.browser_liststate,
+                ALL_BROWSERS.len(),
+                key_event.code,
+            ) {
+                return;
+            }
+            match key_event.code {
+                KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
+                KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::ApiCLient,
+                KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                    if let Some(index) = app.browser_liststate.selected() {
+                        let browser = &ALL_BROWSERS[index];
+                        match client::get_profiles_from_browser(browser) {
+                            Ok(profiles) => {
+                                let mut profiles_liststate = ListState::default();
+                                if !profiles.is_empty() {
+                                    profiles_liststate.select(Some(0));
+                                }
+                                app.popup_state = PopupState::SelectBrowserProfile {
+                                    profiles,
+                                    profiles_liststate,
+                                    browser: *browser,
+                                }
+                            }
+                            Err(e) => {
+                                log_to_file(e);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        PopupState::SelectBrowserProfile {
+            profiles,
+            profiles_liststate,
+            browser,
+        } => {
+            let len = profiles.len();
+            if handle_list_event(profiles_liststate, len, key_event.code) {
+                return;
+            }
+            match key_event.code {
+                KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
+                KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                    if let Some(index) = profiles_liststate.selected() {
+                        let profile = &profiles[index];
+                        match browser.engine() {
+                            BrowserEngine::Gecko => {
+                                if let Ok(containers) =
+                                    get_gecko_containers_from_profile(&profile.path)
+                                {
+                                    let mut containers_liststate = ListState::default();
+                                    containers_liststate.select(Some(0));
+                                    app.popup_state = PopupState::SelectGeckoContainer {
+                                        browser: *browser,
+                                        profile: profile.clone(),
+                                        containers,
+                                        containers_liststate,
+                                    };
+                                }
+                            }
+                            BrowserEngine::Chromium => {
+                                let client = ClientState {
+                                    browser: Some(*browser),
+                                    profile: Some(profile.clone()),
+                                    gecko_container: None,
+                                    account: None,
+                                };
+                                app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
+                                app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
+                            }
+                        }
+                    }
+                }
+                KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::SelectBrowser,
+                _ => {}
+            }
+        }
+        PopupState::SelectGeckoContainer {
+            containers,
+            containers_liststate,
+            browser,
+            profile,
+        } => {
+            let len = containers.len();
+            if handle_list_event(containers_liststate, len, key_event.code) {
+                return;
+            }
+            match key_event.code {
+                KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
+                KeyCode::Char('h') | KeyCode::Left => {
                     match client::get_profiles_from_browser(browser) {
                         Ok(profiles) => {
                             let mut profiles_liststate = ListState::default();
@@ -458,9 +542,9 @@ fn handle_popup_key(key_event: KeyEvent, app: &mut App) {
                                 profiles_liststate.select(Some(0));
                             }
                             app.popup_state = PopupState::SelectBrowserProfile {
+                                browser: *browser,
                                 profiles,
                                 profiles_liststate,
-                                browser: *browser,
                             }
                         }
                         Err(e) => {
@@ -468,156 +552,96 @@ fn handle_popup_key(key_event: KeyEvent, app: &mut App) {
                         }
                     }
                 }
-            }
-            _ => {}
-        },
-        PopupState::SelectBrowserProfile {
-            profiles,
-            profiles_liststate,
-            browser,
-        } => match key_event.code {
-            KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
-            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
-                if let Some(index) = profiles_liststate.selected() {
-                    let profile = &profiles[index];
-                    match browser.engine() {
-                        BrowserEngine::Gecko => {
-                            if let Ok(containers) = get_gecko_containers_from_profile(&profile.path)
-                            {
-                                let mut containers_liststate = ListState::default();
-                                containers_liststate.select(Some(0));
-                                app.popup_state = PopupState::SelectGeckoContainer {
-                                    browser: *browser,
-                                    profile: profile.clone(),
-                                    containers,
-                                    containers_liststate,
-                                };
-                            }
-                        }
-                        BrowserEngine::Chromium => {
-                            let client = ClientState {
-                                browser: Some(*browser),
-                                profile: Some(profile.clone()),
-                                gecko_container: None,
-                                account: None,
-                            };
-                            app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
-                            app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
-                        }
+                KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                    if let Some(index) = containers_liststate.selected() {
+                        let container = &containers[index];
+                        let client = ClientState {
+                            browser: Some(*browser),
+                            profile: Some(profile.clone()),
+                            gecko_container: Some(container.clone()),
+                            account: None,
+                        };
+                        app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
+                        app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
                     }
                 }
+                _ => {}
             }
-            KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::SelectBrowser,
-            _ => {}
-        },
-        PopupState::SelectGeckoContainer {
-            containers,
-            containers_liststate,
-            browser,
-            profile,
-        } => match key_event.code {
-            KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
-            KeyCode::Char('h') | KeyCode::Left => {
-                match client::get_profiles_from_browser(browser) {
-                    Ok(profiles) => {
-                        let mut profiles_liststate = ListState::default();
-                        if !profiles.is_empty() {
-                            profiles_liststate.select(Some(0));
-                        }
-                        app.popup_state = PopupState::SelectBrowserProfile {
-                            browser: *browser,
-                            profiles,
-                            profiles_liststate,
-                        }
-                    }
-                    Err(e) => {
-                        log_to_file(e);
-                    }
-                }
-            }
-            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
-                if let Some(index) = containers_liststate.selected() {
-                    let container = &containers[index];
-                    let client = ClientState {
-                        browser: Some(*browser),
-                        profile: Some(profile.clone()),
-                        gecko_container: Some(container.clone()),
-                        account: None,
-                    };
-                    app.api_loading_kind = Some(ApiLoadingKind::FetchAccountsList);
-                    app.api_cmd_tx.send(ApiCmd::FetchAccountsList(client)).ok();
-                }
-            }
-            _ => {}
-        },
+        }
         PopupState::SelectAccount {
             browser,
             profile,
             container,
             accounts,
             accounts_liststate,
-        } => match key_event.code {
-            KeyCode::Esc => {
-                app.api_cmd_tx.send(ApiCmd::DiscardPendingClient).ok();
-                app.popup_state = PopupState::ApiCLient;
+        } => {
+            let len = accounts.len();
+            if handle_list_event(accounts_liststate, len, key_event.code) {
+                return;
             }
-            KeyCode::Char('h') | KeyCode::Left => {
-                app.api_cmd_tx.send(ApiCmd::DiscardPendingClient).ok();
-                if container.is_some() {
-                    match get_gecko_containers_from_profile(&profile.path) {
-                        Ok(containers) => {
-                            let mut liststate = ListState::default();
-                            if !containers.is_empty() {
-                                liststate.select(Some(0));
+            match key_event.code {
+                KeyCode::Esc => {
+                    app.api_cmd_tx.send(ApiCmd::DiscardPendingClient).ok();
+                    app.popup_state = PopupState::ApiCLient;
+                }
+                KeyCode::Char('h') | KeyCode::Left => {
+                    app.api_cmd_tx.send(ApiCmd::DiscardPendingClient).ok();
+                    if container.is_some() {
+                        match get_gecko_containers_from_profile(&profile.path) {
+                            Ok(containers) => {
+                                let mut liststate = ListState::default();
+                                if !containers.is_empty() {
+                                    liststate.select(Some(0));
+                                }
+                                app.popup_state = PopupState::SelectGeckoContainer {
+                                    browser: *browser,
+                                    profile: profile.clone(),
+                                    containers,
+                                    containers_liststate: liststate,
+                                };
                             }
-                            app.popup_state = PopupState::SelectGeckoContainer {
-                                browser: *browser,
-                                profile: profile.clone(),
-                                containers,
-                                containers_liststate: liststate,
-                            };
-                        }
-                        Err(e) => {
-                            log_to_file(e);
-                        }
-                    }
-                } else {
-                    match get_profiles_from_browser(browser) {
-                        Ok(profiles) => {
-                            let mut liststate = ListState::default();
-                            if !profiles.is_empty() {
-                                liststate.select(Some(0));
+                            Err(e) => {
+                                log_to_file(e);
                             }
-                            app.popup_state = PopupState::SelectBrowserProfile {
-                                browser: *browser,
-                                profiles,
-                                profiles_liststate: liststate,
-                            };
                         }
-                        Err(e) => {
-                            log_to_file(&e);
+                    } else {
+                        match get_profiles_from_browser(browser) {
+                            Ok(profiles) => {
+                                let mut liststate = ListState::default();
+                                if !profiles.is_empty() {
+                                    liststate.select(Some(0));
+                                }
+                                app.popup_state = PopupState::SelectBrowserProfile {
+                                    browser: *browser,
+                                    profiles,
+                                    profiles_liststate: liststate,
+                                };
+                            }
+                            Err(e) => {
+                                log_to_file(&e);
+                            }
                         }
                     }
                 }
-            }
-            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
-                if let Some(index) = accounts_liststate.selected() {
-                    let selected_acc = &accounts[index];
-                    let client_state = ClientState {
-                        browser: Some(*browser),
-                        profile: Some(profile.clone()),
-                        gecko_container: container.clone(),
-                        account: Some(selected_acc.clone()),
-                    };
-                    app.api_cmd_tx.send(ApiCmd::SetClient(client_state)).ok();
-                    app.api_loading_kind = Some(ApiLoadingKind::ReloadClient);
-                    if !matches!(app.popup_state, PopupState::None) {
-                        app.popup_state = PopupState::ApiCLient;
+                KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                    if let Some(index) = accounts_liststate.selected() {
+                        let selected_acc = &accounts[index];
+                        let client_state = ClientState {
+                            browser: Some(*browser),
+                            profile: Some(profile.clone()),
+                            gecko_container: container.clone(),
+                            account: Some(selected_acc.clone()),
+                        };
+                        app.api_cmd_tx.send(ApiCmd::SetClient(client_state)).ok();
+                        app.api_loading_kind = Some(ApiLoadingKind::ReloadClient);
+                        if !matches!(app.popup_state, PopupState::None) {
+                            app.popup_state = PopupState::ApiCLient;
+                        }
                     }
                 }
+                _ => {}
             }
-            _ => {}
-        },
+        }
         PopupState::ApiCLient => match key_event.code {
             KeyCode::Esc => {
                 app.popup_state = PopupState::None;
@@ -760,6 +784,7 @@ fn handle_seach_songs_key(app: &mut App, player: &Player, key_code: KeyCode) {
         _ => {}
     }
 }
+
 fn handle_albums_key(app: &mut App, key_code: KeyCode) {
     if handle_table_event(&mut app.albums_tablestate, app.albums.len(), key_code) {
         return;
@@ -860,6 +885,7 @@ fn unsave_playlist(app: &mut App) {
         }
     }
 }
+
 fn view_list_content(app: &mut App, focus_area: FocusArea) {
     let list = match focus_area {
         FocusArea::Albums => app

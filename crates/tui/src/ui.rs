@@ -131,8 +131,9 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
 fn render_help_line(frame: &mut Frame, area: Rect, theme: &Theme, items: Vec<(&str, &str)>) {
     let mut spans = Vec::new();
     for (i, (desc, key)) in items.iter().enumerate() {
-        spans.push(Span::styled(format!("{}: ", desc), theme.text_style()));
-        spans.push(Span::styled(key.to_string(), theme.key_style()));
+        spans.push(Span::styled(*desc, theme.text_style()));
+        spans.push(Span::styled(": ", theme.text_style()));
+        spans.push(Span::styled(*key, theme.key_style()));
         if i < items.len() - 1 {
             spans.push(Span::styled(" | ", theme.text_style()));
         }
@@ -140,6 +141,7 @@ fn render_help_line(frame: &mut Frame, area: Rect, theme: &Theme, items: Vec<(&s
     let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Right);
     frame.render_widget(p, area);
 }
+
 fn render_tabs(frame: &mut Frame, area: Rect, theme: &Theme, current_idx: usize) {
     let titles = vec![Line::from("  Library "), Line::from("  Search ")];
     let tabs = Tabs::new(titles)
@@ -598,6 +600,7 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
 
     frame.render_stateful_widget(table, inner_area, &mut app.search_albums_tablestate);
 }
+// SEARCH SONGS/VIDEOS
 fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &Theme) {
     let keymap = Line::from(vec![
         Span::styled("[ Add to Queue: ", theme.text_style()),
@@ -637,6 +640,7 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
     ]);
     let block = Block::default()
         .borders(Borders::ALL)
+        .padding(Padding::horizontal(1))
         .border_type(BorderType::Rounded)
         .title(title)
         .title_bottom(keymap.centered())
@@ -655,14 +659,12 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
 
     let rows = search_songs.iter().map(|song| {
         Row::new([
-            "",
             song.title.as_str(),
             song.artist.as_str(),
             song.duration.as_str(),
         ])
     });
     let column_widths = [
-        Constraint::Length(1),
         Constraint::Percentage(80),
         Constraint::Percentage(20),
         Constraint::Length(10),
@@ -673,7 +675,7 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         Style::default()
     };
     let table = Table::new(rows, column_widths)
-        .header(Row::new(["", "Title", "Artist", "Duration"]))
+        .header(Row::new(["Title", "Artist", "Duration"]))
         .row_highlight_style(highlight_style);
 
     frame.render_stateful_widget(table, inner_area, tablestate);
@@ -696,9 +698,9 @@ fn render_save_song_to_playlist_popup(
         .filter_map(|&idx| app.playlists.get(idx))
         .map(|p| {
             if p.playlist_id == "LM" {
-                ListItem::new(format!("  {}", p.title))
+                ListItem::new(Line::from(vec![Span::raw(" "), Span::raw(&p.title)]))
             } else {
-                ListItem::new(format!(" 󰲸 {}", p.title))
+                ListItem::new(Line::from(vec![Span::raw("󰲸 "), Span::raw(&p.title)]))
             }
         })
         .collect();
@@ -825,34 +827,26 @@ fn render_api_client_popup(
         let mut lines = vec![
             Line::from(vec![
                 Span::styled("[b] ", config.theme.key_style()),
-                Span::styled(format!("Browser: {:?}", browser), config.theme.text_style()),
+                Span::raw("Browser: "),
+                Span::raw(format!("{:?}", browser)),
             ]),
             Line::from(vec![
                 Span::styled("[p] ", config.theme.key_style()),
-                Span::styled(
-                    format!("Profile: {}", profile.name),
-                    config.theme.text_style(),
-                ),
+                Span::raw("Profile: "),
+                Span::raw(&profile.name),
             ]),
         ];
         if browser.engine() == BrowserEngine::Gecko {
             lines.push(Line::from(vec![
                 Span::styled("[c] ", config.theme.key_style()),
-                Span::styled(
-                    format!(
-                        "Container: {}",
-                        gecko_container.map_or("None", |c| c.name.as_str())
-                    ),
-                    config.theme.text_style(),
-                ),
+                Span::raw("Container: "),
+                Span::raw(gecko_container.map_or("None", |c| &c.name)),
             ]));
         }
         lines.push(Line::from(vec![
             Span::styled("[a] ", config.theme.key_style()),
-            Span::styled(
-                format!("Account: {}", account.map_or("None", |a| a.email.as_str())),
-                config.theme.text_style(),
-            ),
+            Span::raw("Account:"),
+            Span::raw(account.map_or("None", |a| &a.email)),
         ]));
         let p = Paragraph::new(lines).alignment(Alignment::Left);
         frame.render_widget(p, layout[0]);
@@ -927,7 +921,7 @@ fn render_select_gecko_container_popup(
     frame.render_widget(block, center_area);
     let items: Vec<ListItem> = containers
         .iter()
-        .map(|c| ListItem::new(format!(" {}", c.name)))
+        .map(|c| ListItem::new(c.name.as_str()))
         .collect();
 
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
@@ -1016,7 +1010,7 @@ fn render_select_profile_popup(
     }
     let items: Vec<ListItem> = profiles
         .iter()
-        .map(|p| ListItem::new(format!(" {}", p.name)))
+        .map(|p| ListItem::new(p.name.as_str()))
         .collect();
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
 
@@ -1045,7 +1039,7 @@ fn render_select_browser_popup(frame: &mut Frame, app: &mut App, area: Rect, con
     frame.render_widget(block, center_area);
     let items: Vec<ListItem> = ALL_BROWSERS
         .iter()
-        .map(|b| ListItem::new(format!(" {:?}", b)))
+        .map(|b| ListItem::new(format!("{:?}", b)))
         .collect();
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
     frame.render_stateful_widget(list_widget, layout[1], &mut app.browser_liststate);
@@ -1121,7 +1115,7 @@ fn render_select_account_popup(frame: &mut Frame, app: &mut App, area: Rect, con
     }
     let items: Vec<ListItem> = accounts
         .iter()
-        .map(|a| ListItem::new(format!(" {}", a.email)))
+        .map(|a| ListItem::new(a.email.as_str()))
         .collect();
 
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());

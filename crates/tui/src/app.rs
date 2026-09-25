@@ -175,43 +175,6 @@ impl App {
         }
     }
 
-    // TOGGLE NEXT ITEM IN LISTSTATE
-    pub fn next_item(state: &mut ListState, len: usize) {
-        if len == 0 {
-            return;
-        }
-        let i = match state.selected() {
-            Some(i) => {
-                if i >= len - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        state.select(Some(i));
-    }
-
-    // TOGGLE PREVIOUS ITEM IN LISTSTATE
-    pub fn previous_item(state: &mut ListState, len: usize) {
-        if len == 0 {
-            return;
-        }
-
-        let i = match state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    len - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        state.select(Some(i));
-    }
-
     pub fn get_mpv_idx(&self, id: &str) -> Option<usize> {
         for (pos, mpv_id) in self.mpv_list.iter().enumerate() {
             if id == mpv_id {
