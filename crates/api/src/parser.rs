@@ -201,7 +201,13 @@ pub fn parse_search_albums(data: &str) -> YResult<Vec<Playlist>> {
             let menu = renderer.get("menu.menuRenderer.items");
             if menu.exists() {
                 menu.each(|_, mi| {
-                    if mi.get("toggleMenuServiceItemRenderer.defaultServiceEndpoint.likeEndpoint.status").str() == "INDIFFERENT" {
+                    let toggle = mi.get("toggleMenuServiceItemRenderer");
+                    if toggle.exists()
+                        && toggle
+                            .get("defaultServiceEndpoint.likeEndpoint.status")
+                            .exists()
+                        && toggle.get("isToggled").bool()
+                    {
                         is_saved = true;
                         return false;
                     }
