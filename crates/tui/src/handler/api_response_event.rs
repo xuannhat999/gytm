@@ -1,7 +1,7 @@
 use super::{append_song_to_queue, load_list};
 use crate::{app::App, notification::NotifyType};
 use api::protocol::{ApiCmd, ApiLoadingKind, ApiResponse};
-use data::app::{FocusArea, PopupState};
+use data::app::PopupState;
 use error::{YError, log_to_file};
 use player::Player;
 use ratatui::widgets::ListState;
@@ -62,7 +62,6 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 Ok(albums) => {
                     app.search_albums = albums;
                     if !app.search_albums.is_empty() {
-                        app.focus_area = FocusArea::SearchAlbums;
                         app.search_albums_tablestate.select(Some(0));
                     } else {
                         app.search_albums_tablestate.select(None);

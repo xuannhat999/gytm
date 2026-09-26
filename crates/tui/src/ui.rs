@@ -12,7 +12,7 @@ use data::app::{
 use data::theme::Theme;
 use ratatui::layout::Flex;
 use ratatui::style::{Color, Stylize};
-use ratatui::widgets::{Cell, Padding, Row, Table};
+use ratatui::widgets::{Cell, Gauge, Padding, Row, Table};
 use ratatui::{
     self, Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -34,18 +34,26 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
             } else {
                 Constraint::Length(3) // SEARCH BAR
             },
-            Constraint::Fill(1),        // CONTENT
-            Constraint::Percentage(30), // QUEUE
-            Constraint::Length(4),      // PLAYER
+            Constraint::Percentage(60), // QUEUE
+            Constraint::Percentage(40), // CONTENT
+            Constraint::Length(5),      // PLAYER
         ])
         .split(frame.area());
 
     let hor_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(if app.viewing_list.is_some() {
-            [Constraint::Percentage(55), Constraint::Percentage(45)]
+            [
+                Constraint::Percentage(30),
+                Constraint::Percentage(30),
+                Constraint::Percentage(40),
+            ]
         } else {
-            [Constraint::Min(0), Constraint::Max(0)]
+            [
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+                Constraint::Max(0),
+            ]
         })
         .split(main_layout[2]);
 
@@ -69,21 +77,21 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
     render_queue(frame, app, main_layout[3], &config.theme, start_time);
     render_player(frame, app, main_layout[4], &config.theme);
     if app.viewing_list.is_some() {
-        render_songs(frame, app, hor_layout[1], &config.theme, start_time);
+        render_songs(frame, app, hor_layout[2], &config.theme, start_time);
     }
 
     match app.page {
         AppPage::Library => {
             // HORIZONTAL LAYOUT (ALBUMS | PLAYLISTS)
-            let list_layout = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-                .split(hor_layout[0]);
-
+            // let list_layout = Layout::default()
+            //     .direction(Direction::Vertical)
+            //     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            //     .split(hor_layout[0]);
+            //
             render_list(
                 frame,
                 app,
-                list_layout[0],
+                hor_layout[0],
                 FocusArea::Albums,
                 &config.theme,
                 start_time,
@@ -91,20 +99,20 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
             render_list(
                 frame,
                 app,
-                list_layout[1],
+                hor_layout[1],
                 FocusArea::Playlists,
                 &config.theme,
                 start_time,
             );
         }
         AppPage::Search => {
-            let result_layout = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-                .split(hor_layout[0]);
+            // let result_layout = Layout::default()
+            //     .direction(Direction::Vertical)
+            //     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            //     .split(hor_layout[0]);
             render_search_bar(frame, app, main_layout[1], &config.theme, start_time);
-            render_search_albums(frame, app, result_layout[0], &config.theme);
-            render_search_songs(frame, app, result_layout[1], &config.theme);
+            render_search_albums(frame, app, hor_layout[1], &config.theme);
+            render_search_songs(frame, app, hor_layout[0], &config.theme);
         }
     }
 
@@ -268,8 +276,8 @@ fn render_list(
         };
         let colum_width = [
             Constraint::Length(1),
-            Constraint::Percentage(80),
-            Constraint::Percentage(20),
+            Constraint::Percentage(70),
+            Constraint::Percentage(30),
         ];
         let table = Table::new(rows, colum_width)
             .header(Row::new(["", "Title", "Artist"]).style(theme.table_header_style()))
@@ -525,61 +533,89 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
         .border_style(Style::default().fg(theme.third));
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
-
-    let song_info = match app.player_status {
-        PlayerStatus::Idle => vec![Line::raw("  No song is playing")],
-        _ => {
-            let icon = if app.player_status == PlayerStatus::Playing {
-                " "
-            } else {
-                " "
-            };
-            if let (Some(idx), Some(time_pos)) = (app.playing_song_idx, app.time_pos)
-                && idx < app.queue.len()
-            {
-                let playing_song = &app.queue[idx];
-                let time_pos_text = helper::format_time(time_pos);
-                vec![
-                    Line::from(vec![
-                        Span::raw(icon),
-                        Span::raw(&playing_song.title),
-                        Span::raw(" - "),
-                        Span::raw(&playing_song.artist),
-                    ]),
-                    Line::from(vec![
-                        Span::raw("  "),
-                        Span::raw(time_pos_text),
-                        Span::raw(" / "),
-                        Span::raw(&playing_song.duration),
-                    ]),
-                ]
-            } else {
-                vec![Line::raw("")]
-            }
-        }
-    };
+    let vertical_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(2), Constraint::Length(1)])
+        .split(inner_area);
+    let horizontal_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Min(50), Constraint::Length(8)])
+        .split(vertical_layout[0]);
     let is_shuffle = match app.player_state.play_mode {
         PlayMode::DefaultMode => "Off",
         PlayMode::ShuffleMode => "On ",
     };
-    let right_content = vec![
+    let player_info = Paragraph::new(vec![
         Line::from(vec![Span::raw(" :"), Span::raw(is_shuffle)]),
         Line::from(format!("  {}% ", app.player_state.volume)),
-    ];
-    let left_area = Paragraph::new(song_info)
-        .style(theme.text_style())
-        .alignment(Alignment::Left);
-    let right_area = Paragraph::new(right_content)
-        .style(theme.text_style())
-        .alignment(Alignment::Left);
-
-    let inner_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Min(1), Constraint::Length(8)])
-        .split(inner_area);
-
-    frame.render_widget(left_area, inner_chunks[0]);
-    frame.render_widget(right_area, inner_chunks[1]);
+    ])
+    .style(theme.text_style())
+    .alignment(Alignment::Left);
+    frame.render_widget(player_info, horizontal_layout[1]);
+    if app.player_status == PlayerStatus::Idle {
+        let line = Line::raw("  No song is playing");
+        frame.render_widget(line, horizontal_layout[0]);
+    }
+    if let (Some(playing_idx), Some(time_pos)) = (app.playing_song_idx, app.time_pos) {
+        if let Some(playing_song) = app.queue.get(playing_idx) {
+            let icon = if app.player_status == PlayerStatus::Playing {
+                Span::raw(" ")
+            } else {
+                Span::raw(" ")
+            };
+            let song_info = Line::from(vec![icon, Span::raw(&playing_song.title)]);
+            frame.render_widget(song_info, horizontal_layout[0]);
+            let ratio = helper::progress_ratio(time_pos, &playing_song.duration);
+            let text_time = format!(
+                "{} / {}",
+                helper::format_time(time_pos),
+                playing_song.duration
+            );
+            let progress = Gauge::default()
+                .gauge_style(Style::default().fg(theme.primary).bg(Color::Black))
+                .ratio(ratio)
+                .label(text_time);
+            frame.render_widget(progress, vertical_layout[1]);
+        }
+    }
+    // let (song_info, ratio, time_label) = match app.player_status {
+    //     PlayerStatus::Idle => (vec![Line::raw("  No song is playing")], 0.0, String::new()),
+    //     _ => {
+    //         let icon = if app.player_status == PlayerStatus::Playing {
+    //             " "
+    //         } else {
+    //             " "
+    //         };
+    //         if let (Some(idx), Some(time_pos)) = (app.playing_song_idx, app.time_pos)
+    //             && idx < app.queue.len()
+    //         {
+    //             let playing_song = &app.queue[idx];
+    //             let time_pos_text = helper::format_time(time_pos);
+    //             let ratio = helper::progress_ratio(time_pos, &playing_song.duration);
+    //             let time_label = format!("{} / {}", time_pos_text, playing_song.duration);
+    //             (
+    //                 vec![
+    //                     Line::from(vec![
+    //                         Span::raw(icon),
+    //                         Span::raw(&playing_song.title),
+    //                         Span::raw(" - "),
+    //                         Span::raw(&playing_song.artist),
+    //                     ]),
+    //                     Line::from(vec![
+    //                         Span::raw("  "),
+    //                         Span::raw(time_pos_text),
+    //                         Span::raw(" / "),
+    //                         Span::raw(&playing_song.duration),
+    //                     ]),
+    //                 ],
+    //                 ratio,
+    //                 time_label,
+    //             )
+    //         } else {
+    //             (vec![Line::raw("")], 0.0, String::new())
+    //         }
+    //     }
+    // };
 }
 
 // SEARCH BAR
@@ -648,7 +684,7 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .title("[1]- Albums")
+        .title("[2]- Albums")
         .border_style(border_style)
         .title_bottom(bottom_nav.alignment(ratatui::layout::Alignment::Center));
 
@@ -726,7 +762,7 @@ fn render_search_songs(frame: &mut Frame, app: &mut App, area: Rect, theme: &The
         SearchSongSource::Video => (border_style, tab_hl),
     };
     let title = Line::from(vec![
-        Span::styled("[2]-", border_style),
+        Span::styled("[1]-", border_style),
         Span::styled(" 󰎇 Songs ", song_style),
         Span::styled("|", border_style),
         Span::styled("  Videos ", video_style),

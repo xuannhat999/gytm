@@ -108,6 +108,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                                 .send(ApiCmd::Search(app.search_query.clone()))
                                 .ok();
                             app.api_loading_kind = Some(ApiLoadingKind::Search);
+                            app.focus_area = FocusArea::SearchSongs;
                         }
                         KeyCode::Esc => {
                             app.is_insert = false;
@@ -116,8 +117,8 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
                     }
                 } else {
                     match key_event.code {
-                        KeyCode::Char('1') => app.focus_area = FocusArea::SearchAlbums,
-                        KeyCode::Char('2') => app.focus_area = FocusArea::SearchSongs,
+                        KeyCode::Char('1') => app.focus_area = FocusArea::SearchSongs,
+                        KeyCode::Char('2') => app.focus_area = FocusArea::SearchAlbums,
                         KeyCode::Char('s') => {
                             app.is_insert = true;
                         }

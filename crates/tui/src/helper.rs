@@ -25,6 +25,29 @@ pub fn format_time(secs: f64) -> String {
     }
 }
 
+pub fn parse_duration_to_secs(duration: &str) -> f64 {
+    let s = duration.trim();
+    if s.is_empty() {
+        return 0.0;
+    }
+    let mut total = 0.0;
+    for part in s.split(':') {
+        match part.trim().parse::<f64>() {
+            Ok(v) => total = total * 60.0 + v,
+            Err(_) => return 0.0,
+        }
+    }
+    total
+}
+
+pub fn progress_ratio(time_pos: f64, duration: &str) -> f64 {
+    let total = parse_duration_to_secs(duration);
+    if total <= 0.0 || time_pos <= 0.0 {
+        return 0.0;
+    }
+    (time_pos / total).clamp(0.0, 1.0)
+}
+
 pub fn get_queue_file() -> YResult<PathBuf> {
     Ok(dirs::state_dir()
         .ok_or(YError::InvalidPath("~/.local/state/".to_string()))?
