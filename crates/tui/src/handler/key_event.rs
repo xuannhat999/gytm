@@ -184,7 +184,7 @@ fn handle_page_event(app: &mut App) {
             if app.queue.is_empty() && app.search_songs.is_empty() {
                 app.is_insert = true;
             } else if app.focus_area != FocusArea::Queue {
-                app.focus_area = FocusArea::SearchAlbums;
+                app.focus_area = FocusArea::SearchSongs;
             }
         }
         AppPage::Search => {

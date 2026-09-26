@@ -82,12 +82,6 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
 
     match app.page {
         AppPage::Library => {
-            // HORIZONTAL LAYOUT (ALBUMS | PLAYLISTS)
-            // let list_layout = Layout::default()
-            //     .direction(Direction::Vertical)
-            //     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            //     .split(hor_layout[0]);
-            //
             render_list(
                 frame,
                 app,
@@ -106,10 +100,6 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
             );
         }
         AppPage::Search => {
-            // let result_layout = Layout::default()
-            //     .direction(Direction::Vertical)
-            //     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            //     .split(hor_layout[0]);
             render_search_bar(frame, app, main_layout[1], &config.theme, start_time);
             render_search_albums(frame, app, hor_layout[1], &config.theme);
             render_search_songs(frame, app, hor_layout[0], &config.theme);
@@ -513,7 +503,7 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let key_map = Line::from(vec![
         Span::styled("[ ⏸ / : ", theme.text_style()),
         Span::styled("Space ", theme.key_style()),
-        Span::styled("| Play mode: ", theme.text_style()),
+        Span::styled("| Toggle shuffle: ", theme.text_style()),
         Span::styled("m ", theme.key_style()),
         Span::styled("|  / : ", theme.text_style()),
         Span::styled("b/n ", theme.key_style()),
@@ -563,7 +553,14 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
             } else {
                 Span::raw(" ")
             };
-            let song_info = Line::from(vec![icon, Span::raw(&playing_song.title)]);
+            let song_info = Paragraph::new(vec![
+                Line::from(vec![icon, Span::raw(&playing_song.title)])
+                    .style(theme.text_style())
+                    .bold(),
+                Line::from(vec![Span::raw("  "), Span::raw(&playing_song.artist)])
+                    .style(theme.text_style()),
+            ])
+            .left_aligned();
             frame.render_widget(song_info, horizontal_layout[0]);
             let ratio = helper::progress_ratio(time_pos, &playing_song.duration);
             let text_time = format!(
@@ -572,50 +569,12 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
                 playing_song.duration
             );
             let progress = Gauge::default()
-                .gauge_style(Style::default().fg(theme.primary).bg(Color::Black))
+                .gauge_style(Style::default().fg(theme.primary).bg(theme.secondary))
                 .ratio(ratio)
                 .label(text_time);
             frame.render_widget(progress, vertical_layout[1]);
         }
     }
-    // let (song_info, ratio, time_label) = match app.player_status {
-    //     PlayerStatus::Idle => (vec![Line::raw("  No song is playing")], 0.0, String::new()),
-    //     _ => {
-    //         let icon = if app.player_status == PlayerStatus::Playing {
-    //             " "
-    //         } else {
-    //             " "
-    //         };
-    //         if let (Some(idx), Some(time_pos)) = (app.playing_song_idx, app.time_pos)
-    //             && idx < app.queue.len()
-    //         {
-    //             let playing_song = &app.queue[idx];
-    //             let time_pos_text = helper::format_time(time_pos);
-    //             let ratio = helper::progress_ratio(time_pos, &playing_song.duration);
-    //             let time_label = format!("{} / {}", time_pos_text, playing_song.duration);
-    //             (
-    //                 vec![
-    //                     Line::from(vec![
-    //                         Span::raw(icon),
-    //                         Span::raw(&playing_song.title),
-    //                         Span::raw(" - "),
-    //                         Span::raw(&playing_song.artist),
-    //                     ]),
-    //                     Line::from(vec![
-    //                         Span::raw("  "),
-    //                         Span::raw(time_pos_text),
-    //                         Span::raw(" / "),
-    //                         Span::raw(&playing_song.duration),
-    //                     ]),
-    //                 ],
-    //                 ratio,
-    //                 time_label,
-    //             )
-    //         } else {
-    //             (vec![Line::raw("")], 0.0, String::new())
-    //         }
-    //     }
-    // };
 }
 
 // SEARCH BAR
@@ -707,7 +666,6 @@ fn render_search_albums(frame: &mut Frame, app: &mut App, area: Rect, theme: &Th
         Constraint::Length(1),
         Constraint::Percentage(70),
         Constraint::Percentage(25),
-        Constraint::Length(10),
     ];
     let table = Table::new(rows, colum_width)
         .header(Row::new(["", "Title", "Artist"]).style(theme.table_header_style()))
