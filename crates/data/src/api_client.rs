@@ -9,9 +9,9 @@ pub enum SearchType {
 impl SearchType {
     pub fn get_param(&self) -> &'static str {
         match self {
-            SearchType::Song => "EgWKAQIIAWoMEAQQAxAFEAkQEBAK",
             SearchType::Album => "EgWKAQIYAWoSEAUQAxAEEAoQCRAVEA4QERAQ",
-            SearchType::Video => "EgWKAQIQAWoMEAMQBBAFEAkQChAQ",
+            SearchType::Song => "EgWKAQIIAWoQEAQQAxAKEAUQCRAQEBUQEQ%3D%3D",
+            SearchType::Video => "EgWKAQIQAWoQEAQQAxAKEAUQCRAQEBUQEQ%3D%3D",
         }
     }
 }

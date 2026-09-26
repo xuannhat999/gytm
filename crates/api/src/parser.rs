@@ -78,13 +78,22 @@ pub fn parse_lists(data: &str) -> YResult<(Vec<Playlist>, Vec<Playlist>, Option<
 fn extract_artist(runs: &gjson::Value) -> String {
     let mut parts = String::new();
     runs.each(|_, run| {
-        let binding = run.get("text");
-        let t = binding.str().trim();
-        if t == "•" || t == "|" {
-            return false;
+        let text = run.get("text");
+        let str_text = text.str();
+
+        if str_text.contains("&")  || str_text.contains(",") {
+            parts.push_str(str_text);
+            return true;
         }
-        parts.push_str(t);
-        parts.push(' ');
+        let page_type = run.get("navigationEndpoint.browseEndpoint.browseEndpointContextSupportedConfigs.browseEndpointContextMusicConfig.pageType");
+        if page_type.exists() {
+            match page_type.str() {
+                "MUSIC_PAGE_TYPE_ARTIST"|"MUSIC_PAGE_TYPE_USER_CHANNEL" => {
+                    parts.push_str(str_text);
+                },
+                _ => {}
+            }
+        }
         true
     });
     parts

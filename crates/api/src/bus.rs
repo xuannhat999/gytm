@@ -69,23 +69,21 @@ impl YTBus {
 
     pub async fn get_lists(&self) -> YResult<(Vec<Playlist>, Vec<Playlist>, Vec<usize>)> {
         self.check_auth()?;
-        let mut all_albums: Vec<Playlist> = Vec::new();
-        let mut all_playlists: Vec<Playlist> = Vec::new();
-        let mut all_cus_playlists: Vec<usize> = Vec::new();
         let raw_data = self.dao.get_library_playlists().await?;
-
         let (mut albums, mut playlists, mut token) = parser::parse_lists(&raw_data)?;
-        all_albums.append(&mut albums);
-        all_playlists.append(&mut playlists);
+        let mut all_cus_playlists: Vec<usize> = Vec::new();
+        drop(raw_data);
+
         while let Some(current_token) = token {
             let next_raw_data = self.dao.get_continuation(&current_token).await?;
             let (mut next_albums, mut next_playlists, next_token) =
                 parser::parse_lists(&next_raw_data)?;
-            all_albums.append(&mut next_albums);
-            all_playlists.append(&mut next_playlists);
+            drop(next_raw_data);
+            albums.append(&mut next_albums);
+            playlists.append(&mut next_playlists);
             token = next_token;
         }
-        for (idx, playlist) in all_playlists.iter_mut().enumerate() {
+        for (idx, playlist) in playlists.iter_mut().enumerate() {
             if playlist.playlist_id == "LM" {
                 playlist.is_custom = true;
             }
@@ -93,7 +91,7 @@ impl YTBus {
                 all_cus_playlists.push(idx);
             }
         }
-        Ok((all_albums, all_playlists, all_cus_playlists))
+        Ok((albums, playlists, all_cus_playlists))
     }
 
     pub async fn get_accounts_list(&mut self, client_state: &ClientState) -> YResult<Vec<Account>> {
