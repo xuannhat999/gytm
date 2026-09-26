@@ -82,12 +82,6 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
 
     match app.page {
         AppPage::Library => {
-            // HORIZONTAL LAYOUT (ALBUMS | PLAYLISTS)
-            // let list_layout = Layout::default()
-            //     .direction(Direction::Vertical)
-            //     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            //     .split(hor_layout[0]);
-            //
             render_list(
                 frame,
                 app,
@@ -106,10 +100,6 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
             );
         }
         AppPage::Search => {
-            // let result_layout = Layout::default()
-            //     .direction(Direction::Vertical)
-            //     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            //     .split(hor_layout[0]);
             render_search_bar(frame, app, main_layout[1], &config.theme, start_time);
             render_search_albums(frame, app, hor_layout[1], &config.theme);
             render_search_songs(frame, app, hor_layout[0], &config.theme);
