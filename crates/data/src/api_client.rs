@@ -10,7 +10,7 @@ impl SearchType {
     pub fn get_param(&self) -> &'static str {
         match self {
             SearchType::Song => "EgWKAQIIAWoMEAQQAxAFEAkQEBAK",
-            SearchType::Album => "EgWKAQIYAWoMEAQQAxAFEAkQEBAK",
+            SearchType::Album => "EgWKAQIYAWoSEAUQAxAEEAoQCRAVEA4QERAQ",
             SearchType::Video => "EgWKAQIQAWoMEAMQBBAFEAkQChAQ",
         }
     }
