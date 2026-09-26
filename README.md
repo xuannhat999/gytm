@@ -118,32 +118,34 @@ paru -S gytm-git
 ### Navigation
 
 - (<kbd>arrow up</kbd>/<kbd>k</kbd>) / (<kbd>arrow down</kbd>/<kbd>j</kbd>): Navigate up/down list items
-- <kbd>l</kbd>: View Songs from album/playlist (In Library)
+- <kbd>l</kbd>: View Songs from album/playlist
+- <kbd>h</kbd>: Close [4] Content pane 
+- <kbd>4</kbd>: Focus [4] Content (only when a playlist/album is open)
 - <kbd>Enter</kbd>: Play Album/Playlist/Song
 
 ### Playback
 
 - <kbd>Space</kbd>: Pause/Resume
-- <kbd>m</kbd>: Toggle playmode (Default/Shuffle)
+- <kbd>m</kbd>: Toggle shuffle On/Off
 - <kbd>b</kbd>/<kbd>n</kbd>: Play previous/next song in Queue (If playmode is Shuffle, next song will be random)
 - <kbd>+</kbd>/<kbd>-</kbd>: Increase/Decrease volume
-- <kbd>arrow left</kbd>/<kbd>arrow right</kbd>: Go Back/Forward 5s
+- <kbd>arrow left</kbd>/<kbd>arrow right</kbd>: Go Back/Forward `seek_seconds` (default 5s, configurable in `config.toml`)
 
 ### Search
 
 - <kbd>s</kbd>: Toggle search input (in Search Tab)
 - <kbd>Esc</kbd>: Exit insert mode (in search input)
 - <kbd>Enter</kbd>: Submit and search (in search input)
-- <kbd>l</kbd>/<kbd>h</kbd>: Switch between Songs and Videos results (in [2] box)
+- <kbd>l</kbd>/<kbd>h</kbd>: Switch between Songs and Videos results (in [1] box)
 
 ### Content Management
 
 - <kbd>x</kbd>:
-  - [1]Albums Search results: Save/Unsave album
+  - [2]Albums Search results: Save/Unsave album
   - [1]Albums/[2]Playlists in Library: Unsave album/playlist
   - [4]Content: Save song to playlist, Unsave with <kbd>X</kbd>
 - <kbd>a</kbd>:
-  - [2]Songs/Videos Search results / [4]Content: Add song to Queue
+  - [1]Songs/Videos Search results / [4]Content: Add song to Queue
   - [2]Playlist in Library: Create new playlist
 - <kbd>d</kbd>:
   - [3]Queue: Remove song from Queue
