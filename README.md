@@ -3,9 +3,9 @@
 Stream Youtube Music from your terminal !
 
 # Demo
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/b6cb088f-c9f4-4dc3-ab10-76432c667104" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/7cb0c00f-2aeb-431e-9912-7a4d25dacf48" />
 <br></br>
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/17d8e098-1be3-424f-b904-b5a22128d2f6" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/244a6059-a2ad-4972-9956-501b76b35830" />
 
 <br></br>
 
