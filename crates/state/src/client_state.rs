@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::persist::Persist;
 use data::api_client::{Account, Browser, BrowserProfile, GeckoContainer};
 use error::{YError, YResult};
@@ -12,7 +14,9 @@ pub struct ClientState {
 }
 
 impl Persist for ClientState {
-    const FILE_NAME: &'static str = "client_state.json";
+    fn file_name() -> std::path::PathBuf {
+        PathBuf::from("client_state.json")
+    }
 }
 
 impl ClientState {

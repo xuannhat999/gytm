@@ -1,6 +1,3 @@
-use error::{YError, YResult};
-use std::{fs, path::PathBuf};
-
 pub fn get_vid_id_from_url(url: &str) -> String {
     url.split("v=").last().unwrap_or(url).to_string()
 }
@@ -46,18 +43,4 @@ pub fn progress_ratio(time_pos: f64, duration: &str) -> f64 {
         return 0.0;
     }
     (time_pos / total).clamp(0.0, 1.0)
-}
-
-pub fn get_queue_file() -> YResult<PathBuf> {
-    Ok(dirs::state_dir()
-        .ok_or(YError::InvalidPath("~/.local/state/".to_string()))?
-        .join("gytm/queue.json"))
-}
-
-pub fn remove_queue_file() {
-    if let Ok(queue_file) = get_queue_file()
-        && queue_file.exists()
-    {
-        fs::remove_file(queue_file).ok();
-    }
 }

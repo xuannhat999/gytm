@@ -34,18 +34,20 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
         if !app.is_insert {
             match key_event.code {
                 KeyCode::Char('q') => {
-                    if app.queue.is_empty() {
-                        App::shutdown(player);
+                    if app.queue_state.queue.is_empty() {
+                        App::shutdown(app, player);
                     }
                     app.is_exit = true;
                 }
                 KeyCode::Char('Q') => {
-                    App::shutdown(player);
+                    App::shutdown(app, player);
                     app.is_exit = true;
                 }
                 KeyCode::Char('3') => {
                     app.focus_area = FocusArea::Queue;
-                    if !app.queue.is_empty() && app.queue_tablestate.selected().is_none() {
+                    if !app.queue_state.queue.is_empty()
+                        && app.queue_tablestate.selected().is_none()
+                    {
                         app.queue_tablestate.select(Some(0));
                     }
                 }
@@ -139,7 +141,11 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
 }
 
 fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
-    if handle_table_event(&mut app.queue_tablestate, app.queue.len(), key_event.code) {
+    if handle_table_event(
+        &mut app.queue_tablestate,
+        app.queue_state.queue.len(),
+        key_event.code,
+    ) {
         return;
     }
     match key_event.code {
@@ -148,7 +154,7 @@ fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
                 if app.player_state.play_mode == PlayMode::DefaultMode {
                     remove_song_from_queue(app, player, i, i);
                 } else {
-                    if let Some(song) = app.queue.get(i) {
+                    if let Some(song) = app.queue_state.queue.get(i) {
                         if let Some(idx_mpv) = app.get_mpv_idx(&song.video_id) {
                             remove_song_from_queue(app, player, i, idx_mpv);
                         }
@@ -163,7 +169,7 @@ fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
                         log_to_file(&e);
                     }
                 } else {
-                    if let Some(song) = app.queue.get(i) {
+                    if let Some(song) = app.queue_state.queue.get(i) {
                         if let Some(pos) = app.get_mpv_idx(&song.video_id)
                             && let Err(e) = player.send_mpv_command(MpvCommand::PlayPos(pos))
                         {
@@ -181,7 +187,7 @@ fn handle_page_event(app: &mut App) {
     match app.page {
         AppPage::Library => {
             app.page = AppPage::Search;
-            if app.queue.is_empty() && app.search_songs.is_empty() {
+            if app.queue_state.queue.is_empty() && app.search_songs.is_empty() {
                 app.is_insert = true;
             } else if app.focus_area != FocusArea::Queue {
                 app.focus_area = FocusArea::SearchSongs;
@@ -222,14 +228,14 @@ fn handle_player_key(key_event: KeyEvent, app: &mut App, player: &mut Player, co
             }
         }
         KeyCode::Char('n') => {
-            if !app.queue.is_empty()
+            if !app.queue_state.queue.is_empty()
                 && let Err(e) = player.send_mpv_command(MpvCommand::PlayNext)
             {
                 log_to_file(&e);
             }
         }
         KeyCode::Char('b') => {
-            if !app.queue.is_empty()
+            if !app.queue_state.queue.is_empty()
                 && let Err(e) = player.send_mpv_command(MpvCommand::PlayPrev)
             {
                 log_to_file(&e);
@@ -270,7 +276,8 @@ fn handle_songs_key(key_event: KeyEvent, app: &mut App, player: &mut Player) {
     match key_event.code {
         KeyCode::Enter => {
             if let Some(list) = &app.viewing_list {
-                let is_dup = app.playing_playlist_id.as_ref() == Some(&list.playlist_id);
+                let is_dup =
+                    app.queue_state.playing_playlist_id.as_ref() == Some(&list.playlist_id);
                 if !is_dup {
                     if let Some(i) = app.songs_tablestate.selected() {
                         if let Err(e) = load_list(

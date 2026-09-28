@@ -1,16 +1,12 @@
-use crate::{
-    helper::{self, get_queue_file},
-    notification::NotificationManager,
-};
+use crate::notification::NotificationManager;
 use api::protocol::{ApiCmd, ApiLoadingKind};
 use config::Config;
-use data::app::{
-    AppPage, FocusArea, PlayerStatus, Playlist, PopupState, QueueData, SearchSongSource, Song,
-};
-use error::YResult;
+use data::app::{AppPage, FocusArea, PlayerStatus, Playlist, PopupState, SearchSongSource, Song};
 use player::Player;
 use ratatui::widgets::{ListState, ScrollbarState, TableState};
-use state::{client_state::ClientState, player_state::PlayerState};
+use state::{
+    Persist, client_state::ClientState, player_state::PlayerState, queue_state::QueueState,
+};
 use tokio::sync::mpsc;
 
 pub struct App {
@@ -35,7 +31,7 @@ pub struct App {
     pub songs_scrollbar_state: ScrollbarState,
 
     // QUEUE
-    pub queue: Vec<Song>,
+    pub queue_state: QueueState,
     pub queue_tablestate: TableState,
     pub queue_scrollbar_state: ScrollbarState,
 
@@ -45,7 +41,6 @@ pub struct App {
     pub mpv_list: Vec<String>,
     pub player_status: PlayerStatus,
 
-    pub playing_playlist_id: Option<String>,
     pub viewing_list: Option<Playlist>,
 
     // ALBUMS (SEARCH)
@@ -87,6 +82,7 @@ impl App {
     pub fn new(
         player_state: PlayerState,
         client_state: ClientState,
+        queue_state: QueueState,
         config: &Config,
         api_cmd_tx: mpsc::UnboundedSender<ApiCmd>,
     ) -> Self {
@@ -112,7 +108,7 @@ impl App {
             songs_scrollbar_state: ScrollbarState::default(),
 
             // QUEUE
-            queue: Vec::new(),
+            queue_state,
             queue_tablestate: TableState::default(),
             queue_scrollbar_state: ScrollbarState::default(),
 
@@ -122,7 +118,6 @@ impl App {
             mpv_list: Vec::new(),
             player_status: PlayerStatus::Idle,
 
-            playing_playlist_id: None,
             viewing_list: None,
 
             // ALBUMS (SEARCH)
@@ -211,33 +206,8 @@ impl App {
         !matches!(self.popup_state, PopupState::None)
     }
 
-    pub fn save_queue_file(&self) -> YResult<()> {
-        let path = get_queue_file()?;
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
-        }
-        let data = QueueData {
-            queue: self.queue.clone(),
-            playing_playlist_id: self.playing_playlist_id.clone(),
-        };
-        let content = serde_json::to_string(&data)?;
-        std::fs::write(&path, content)?;
-        Ok(())
-    }
-
-    pub fn load_queue_file(&mut self) -> YResult<()> {
-        let path = get_queue_file()?;
-        if path.exists() {
-            let content = std::fs::read_to_string(path)?;
-            let data: QueueData = serde_json::from_str(&content).unwrap_or_default();
-            self.queue = data.queue;
-            self.playing_playlist_id = data.playing_playlist_id;
-        }
-        Ok(())
-    }
-
-    pub fn shutdown(player: &mut Player) {
-        helper::remove_queue_file();
+    pub fn shutdown(&self, player: &mut Player) {
+        QueueState::delete().ok();
         player.shutdown();
     }
 }

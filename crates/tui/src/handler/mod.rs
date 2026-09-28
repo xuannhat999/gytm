@@ -17,7 +17,12 @@ use error::{YResult, log_to_file};
 use player::Player;
 
 fn append_song_to_queue(app: &mut App, player: &Player, song: Song) -> YResult<()> {
-    if app.queue.iter().any(|s| s.video_id == song.video_id) {
+    if app
+        .queue_state
+        .queue
+        .iter()
+        .any(|s| s.video_id == song.video_id)
+    {
         app.noti.notify(
             NotifyType::Error,
             format!("'{}' already in queue", song.title),
@@ -26,14 +31,14 @@ fn append_song_to_queue(app: &mut App, player: &Player, song: Song) -> YResult<(
     }
     let url = get_url_from_vid_id(&song.video_id);
     player.send_mpv_command(MpvCommand::AppendSong(url))?;
-    if app.player_state.play_mode == PlayMode::ShuffleMode && app.queue.len() == 3 {
+    if app.player_state.play_mode == PlayMode::ShuffleMode && app.queue_state.queue.len() == 3 {
         player.send_mpv_command(MpvCommand::Shuffle)?;
     }
     app.noti.notify(
         NotifyType::Success,
         format!("Appended '{}' in queue", song.title),
     );
-    app.queue.push(song);
+    app.queue_state.queue.push(song);
 
     Ok(())
 }
@@ -54,10 +59,10 @@ pub(crate) fn remove_song_from_queue(
                 app.playing_song_idx = None;
             }
         }
-        app.queue.remove(idx);
-        if app.queue.is_empty() {
+        app.queue_state.queue.remove(idx);
+        if app.queue_state.queue.is_empty() {
             app.player_status = PlayerStatus::Idle;
-            app.playing_playlist_id = None;
+            app.queue_state.playing_playlist_id = None;
             app.time_pos = None;
             app.queue_tablestate.select(None);
         }
@@ -71,9 +76,9 @@ pub(crate) fn clear_queue(app: &mut App, player: &Player) -> YResult<()> {
     app.player_status = PlayerStatus::Idle;
     app.playing_song_idx = None;
     app.time_pos = None;
-    app.queue.clear();
+    app.queue_state.queue.clear();
     app.queue_tablestate.select(None);
-    app.playing_playlist_id = None;
+    app.queue_state.playing_playlist_id = None;
     Ok(())
 }
 
@@ -93,9 +98,9 @@ pub(crate) fn load_list(
         if app.player_state.play_mode == PlayMode::ShuffleMode {
             player.send_mpv_command(MpvCommand::Shuffle)?;
         }
-        app.queue = songs;
+        app.queue_state.queue = songs;
         app.queue_tablestate.select(Some(start_index));
-        app.playing_playlist_id = playlist_id;
+        app.queue_state.playing_playlist_id = playlist_id;
         app.playing_song_idx = None;
     } else {
         clear_queue(app, player).ok();

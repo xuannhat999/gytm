@@ -18,3 +18,7 @@ config = { workspace = true }
 crossterm = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 ratatui = { workspace = true }
+dhat = { version = "0.3", optional = true }
+
+[features]
+dhat = ["dep:dhat"]

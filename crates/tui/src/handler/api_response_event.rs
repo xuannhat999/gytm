@@ -35,7 +35,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 {
                     app.songs.push(song.clone());
                 }
-                if let Some(playing_list) = &app.playing_playlist_id
+                if let Some(playing_list) = &app.queue_state.playing_playlist_id
                     && playing_list.eq(&playlist_id)
                 {
                     if let Err(e) = append_song_to_queue(app, player, song) {
@@ -107,7 +107,7 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
                 {
                     app.songs.push(song.clone());
                 }
-                if let Some(playing_list) = &app.playing_playlist_id
+                if let Some(playing_list) = &app.queue_state.playing_playlist_id
                     && playing_list.eq("LM")
                 {
                     if let Err(e) = append_song_to_queue(app, player, song) {

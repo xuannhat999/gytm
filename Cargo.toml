@@ -46,6 +46,12 @@ gytm = { path = "crates/gytm" }
 state = { path = "crates/state" }
 config = { path = "crates/config" }
 
+[profile.dev]
+debug = true
+
+[profile.dev.package."*"]
+debug = true
+
 [profile.release]
 opt-level = "z"
 lto = "thin"

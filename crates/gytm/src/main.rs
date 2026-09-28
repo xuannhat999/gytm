@@ -12,24 +12,32 @@ use data::mpv::{MpvCommand, MpvEvent};
 use error::{YResult, log_to_file};
 use player::Player;
 use ratatui::{Terminal, backend::CrosstermBackend};
-use state::{Persist, client_state::ClientState, player_state::PlayerState};
+use state::{
+    Persist, client_state::ClientState, player_state::PlayerState, queue_state::QueueState,
+};
 use std::{env, io, time::Duration};
 use tokio::sync::mpsc::{self};
 use tui::{
     app::App,
     handler,
-    helper::remove_queue_file,
     ui::{self},
     worker::spawn_api_worker,
 };
 
+#[cfg(feature = "dhat")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 #[tokio::main]
 async fn main() -> YResult<()> {
+    #[cfg(feature = "dhat")]
+    let _profiler = dhat::Profiler::new_heap();
+
     let mut player = Player::default();
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 && args[1] == "quit" {
         player.shutdown();
-        remove_queue_file();
+        QueueState::delete().ok();
         println!("Exited gytm");
         std::process::exit(0);
     }
@@ -39,11 +47,15 @@ async fn main() -> YResult<()> {
     // Setup CLient State
     let client_state = ClientState::load()?;
 
+    let queue_state = QueueState::load()?;
+
+    // Config
     let config = Config::load();
+
     // Setup API client
     let (api_cmd_tx, api_cmd_rx) = mpsc::unbounded_channel::<ApiCmd>();
     let (api_res_tx, mut api_res_rx) = mpsc::unbounded_channel::<ApiResponse>();
-    let mut app = App::new(player_state, client_state, &config, api_cmd_tx);
+    let mut app = App::new(player_state, client_state, queue_state, &config, api_cmd_tx);
 
     println!("󱘖 Connecting to YouTube Music...");
     let dao = match YTDao::new(&app.client_state).await {
@@ -67,10 +79,9 @@ async fn main() -> YResult<()> {
     if Player::check_socket_exists()
         && let Ok(stream) = player.connect_mpv().await
     {
-        app.load_queue_file().ok();
         player.observe_mpv(stream, tx_event).await?;
     } else {
-        remove_queue_file();
+        QueueState::delete().ok();
         player.spawn_mpv()?;
         let stream = player.connect_mpv().await?;
         player.observe_mpv(stream, tx_event).await?;
