@@ -499,6 +499,7 @@ fn handle_popup_key(key_event: KeyEvent, app: &mut App) {
                                 }
                             }
                             Err(e) => {
+                                app.noti.notify(NotifyType::Error, e.to_string());
                                 log_to_file(e);
                             }
                         }
