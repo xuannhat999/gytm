@@ -3,7 +3,7 @@ use api::protocol::{ApiCmd, ApiLoadingKind};
 use config::Config;
 use data::app::{AppPage, FocusArea, PlayerStatus, Playlist, PopupState, SearchSongSource, Song};
 use player::Player;
-use ratatui::widgets::{ListState, ScrollbarState, TableState};
+use ratatui::widgets::{ScrollbarState, TableState};
 use state::{
     Persist, client_state::ClientState, player_state::PlayerState, queue_state::QueueState,
 };
@@ -65,14 +65,11 @@ pub struct App {
 
     //POPUP
     pub popup_state: PopupState,
-    pub cus_playlists: Vec<usize>,
-    pub cus_playlists_liststate: ListState,
-
-    pub browser_liststate: ListState,
 
     // STATE
     pub player_state: PlayerState,
     pub client_state: ClientState,
+
     // API WORKER
     pub api_cmd_tx: mpsc::UnboundedSender<ApiCmd>,
     pub api_loading_kind: Option<ApiLoadingKind>,
@@ -142,10 +139,6 @@ impl App {
 
             //POPUP
             popup_state: PopupState::None,
-            cus_playlists: Vec::new(),
-            cus_playlists_liststate: ListState::default(),
-
-            browser_liststate: ListState::default(),
 
             // STATE
             player_state,
@@ -191,15 +184,6 @@ impl App {
             }
         }
         None
-    }
-    pub fn refresh_cus_playlist(&mut self) {
-        let mut new_cus: Vec<usize> = Vec::new();
-        for (i, playlist) in self.playlists.iter().enumerate() {
-            if playlist.is_custom {
-                new_cus.push(i);
-            }
-        }
-        self.cus_playlists = new_cus;
     }
 
     pub fn is_popup_active(&self) -> bool {

@@ -67,11 +67,10 @@ impl YTBus {
         Ok(playlist)
     }
 
-    pub async fn get_lists(&self) -> YResult<(Vec<Playlist>, Vec<Playlist>, Vec<usize>)> {
+    pub async fn get_lists(&self) -> YResult<(Vec<Playlist>, Vec<Playlist>)> {
         self.check_auth()?;
         let raw_data = self.dao.get_library_playlists().await?;
         let (mut albums, mut playlists, mut token) = parser::parse_lists(&raw_data)?;
-        let mut all_cus_playlists: Vec<usize> = Vec::new();
         drop(raw_data);
 
         while let Some(current_token) = token {
@@ -83,15 +82,7 @@ impl YTBus {
             playlists.append(&mut next_playlists);
             token = next_token;
         }
-        for (idx, playlist) in playlists.iter_mut().enumerate() {
-            if playlist.playlist_id == "LM" {
-                playlist.is_custom = true;
-            }
-            if playlist.is_custom {
-                all_cus_playlists.push(idx);
-            }
-        }
-        Ok((albums, playlists, all_cus_playlists))
+        Ok((albums, playlists))
     }
 
     pub async fn get_accounts_list(&mut self, client_state: &ClientState) -> YResult<Vec<Account>> {

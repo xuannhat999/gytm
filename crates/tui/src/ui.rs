@@ -5,6 +5,7 @@ use crate::helper;
 use api::protocol::ApiLoadingKind;
 use config::Config;
 use data::api_client::{ALL_BROWSERS, BrowserEngine};
+use data::app::PopupState::SelectBrowser;
 use data::app::{
     AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus, PopupState,
     SearchSongSource,
@@ -120,7 +121,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
         PopupState::CreatePlaylist { .. } => {
             render_create_playlist_popup(frame, app, frame.area(), config, start_time);
         }
-        PopupState::SelectBrowser => {
+        PopupState::SelectBrowser { .. } => {
             render_select_browser_popup(frame, app, frame.area(), config);
         }
         PopupState::SelectAccount { .. } => {
@@ -794,12 +795,16 @@ fn render_save_song_to_playlist_popup(
     config: &Config,
     start_time: std::time::Instant,
 ) {
-    let PopupState::SaveSong { selected_save_song } = &app.popup_state else {
+    let PopupState::SaveSong {
+        selected_save_song,
+        custom_playlists_idx,
+        custom_playlists_liststate,
+    } = &mut app.popup_state
+    else {
         return;
     };
 
-    let items: Vec<ListItem> = app
-        .cus_playlists
+    let items: Vec<ListItem> = custom_playlists_idx
         .iter()
         .filter_map(|&idx| app.playlists.get(idx))
         .map(|p| {
@@ -862,7 +867,7 @@ fn render_save_song_to_playlist_popup(
         render_spinner(frame, title_layout[0], &config.theme, start_time);
     }
     frame.render_widget(line, layout[1]);
-    frame.render_stateful_widget(list_widget, layout[2], &mut app.cus_playlists_liststate);
+    frame.render_stateful_widget(list_widget, layout[2], custom_playlists_liststate);
 }
 
 // API CLIENT SELECT
@@ -1128,6 +1133,9 @@ fn render_select_profile_popup(
 
 // BROWSER
 fn render_select_browser_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
+    let SelectBrowser { browsers_liststate } = &mut app.popup_state else {
+        return;
+    };
     let block = Block::default()
         .borders(Borders::ALL)
         .padding(Padding::horizontal(1))
@@ -1152,7 +1160,7 @@ fn render_select_browser_popup(frame: &mut Frame, app: &mut App, area: Rect, con
         .map(|b| ListItem::new(format!("{:?}", b)))
         .collect();
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
-    frame.render_stateful_widget(list_widget, layout[1], &mut app.browser_liststate);
+    frame.render_stateful_widget(list_widget, layout[1], browsers_liststate);
 }
 
 // ACCOUNT

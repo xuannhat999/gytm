@@ -1,9 +1,6 @@
-use std::path::PathBuf;
-
+use crate::Persist;
 use data::app::Song;
 use serde::{Deserialize, Serialize};
-
-use crate::Persist;
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct QueueState {
@@ -12,7 +9,5 @@ pub struct QueueState {
 }
 
 impl Persist for QueueState {
-    fn file_name() -> std::path::PathBuf {
-        PathBuf::from("queue_state.json")
-    }
+    const FILE_NAME: &'static str = "queue_state.json";
 }

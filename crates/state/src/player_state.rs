@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use crate::persist::Persist;
 use data::app::PlayMode;
 use serde::{Deserialize, Serialize};
@@ -20,7 +18,5 @@ impl Default for PlayerState {
 }
 
 impl Persist for PlayerState {
-    fn file_name() -> PathBuf {
-        PathBuf::from("player_state.json")
-    }
+    const FILE_NAME: &'static str = "player_state.json";
 }

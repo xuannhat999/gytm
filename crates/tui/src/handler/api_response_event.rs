@@ -13,7 +13,6 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
         ApiResponse::CreatePlaylist(res) => match res {
             Ok(playlist) => {
                 app.playlists.push(playlist);
-                app.cus_playlists.push(app.playlists.len() - 1);
                 app.popup_state = PopupState::None;
                 app.noti
                     .notify(NotifyType::Success, "Created playlist".to_string());
@@ -195,7 +194,6 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             Ok(_) => {
                 app.noti
                     .notify(NotifyType::Success, format!("Unsaved playlist '{}'", title));
-                app.refresh_cus_playlist();
             }
             Err(e) => {
                 log_to_file(&e);
@@ -234,10 +232,9 @@ pub fn handle_api_response(app: &mut App, response: ApiResponse, player: &Player
             }
         },
         ApiResponse::FetchLibraryData(lib_data) => match lib_data {
-            Ok((albums, playlists, cus_playlists)) => {
+            Ok((albums, playlists)) => {
                 app.albums = albums;
                 app.playlists = playlists;
-                app.cus_playlists = cus_playlists;
                 if !app.albums.is_empty() {
                     app.albums_tablestate.select(Some(0));
                 } else {

@@ -77,6 +77,8 @@ pub enum PopupState {
     None,
     SaveSong {
         selected_save_song: Song,
+        custom_playlists_idx: Vec<usize>,
+        custom_playlists_liststate: ListState,
     },
     CreatePlaylist {
         title: String,
@@ -85,7 +87,9 @@ pub enum PopupState {
         focused_field: CreatePlaylistFocus,
     },
     ApiCLient,
-    SelectBrowser,
+    SelectBrowser {
+        browsers_liststate: ListState,
+    },
     SelectBrowserProfile {
         browser: Browser,
         profiles: Vec<BrowserProfile>,

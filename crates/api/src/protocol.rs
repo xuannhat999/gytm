@@ -58,7 +58,7 @@ pub enum ApiResponse {
     UnsaveCusPlaylist((YResult<()>, String)),
     SaveAlbum((YResult<()>, Playlist)),
     GetRelatedSongsToPlay(YResult<Vec<Song>>),
-    FetchLibraryData(YResult<(Vec<Playlist>, Vec<Playlist>, Vec<usize>)>),
+    FetchLibraryData(YResult<(Vec<Playlist>, Vec<Playlist>)>),
     FetchAccountsList(
         YResult<(
             Vec<Account>,

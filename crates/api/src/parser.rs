@@ -28,30 +28,35 @@ pub fn parse_lists(data: &str) -> YResult<(Vec<Playlist>, Vec<Playlist>, Option<
 
             let page_type_v = renderer.get("navigationEndpoint.browseEndpoint.browseEndpointContextSupportedConfigs.browseEndpointContextMusicConfig.pageType");
             let page_type = page_type_v.str();
-            let mut is_custom = false;
-            let menu = renderer.get("menu.menuRenderer.items");
-            if menu.exists() {
-                menu.each(|_, mi| {
-                    let p1 = "menuNavigationItemRenderer.navigationEndpoint.confirmDialogEndpoint.content.confirmDialogRenderer.confirmButton.buttonRenderer.serviceEndpoint.deletePlaylistEndpoint";
-                    let p2 = "menuNavigationItemRenderer.navigationEndpoint.playlistEditorEndpoint";
-                    if mi.get(p1).exists() || mi.get(p2).exists() {
-                        is_custom = true;
-                        return false;
-                    }
-                    true
-                });
-            }
 
             let title_v = renderer.get("title.runs.0.text");
             let artist_v = renderer.get("subtitle.runs.2.text");
             let browse_id_v = renderer.get("navigationEndpoint.browseEndpoint.browseId");
             let playlist_id_v = renderer.get("thumbnailOverlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer.playNavigationEndpoint.watchPlaylistEndpoint.playlistId");
 
+            let playlist_id = playlist_id_v.str();
+
+            let mut is_custom = false;
+            let menu = renderer.get("menu.menuRenderer.items");
+            if menu.exists() {
+                menu.each(|_, mi| {
+                    let p1 = "menuNavigationItemRenderer.navigationEndpoint.confirmDialogEndpoint.content.confirmDialogRenderer.confirmButton.buttonRenderer.serviceEndpoint.deletePlaylistEndpoint";
+                    let p2 = "menuNavigationItemRenderer.navigationEndpoint.playlistEditorEndpoint";
+                    if mi.get(p1).exists() || mi.get(p2).exists(){
+                        is_custom = true;
+                        return false;
+                    }
+                    true
+                });
+            }
+            if playlist_id == "LM" {
+                is_custom = true;
+            }
             let album = Playlist {
                 title: if title_v.str().is_empty() { "Unknown".to_string() } else { title_v.str().to_string() },
                 artist: if artist_v.str().is_empty() { "Unknown".to_string() } else { artist_v.str().to_string() },
                 browse_id: browse_id_v.str().to_string(),
-                playlist_id: playlist_id_v.str().to_string(),
+                playlist_id: playlist_id.to_string(),
                 is_saved: true,
                 is_custom,
             };

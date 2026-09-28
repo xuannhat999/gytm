@@ -3,11 +3,11 @@ use serde::{Serialize, de::DeserializeOwned};
 use std::{fs, path::PathBuf};
 
 pub trait Persist: Sized + Default + Serialize + DeserializeOwned {
-    fn file_name() -> PathBuf;
+    const FILE_NAME: &'static str;
 
     fn get_path() -> YResult<PathBuf> {
         dirs::state_dir()
-            .map(|p| p.join("gytm").join(Self::file_name()))
+            .map(|p| p.join("gytm").join(Self::FILE_NAME))
             .ok_or(YError::InvalidPath("STATE_DIR".to_string()))
     }
 
