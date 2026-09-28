@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::api_client::{Account, Browser, BrowserProfile, GeckoContainer};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Playlist {
     pub title: String,
     pub artist: String,
@@ -12,21 +12,15 @@ pub struct Playlist {
     pub is_saved: bool,
     pub is_custom: bool,
 }
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Song {
     pub title: String,
-    #[serde(default)]
     pub artist: String,
     pub set_video_id: String,
     pub video_id: String,
     pub duration: String,
 }
-#[derive(Default, Serialize, Deserialize)]
-pub struct QueueData {
-    #[serde(default)]
-    pub playing_playlist_id: Option<String>,
-    pub queue: Vec<Song>,
-}
+
 #[derive(PartialEq)]
 pub enum PlayerStatus {
     Idle,
@@ -41,7 +35,7 @@ pub enum SearchSongSource {
     Video,
 }
 
-#[derive(Default, PartialEq, Serialize, Deserialize, Debug, Clone)]
+#[derive(Default, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum PlayMode {
     #[default]
@@ -83,6 +77,8 @@ pub enum PopupState {
     None,
     SaveSong {
         selected_save_song: Song,
+        custom_playlists_idx: Vec<usize>,
+        custom_playlists_liststate: ListState,
     },
     CreatePlaylist {
         title: String,
@@ -91,7 +87,9 @@ pub enum PopupState {
         focused_field: CreatePlaylistFocus,
     },
     ApiCLient,
-    SelectBrowser,
+    SelectBrowser {
+        browsers_liststate: ListState,
+    },
     SelectBrowserProfile {
         browser: Browser,
         profiles: Vec<BrowserProfile>,

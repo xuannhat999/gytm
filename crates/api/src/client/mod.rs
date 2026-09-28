@@ -17,19 +17,23 @@ mod chromium;
 pub mod gecko;
 
 pub fn get_profiles_from_browser(browser: &Browser) -> YResult<Vec<BrowserProfile>> {
-    let root = get_root_path_from_browser(browser).unwrap_or_default();
-    let engine = browser.engine();
-    let profiles = match engine {
-        BrowserEngine::Gecko => {
-            let profiles = get_gecko_profiles_from_sqlite(&root)?;
-            if !profiles.is_empty() {
-                return Ok(profiles);
-            }
-            get_gecko_profiles_from_ini(&root)?
+    match get_root_path_from_browser(browser) {
+        Some(root) => {
+            let engine = browser.engine();
+            let profiles = match engine {
+                BrowserEngine::Gecko => {
+                    let profiles = get_gecko_profiles_from_sqlite(&root)?;
+                    if !profiles.is_empty() {
+                        return Ok(profiles);
+                    }
+                    get_gecko_profiles_from_ini(&root)?
+                }
+                BrowserEngine::Chromium => get_chromium_profiles_from_root(&root)?,
+            };
+            Ok(profiles)
         }
-        BrowserEngine::Chromium => get_chromium_profiles_from_root(&root)?,
-    };
-    Ok(profiles)
+        None => Err(YError::InvalidPath(format!("{:?} root directory", browser))),
+    }
 }
 
 pub fn load_cookies(

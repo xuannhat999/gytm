@@ -5,6 +5,7 @@ use crate::helper;
 use api::protocol::ApiLoadingKind;
 use config::Config;
 use data::api_client::{ALL_BROWSERS, BrowserEngine};
+use data::app::PopupState::SelectBrowser;
 use data::app::{
     AppPage, CreatePlaylistFocus, FocusArea, PlayListPrivacy, PlayMode, PlayerStatus, PopupState,
     SearchSongSource,
@@ -120,7 +121,7 @@ pub fn render(app: &mut App, frame: &mut Frame, config: &Config, start_time: std
         PopupState::CreatePlaylist { .. } => {
             render_create_playlist_popup(frame, app, frame.area(), config, start_time);
         }
-        PopupState::SelectBrowser => {
+        PopupState::SelectBrowser { .. } => {
             render_select_browser_popup(frame, app, frame.area(), config);
         }
         PopupState::SelectAccount { .. } => {
@@ -248,7 +249,7 @@ fn render_list(
     };
     if let Some((data, list, scrollbar_state)) = result {
         let rows = data.iter().map(|item| {
-            if let Some(id) = &app.playing_playlist_id
+            if let Some(id) = &app.queue_state.playing_playlist_id
                 && id == &item.playlist_id
             {
                 Row::new(["", item.title.as_str(), item.artist.as_str()])
@@ -426,7 +427,7 @@ fn render_queue(
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .title(format!("[3]- Queue ({})", app.queue.len()))
+        .title(format!("[3]- Queue ({})", app.queue_state.queue.len()))
         .title_bottom(key_map.centered())
         .border_style(border_style);
     let inner_area = block.inner(area);
@@ -435,7 +436,7 @@ fn render_queue(
         render_spinner(frame, inner_area, theme, start_time);
         return;
     }
-    if app.queue.is_empty() {
+    if app.queue_state.queue.is_empty() {
         return;
     }
     let highlight_style = if is_focused {
@@ -443,7 +444,7 @@ fn render_queue(
     } else {
         Style::default()
     };
-    let rows = app.queue.iter().enumerate().map(|(i, song)| {
+    let rows = app.queue_state.queue.iter().enumerate().map(|(i, song)| {
         if app.playing_song_idx.is_some_and(|playing| playing == i) {
             Row::new(vec![
                 Cell::from(""),
@@ -466,6 +467,7 @@ fn render_queue(
         }
     });
     let idx_width = app
+        .queue_state
         .queue
         .len()
         .saturating_sub(1)
@@ -487,11 +489,11 @@ fn render_queue(
 
     frame.render_stateful_widget(table, inner_area, &mut app.queue_tablestate);
     let visible = inner_area.height.saturating_sub(1) as usize;
-    if app.queue.len() > visible {
+    if app.queue_state.queue.len() > visible {
         app.queue_scrollbar_state = app
             .queue_scrollbar_state
             .viewport_content_length(visible)
-            .content_length(app.queue.len() - visible + 1)
+            .content_length(app.queue_state.queue.len() - visible + 1)
             .position(app.queue_tablestate.offset());
         let scrollbar = theme.scrollbar();
         frame.render_stateful_widget(scrollbar, inner_area, &mut app.queue_scrollbar_state);
@@ -547,7 +549,7 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
         frame.render_widget(line, horizontal_layout[0]);
     }
     if let (Some(playing_idx), Some(time_pos)) = (app.playing_song_idx, app.time_pos) {
-        if let Some(playing_song) = app.queue.get(playing_idx) {
+        if let Some(playing_song) = app.queue_state.queue.get(playing_idx) {
             let icon = if app.player_status == PlayerStatus::Playing {
                 Span::raw(" ")
             } else {
@@ -793,12 +795,16 @@ fn render_save_song_to_playlist_popup(
     config: &Config,
     start_time: std::time::Instant,
 ) {
-    let PopupState::SaveSong { selected_save_song } = &app.popup_state else {
+    let PopupState::SaveSong {
+        selected_save_song,
+        custom_playlists_idx,
+        custom_playlists_liststate,
+    } = &mut app.popup_state
+    else {
         return;
     };
 
-    let items: Vec<ListItem> = app
-        .cus_playlists
+    let items: Vec<ListItem> = custom_playlists_idx
         .iter()
         .filter_map(|&idx| app.playlists.get(idx))
         .map(|p| {
@@ -861,7 +867,7 @@ fn render_save_song_to_playlist_popup(
         render_spinner(frame, title_layout[0], &config.theme, start_time);
     }
     frame.render_widget(line, layout[1]);
-    frame.render_stateful_widget(list_widget, layout[2], &mut app.cus_playlists_liststate);
+    frame.render_stateful_widget(list_widget, layout[2], custom_playlists_liststate);
 }
 
 // API CLIENT SELECT
@@ -1127,6 +1133,9 @@ fn render_select_profile_popup(
 
 // BROWSER
 fn render_select_browser_popup(frame: &mut Frame, app: &mut App, area: Rect, config: &Config) {
+    let SelectBrowser { browsers_liststate } = &mut app.popup_state else {
+        return;
+    };
     let block = Block::default()
         .borders(Borders::ALL)
         .padding(Padding::horizontal(1))
@@ -1151,7 +1160,7 @@ fn render_select_browser_popup(frame: &mut Frame, app: &mut App, area: Rect, con
         .map(|b| ListItem::new(format!("{:?}", b)))
         .collect();
     let list_widget = List::new(items).highlight_style(config.theme.selected_item());
-    frame.render_stateful_widget(list_widget, layout[1], &mut app.browser_liststate);
+    frame.render_stateful_widget(list_widget, layout[1], browsers_liststate);
 }
 
 // ACCOUNT

@@ -2,7 +2,7 @@ use crate::persist::Persist;
 use data::app::PlayMode;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct PlayerState {
     pub volume: u8,
     pub play_mode: PlayMode,

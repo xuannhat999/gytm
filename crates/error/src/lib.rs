@@ -7,7 +7,7 @@ use std::{
     path::PathBuf,
     sync::{
         OnceLock,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
     },
 };
 use thiserror::Error;
@@ -79,12 +79,10 @@ pub enum YError {
 pub type YResult<T> = std::result::Result<T, YError>;
 
 const LOG_MAX_SIZE: u64 = 5 * 1024 * 1024;
-const LOG_CHECK_EVERY: u64 = 1024;
 
 static LOG_FORMAT: OnceLock<Vec<BorrowedFormatItem<'static>>> = OnceLock::new();
 static LOG_FILE: OnceLock<Option<PathBuf>> = OnceLock::new();
-static LOG_TICKS: AtomicU64 = AtomicU64::new(0);
-static LOG_OVERSIZE: AtomicBool = AtomicBool::new(false);
+static LOG_SIZE: AtomicU64 = AtomicU64::new(0);
 
 fn log_format() -> &'static Vec<BorrowedFormatItem<'static>> {
     LOG_FORMAT.get_or_init(|| {
@@ -99,7 +97,10 @@ fn log_file_path() -> Option<PathBuf> {
             dirs::state_dir().map(|p| {
                 let dir = p.join("gytm");
                 let _ = fs::create_dir_all(&dir);
-                dir.join("log.txt")
+                let path = dir.join("gytm.log");
+                let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                LOG_SIZE.store(size, Ordering::Relaxed);
+                path
             })
         })
         .clone()
@@ -112,27 +113,23 @@ pub fn log_to_file<T: Display>(message: T) {
 
     let now = OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc());
     let datetime = now.format(log_format()).unwrap_or_default();
+    let line = format!("{} : {}\n", datetime, message);
 
-    let tick = LOG_TICKS.fetch_add(1, Ordering::Relaxed);
-    let oversize = if tick.is_multiple_of(LOG_CHECK_EVERY) {
-        let over = fs::metadata(&file_path)
-            .map(|meta| meta.len() >= LOG_MAX_SIZE)
-            .unwrap_or(false);
-        LOG_OVERSIZE.store(over, Ordering::Relaxed);
-        over
-    } else {
-        LOG_OVERSIZE.load(Ordering::Relaxed)
+    if LOG_SIZE.load(Ordering::Relaxed) >= LOG_MAX_SIZE {
+        let backup_path = file_path.with_extension("log.bak");
+        let _ = fs::rename(&file_path, &backup_path);
+        LOG_SIZE.store(0, Ordering::Relaxed);
+    }
+
+    let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&file_path)
+    else {
+        return;
     };
 
-    let mut options = OpenOptions::new();
-    options.create(true).write(true);
-
-    if oversize {
-        options.truncate(true);
-    } else {
-        options.append(true);
-    }
-    if let Ok(mut file) = options.open(file_path) {
-        let _ = writeln!(file, "{} : {}", datetime, message);
+    if file.write_all(line.as_bytes()).is_ok() {
+        LOG_SIZE.fetch_add(line.len() as u64, Ordering::Relaxed);
     }
 }

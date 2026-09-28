@@ -176,7 +176,7 @@ seek_seconds = 5
 # ⚠️ Troubleshooting
 ### - App freezes on startup  
 Log file path:
-`$XDG_STATE_HOME/gytm/log.txt` or `~/.local/state/gytm/log.txt`  
+`$XDG_STATE_HOME/gytm/gytm.log` or `~/.local/state/gytm/gytm.log`  
 
 Check the log file at `$XDG_STATE_HOME/gytm/log.txt` for specific error details.
 If you are using a standalone **Window Manager (Hyprland, i3, Sway, etc.)** and the app freezes on startup, your browser's secure storage is likely locked. Because these environments lack a default graphical interface to prompt for your password, the application hangs waiting for permission.

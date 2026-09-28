@@ -7,7 +7,7 @@ pub trait Persist: Sized + Default + Serialize + DeserializeOwned {
 
     fn get_path() -> YResult<PathBuf> {
         dirs::state_dir()
-            .map(|p| p.join(format!("gytm/{}", Self::FILE_NAME)))
+            .map(|p| p.join("gytm").join(Self::FILE_NAME))
             .ok_or(YError::InvalidPath("STATE_DIR".to_string()))
     }
 
@@ -36,8 +36,23 @@ pub trait Persist: Sized + Default + Serialize + DeserializeOwned {
 
     fn save(&self) -> YResult<()> {
         let path = Self::get_path()?;
-        let f = fs::File::create(&path)?;
-        serde_json::to_writer(f, self)?;
+        if let Some(dir) = path.parent() {
+            fs::create_dir_all(dir)?;
+        }
+
+        let tmp_path = path.with_extension("json.tmp");
+        {
+            let f = fs::File::create(&tmp_path)?;
+            let writer = std::io::BufWriter::new(f);
+            serde_json::to_writer(writer, self)?;
+        }
+        fs::rename(&tmp_path, &path)?;
+        Ok(())
+    }
+
+    fn delete() -> YResult<()> {
+        let path = Self::get_path()?;
+        fs::remove_file(path)?;
         Ok(())
     }
 }

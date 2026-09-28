@@ -34,18 +34,20 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
         if !app.is_insert {
             match key_event.code {
                 KeyCode::Char('q') => {
-                    if app.queue.is_empty() {
-                        App::shutdown(player);
+                    if app.queue_state.queue.is_empty() {
+                        App::shutdown(app, player);
                     }
                     app.is_exit = true;
                 }
                 KeyCode::Char('Q') => {
-                    App::shutdown(player);
+                    App::shutdown(app, player);
                     app.is_exit = true;
                 }
                 KeyCode::Char('3') => {
                     app.focus_area = FocusArea::Queue;
-                    if !app.queue.is_empty() && app.queue_tablestate.selected().is_none() {
+                    if !app.queue_state.queue.is_empty()
+                        && app.queue_tablestate.selected().is_none()
+                    {
                         app.queue_tablestate.select(Some(0));
                     }
                 }
@@ -139,7 +141,11 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App, player: &mut Player
 }
 
 fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
-    if handle_table_event(&mut app.queue_tablestate, app.queue.len(), key_event.code) {
+    if handle_table_event(
+        &mut app.queue_tablestate,
+        app.queue_state.queue.len(),
+        key_event.code,
+    ) {
         return;
     }
     match key_event.code {
@@ -148,7 +154,7 @@ fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
                 if app.player_state.play_mode == PlayMode::DefaultMode {
                     remove_song_from_queue(app, player, i, i);
                 } else {
-                    if let Some(song) = app.queue.get(i) {
+                    if let Some(song) = app.queue_state.queue.get(i) {
                         if let Some(idx_mpv) = app.get_mpv_idx(&song.video_id) {
                             remove_song_from_queue(app, player, i, idx_mpv);
                         }
@@ -163,7 +169,7 @@ fn handle_queue_event(key_event: KeyEvent, app: &mut App, player: &mut Player) {
                         log_to_file(&e);
                     }
                 } else {
-                    if let Some(song) = app.queue.get(i) {
+                    if let Some(song) = app.queue_state.queue.get(i) {
                         if let Some(pos) = app.get_mpv_idx(&song.video_id)
                             && let Err(e) = player.send_mpv_command(MpvCommand::PlayPos(pos))
                         {
@@ -181,7 +187,7 @@ fn handle_page_event(app: &mut App) {
     match app.page {
         AppPage::Library => {
             app.page = AppPage::Search;
-            if app.queue.is_empty() && app.search_songs.is_empty() {
+            if app.queue_state.queue.is_empty() && app.search_songs.is_empty() {
                 app.is_insert = true;
             } else if app.focus_area != FocusArea::Queue {
                 app.focus_area = FocusArea::SearchSongs;
@@ -222,14 +228,14 @@ fn handle_player_key(key_event: KeyEvent, app: &mut App, player: &mut Player, co
             }
         }
         KeyCode::Char('n') => {
-            if !app.queue.is_empty()
+            if !app.queue_state.queue.is_empty()
                 && let Err(e) = player.send_mpv_command(MpvCommand::PlayNext)
             {
                 log_to_file(&e);
             }
         }
         KeyCode::Char('b') => {
-            if !app.queue.is_empty()
+            if !app.queue_state.queue.is_empty()
                 && let Err(e) = player.send_mpv_command(MpvCommand::PlayPrev)
             {
                 log_to_file(&e);
@@ -270,7 +276,8 @@ fn handle_songs_key(key_event: KeyEvent, app: &mut App, player: &mut Player) {
     match key_event.code {
         KeyCode::Enter => {
             if let Some(list) = &app.viewing_list {
-                let is_dup = app.playing_playlist_id.as_ref() == Some(&list.playlist_id);
+                let is_dup =
+                    app.queue_state.playing_playlist_id.as_ref() == Some(&list.playlist_id);
                 if !is_dup {
                     if let Some(i) = app.songs_tablestate.selected() {
                         if let Err(e) = load_list(
@@ -337,10 +344,13 @@ fn handle_songs_key(key_event: KeyEvent, app: &mut App, player: &mut Player) {
         KeyCode::Char('x') => {
             if let Some(i) = app.songs_tablestate.selected() {
                 if let Some(song) = app.songs.get(i) {
+                    let (custom_playlists_idx, custom_playlists_liststate) =
+                        get_custom_playlists(app);
                     app.popup_state = PopupState::SaveSong {
                         selected_save_song: song.clone(),
+                        custom_playlists_idx,
+                        custom_playlists_liststate,
                     };
-                    app.cus_playlists_liststate.select(Some(0));
                 }
             }
         }
@@ -363,9 +373,13 @@ fn handle_songs_key(key_event: KeyEvent, app: &mut App, player: &mut Player) {
 
 fn handle_popup_key(key_event: KeyEvent, app: &mut App) {
     match &mut app.popup_state {
-        PopupState::SaveSong { selected_save_song } => {
-            let len = app.cus_playlists.len();
-            if handle_list_event(&mut app.cus_playlists_liststate, len, key_event.code) {
+        PopupState::SaveSong {
+            selected_save_song,
+            custom_playlists_idx,
+            custom_playlists_liststate,
+        } => {
+            let len = custom_playlists_idx.len();
+            if handle_list_event(custom_playlists_liststate, len, key_event.code) {
                 return;
             }
             match key_event.code {
@@ -374,8 +388,8 @@ fn handle_popup_key(key_event: KeyEvent, app: &mut App) {
                 }
                 KeyCode::Enter => {
                     let song = selected_save_song;
-                    if let Some(i) = app.cus_playlists_liststate.selected() {
-                        if let Some(idx) = app.cus_playlists.get(i) {
+                    if let Some(i) = custom_playlists_liststate.selected() {
+                        if let Some(idx) = custom_playlists_idx.get(i) {
                             if let Some(playlist) = app.playlists.get(*idx) {
                                 let playlist_id = &playlist.playlist_id;
                                 if playlist_id == "LM" {
@@ -462,19 +476,15 @@ fn handle_popup_key(key_event: KeyEvent, app: &mut App) {
 
             _ => {}
         },
-        PopupState::SelectBrowser => {
-            if handle_list_event(
-                &mut app.browser_liststate,
-                ALL_BROWSERS.len(),
-                key_event.code,
-            ) {
+        PopupState::SelectBrowser { browsers_liststate } => {
+            if handle_list_event(browsers_liststate, ALL_BROWSERS.len(), key_event.code) {
                 return;
             }
             match key_event.code {
                 KeyCode::Esc => app.popup_state = PopupState::ApiCLient,
                 KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::ApiCLient,
                 KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
-                    if let Some(index) = app.browser_liststate.selected() {
+                    if let Some(index) = browsers_liststate.selected() {
                         let browser = &ALL_BROWSERS[index];
                         match client::get_profiles_from_browser(browser) {
                             Ok(profiles) => {
@@ -489,6 +499,7 @@ fn handle_popup_key(key_event: KeyEvent, app: &mut App) {
                                 }
                             }
                             Err(e) => {
+                                app.noti.notify(NotifyType::Error, e.to_string());
                                 log_to_file(e);
                             }
                         }
@@ -539,7 +550,13 @@ fn handle_popup_key(key_event: KeyEvent, app: &mut App) {
                         }
                     }
                 }
-                KeyCode::Char('h') | KeyCode::Left => app.popup_state = PopupState::SelectBrowser,
+                KeyCode::Char('h') | KeyCode::Left => {
+                    let mut liststate = ListState::default();
+                    liststate.select(Some(0));
+                    app.popup_state = PopupState::SelectBrowser {
+                        browsers_liststate: liststate,
+                    };
+                }
                 _ => {}
             }
         }
@@ -668,8 +685,11 @@ fn handle_popup_key(key_event: KeyEvent, app: &mut App) {
                 app.popup_state = PopupState::None;
             }
             KeyCode::Char('b') => {
-                app.popup_state = PopupState::SelectBrowser;
-                app.browser_liststate.select(Some(0));
+                let mut liststate = ListState::default();
+                liststate.select(Some(0));
+                app.popup_state = PopupState::SelectBrowser {
+                    browsers_liststate: liststate,
+                };
             }
             KeyCode::Char('p') => {
                 if let Ok((browser, _, _, _)) = app.client_state.get_validated_fields() {
@@ -776,10 +796,12 @@ fn handle_seach_songs_key(app: &mut App, player: &Player, key_code: KeyCode) {
     match key_code {
         KeyCode::Char('x') => {
             if let Some(song) = app.selected_search_song() {
+                let (custom_playlists_idx, custom_playlists_liststate) = get_custom_playlists(app);
                 app.popup_state = PopupState::SaveSong {
                     selected_save_song: song.clone(),
+                    custom_playlists_idx,
+                    custom_playlists_liststate,
                 };
-                app.cus_playlists_liststate.select(Some(0));
             }
         }
         KeyCode::Char('a') => {
@@ -956,4 +978,18 @@ fn play_list(app: &mut App, focus_area: FocusArea) {
         app.api_loading_kind = Some(ApiLoadingKind::GetSongsToPlay);
         app.focus_area = FocusArea::Queue;
     }
+}
+
+fn get_custom_playlists(app: &App) -> (Vec<usize>, ListState) {
+    let mut custom_playlists_idx = Vec::new();
+    for (idx, playlist) in app.playlists.iter().enumerate() {
+        if playlist.is_custom {
+            custom_playlists_idx.push(idx);
+        }
+    }
+    let mut custom_playlists_liststate = ListState::default();
+    if !custom_playlists_idx.is_empty() {
+        custom_playlists_liststate.select(Some(0));
+    }
+    (custom_playlists_idx, custom_playlists_liststate)
 }
