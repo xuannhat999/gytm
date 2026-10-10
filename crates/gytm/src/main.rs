@@ -30,6 +30,7 @@ static ALLOC: dhat::Alloc = dhat::Alloc;
 
 #[tokio::main]
 async fn main() -> YResult<()> {
+    // Dhat
     #[cfg(feature = "dhat")]
     let _profiler = dhat::Profiler::new_heap();
 
@@ -47,6 +48,7 @@ async fn main() -> YResult<()> {
     // Setup CLient State
     let client_state = ClientState::load()?;
 
+    // Queue State
     let queue_state = QueueState::load()?;
 
     // Config

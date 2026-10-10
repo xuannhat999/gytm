@@ -523,6 +523,7 @@ fn render_player(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
         .title_bottom(key_map.alignment(Alignment::Center))
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(theme.third));
+
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
     let vertical_layout = Layout::default()
